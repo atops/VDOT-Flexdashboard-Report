@@ -1,0 +1,44 @@
+
+@import url(//fonts.googleapis.com/css?family=Open+Sans);
+@import url(//fonts.googleapis.com/css?family=Josefin+Sans); /*:700*/
+
+@font-face { 
+  font-family: "Open Sans";
+  src: url(OpenSans-Regular.ttf);
+}
+@font-face {  
+  font-family: "Open Sans";
+  font-style: bold;
+  font-weight: bold;
+  src: url(OpenSans-Bold.ttf);
+}
+
+.navbar {
+  background-color:#045594; /*#256194;*/
+  border-color:white;
+}
+.navbar-logo {
+  height:48px;
+  padding-top:5px;
+}
+.navbar-brand {
+  color: white!important;
+  font-family: 'Josefin Sans', sans-serif;
+  /*font-weight: bold;*/
+}
+.navbar-inverse .navbar-nav>li>a:focus{
+    color:#ffffff;
+    background-color:#2d6797
+}
+.navbar-inverse .navbar-nav>li>a:hover{
+    color:#ffffff;
+    background-color:#2d6797
+}
+.navbar-inverse .navbar-nav>.active>a { 
+    color:#ffffff;
+    background-color:#2d6797;
+}
+.navbar-inverse .navbar-nav>.active>a:focus { 
+    color:#ffffff;
+    background-color:#2d6797;
+}
