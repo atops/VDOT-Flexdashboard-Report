@@ -4,7 +4,7 @@
 #mode: production
 mode: beta
 
-selected_month: October 2018
+selected_month: November 2018
 
 report_months:
     - November 2018
@@ -20,8 +20,8 @@ report_months:
     - January 2018
     - December 2017
     - November 2017
-    - October 2017
 
+<<<<<<< HEAD
 signal_groups:
     - Northwest Region 
     - Northern Region
@@ -29,6 +29,14 @@ signal_groups:
     - Eastern Region
     - Central Region
 
+=======
+zone_groups:
+    - Northwest Region 
+    - Northern Region
+    - Eastern Region
+    - Southwest Region
+    - Central Region
+>>>>>>> 7ae0da6ca62d057e9cf40ed8fb5d869807965957
 
 corridors_filename: corridors.feather
 
