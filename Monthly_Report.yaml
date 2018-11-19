@@ -4,7 +4,7 @@
 #mode: production
 mode: beta
 
-selected_month: October 2018
+selected_month: November 2018
 
 report_months:
     - November 2018
@@ -20,20 +20,13 @@ report_months:
     - January 2018
     - December 2017
     - November 2017
-    - October 2017
 
 zone_groups:
-    - All RTOP 
-    - RTOP1
-    - RTOP2
-    - D1
-    - D3
-    - D4
-    - D5
-    - D6
-    - Zone 7
-    - Cobb County
-
+    - Northwest Region 
+    - Northern Region
+    - Eastern Region
+    - Southwest Region
+    - Central Region
 
 corridors_filename: corridors.feather
 

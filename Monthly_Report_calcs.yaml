@@ -4,76 +4,16 @@
 start_date: yesterday
 end_date: yesterday
 
-report_start_date: 2017-10-01
+report_start_date: 2017-11-01
 report_end_date: yesterday
 
 corridors_filename: corridors.feather
-corridors_xlsx_filename: ../Master RTOP Counts File_2018-10-23.xlsx
+corridors_xlsx_filename: corridors.csv 
 
-cctv_config_filename: ../camera_ids_2018-11-01.csv
-cctv_parsed_filename: parsed_cctv.feather
+cctv_config_filename: 
+cctv_parsed_filename: 
 
-teams_tasks_filename: TEAMS_Reports/tasks.csv
+teams_tasks_filename: 
 
 tmc_filename: tmc_routes.feather
 
-xl_uptime:
-    path: Vehicle and Ped Detector Info
-
-    filenames: 
-        - January Vehicle and Ped Detector Info.xlsx
-        - February Vehicle and Ped Detector Info.xlsx
-        - March Vehicle and Ped Detector Info.xlsx
-        - April Vehicle and Ped Detector Info.xlsx
-        - May Vehicle and Ped Detector Info.xlsx
-        - June Vehicle and Ped Detector Info.xlsx
-        - July Vehicle and Ped Detector Info.xlsx
-        - August Vehicle and Ped Detector Info.xlsx
-        - September Vehicle and Ped Detector Info.xlsx
-        - October Vehicle and Ped Detector Info.xlsx
-        
-    months:
-        - 2018-01-01
-        - 2018-02-01
-        - 2018-03-01
-        - 2018-04-01
-        - 2018-05-01
-        - 2018-06-01
-        - 2018-07-01
-        - 2018-08-01
-        - 2018-09-01
-        - 2018-10-01
-
-
-# These are not used anymore. We use the TEAMS API.
-teams:
-
-    rtop:
-        zone_group: All RTOP
-
-        path: TEAMS Reports
-        filenames:
-            - 2017 Teams Tasks Zones 1-6.csv
-            - 2018 Teams Tasks Zones 1-6 - August.csv
-            
-    rtop_z7:
-        zone_group: Zone 7
-
-        path: TEAMS Reports
-        filenames:
-            # 2017 - no data
-            - 2018 Teams Tasks Zones 7 - August.csv
-
-    rtso_d1:
-        zone_group: D1
-
-        path: TEAMS Reports
-        filenames:
-            - R1TSO__D1_TEAMSReport_Aug2018_ALL.csv
-        
-    rtso_d6:
-        zone_group: D6
-
-        path: TEAMS Reports
-        filenames:
-            - R1TSO__D6_TEAMSReport_Aug2018_ALL.csv
