@@ -21,7 +21,6 @@ report_months:
     - December 2017
     - November 2017
 
-<<<<<<< HEAD
 signal_groups:
     - Northwest Region 
     - Northern Region
@@ -29,14 +28,6 @@ signal_groups:
     - Eastern Region
     - Central Region
 
-=======
-zone_groups:
-    - Northwest Region 
-    - Northern Region
-    - Eastern Region
-    - Southwest Region
-    - Central Region
->>>>>>> 7ae0da6ca62d057e9cf40ed8fb5d869807965957
 
 corridors_filename: corridors.feather
 

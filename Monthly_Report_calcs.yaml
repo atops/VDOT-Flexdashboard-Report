@@ -8,11 +8,7 @@ report_start_date: 2017-11-01
 report_end_date: yesterday
 
 corridors_filename: corridors.feather
-<<<<<<< HEAD
-corridors_xlsx_filename: ../Corridors.xlsx
-=======
 corridors_xlsx_filename: corridors.csv 
->>>>>>> 7ae0da6ca62d057e9cf40ed8fb5d869807965957
 
 cctv_config_filename: 
 cctv_parsed_filename: 
