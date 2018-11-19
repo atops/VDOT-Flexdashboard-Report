@@ -4,10 +4,10 @@
 library(yaml)
 
 if (Sys.info()["sysname"] == "Windows") {
-    working_directory <- file.path(dirname(path.expand("~")), "Code", "GDOT", "GDOT-Flexdashboard-Report")
+    working_directory <- file.path(dirname(path.expand("~")), "Code", "VDOT", "VDOT-Flexdashboard-Report")
     
 } else if (Sys.info()["sysname"] == "Linux") {
-    working_directory <- file.path("~", "Code", "GDOT", "GDOT-Flexdashboard-Report")
+    working_directory <- file.path("~", "Code", "VDOT", "VDOT-Flexdashboard-Report")
     
 } else {
     stop("Unknown operating system.")
@@ -164,18 +164,16 @@ get_counts_based_measures <- function(month_abbrs) {
             print("adjusted counts")
             adjusted_counts_1hr <- get_adjusted_counts(filtered_counts_1hr)
             write_fst_(adjusted_counts_1hr, paste0("adjusted_counts_1hr_", yyyy_mm, ".fst"))
-            #rm(adjusted_counts_1hr)
-            
+
             print("bad detectors")
             bad_detectors <- get_bad_detectors(filtered_counts_1hr)
-            #rm(filtered_counts_1hr)
-            
+
             bd_fn <- glue("bad_detectors_{yyyy_mm}.fst")
             write_fst(bad_detectors, bd_fn)
             
             aws.s3::put_object(file = bd_fn, 
                                object = glue("bad_detectors/{bd_fn}"), 
-                               bucket = "gdot-devices")
+                               bucket = SPM_BUCKET)
             
             
             # VPD
@@ -266,31 +264,6 @@ lapply(bd_fns, read_fst) %>% bind_rows() %>%
     write_feather("bad_detectors.feather")
 
 print("--- Finished counts-based measures ---")
-
-# --- This needs the ATSPM database ---
-# print("Upload bad detectors to DB")
-# upload_bad_detectors_to_db <- function(month_abbrs) {
-#     
-#     lapply(month_abbrs, function(yyyy_mm) {
-#         print(yyyy_mm)
-# 
-#         conn <- get_atspm_connection()
-#         
-#         bad_detectors <- read_fst(paste0("bad_detectors_", yyyy_mm, ".fst"))
-#         # Need to be carefule with this to prevent duplicates
-#         lapply(strsplit(yyyy_mm, "-"), 
-#                function(x) { 
-#                    dbSendQuery(conn, paste("delete from BadDetectors where year(Date) =", x[1], "and month(Date) =", x[2]))
-#                }
-#         )
-#         dbWriteTable(conn, "BadDetectors", bad_detectors, append = TRUE)
-# 
-#         dbDisconnect(conn)
-#     })
-# }
-# upload_bad_detectors_to_db(month_abbrs)
-
-
 
 
 # -- Run etl_dashboard (Python): cycledata, detectionevents to S3/Athena --
@@ -410,19 +383,8 @@ lapply(month_abbrs, function(month_abbr) {
 })
 
 
-# # GET TEAMS TASKS ###########################################################
-
-# Download all TEAMS tasks via API. Shell command. Windows only.
-# if (Sys.info()["sysname"] == "Windows") {
-#     system('"DocumentClient.exe" TEAMS_Reports/tasks.csv') 
-# }
-
-# # GET CAMERA UPTIMES ########################################################
-
-py_run_file("parse_cctvlog.py") # Run python script
-
 # # TRAVEL TIMES FROM RITIS API ###############################################
 
-py_run_file("get_travel_times.py") # Run python script
+#py_run_file("get_travel_times.py") # Run python script
 
 print("\n--------------------- End Monthly Report calcs -----------------------\n")

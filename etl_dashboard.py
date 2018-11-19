@@ -15,10 +15,12 @@ import itertools
 from spm_events import etl_main
 import boto3
 import yaml
+from glob import glob
 
 s3 = boto3.client('s3')
 ath = boto3.client('athena')
 
+ATHENA_DB = 'vdot_spm'
 
 '''
     df:
@@ -122,8 +124,8 @@ if __name__=='__main__':
     
     if os.name=='nt':
         
-        uid = os.environ['ATSPM_USERNAME']
-        pwd = os.environ['ATSPM_PASSWORD']
+        uid = os.environ['VDOT_ATSPM_USERNAME']
+        pwd = os.environ['VDOT_ATSPM_PASSWORD']
         
         engine = sq.create_engine('mssql+pyodbc://{}:{}@sqlodbc'.format(uid, pwd),
                                   pool_size=20)
@@ -133,24 +135,24 @@ if __name__=='__main__':
         def connect():
             return pyodbc.connect(
                 'DRIVER=FreeTDS;' + 
-                'SERVER={};'.format(os.environ["ATSPM_SERVER_INSTANCE"]) +
-                'DATABASE={};'.format(os.environ["ATSPM_DB"]) +
-                'UID={};'.format(os.environ['ATSPM_USERNAME']) +
-                'PWD={};'.format(os.environ['ATSPM_PASSWORD']) +
+                'SERVER={};'.format(os.environ['VDOT_ATSPM_SERVER_INSTANCE']) +
+                'DATABASE={};'.format(os.environ['VDOT_ATSPM_DB']) +
+                'UID={};'.format(os.environ['VDOT_ATSPM_USERNAME']) +
+                'PWD={};'.format(os.environ['VDOT_ATSPM_PASSWORD']) +
                 'TDS_Version=8.0;')
         
         engine = sq.create_engine('mssql://', creator=connect)
         
     
-    with engine.connect() as conn:
-
-        #det_config = pd.read_sql_table('DetectorConfig', con=conn)
-        #det_config = det_config.rename(columns={'CallPhase':'Call Phase'})
-        
-        bad_detectors = (pd.read_sql_table('BadDetectors', con=conn)
-                            .assign(SignalID = lambda x: x.SignalID.astype('int64'),
-                                    Detector = lambda x: x.Detector.astype('int64')))
-        
+    #with engine.connect() as conn:
+    #
+    #    #det_config = pd.read_sql_table('DetectorConfig', con=conn)
+    #    #det_config = det_config.rename(columns={'CallPhase':'Call Phase'})
+    #    
+    #    bad_detectors = (pd.read_sql_table('BadDetectors', con=conn)
+    #                        .assign(SignalID = lambda x: x.SignalID.astype('int64'),
+    #                                Detector = lambda x: x.Detector.astype('int64')))
+    bad_detectors = pd.read_feather('bad_detectors.feather')
     
 
     
@@ -191,10 +193,10 @@ if __name__=='__main__':
         os.environ['AWS_DEFAULT_REGION'] = 'us-east-1'
         
         response = ath.start_query_execution(QueryString='MSCK REPAIR TABLE cycledata', 
-                                             QueryExecutionContext={'Database': 'gdot_spm'},
+                                             QueryExecutionContext={'Database': ATHENA_DB},
                                              ResultConfiguration={'OutputLocation': 's3://aws-athena-query-results-322643905670-us-east-1'})
         response = ath.start_query_execution(QueryString='MSCK REPAIR TABLE detectionevents', 
-                                             QueryExecutionContext={'Database': 'gdot_spm'},
+                                             QueryExecutionContext={'Database': ATHENA_DB},
                                              ResultConfiguration={'OutputLocation': 's3://aws-athena-query-results-322643905670-us-east-1'})
         
         print('\n{} signals in {} days. Done in {} minutes'.format(len(signalids), len([date_]), int((time.time()-t0)/60)))

@@ -1,6 +1,7 @@
 
 @import url(//fonts.googleapis.com/css?family=Open+Sans);
 @import url(//fonts.googleapis.com/css?family=Josefin+Sans); /*:700*/
+@import url(//fonts.googleapis.com/css?family=Nanum+Gothic:800); /*:700*/
 
 @font-face { 
   font-family: "Open Sans";
@@ -14,31 +15,33 @@
 }
 
 .navbar {
-  background-color:#045594; /*#256194;*/
+  background-color:#005da9; /*#256194;*/
   border-color:white;
 }
 .navbar-logo {
   height:48px;
-  padding-top:5px;
+  /*padding-top:5px;*/
 }
 .navbar-brand {
   color: white!important;
-  font-family: 'Josefin Sans', sans-serif;
+  font-family: 'Nanum Gothic', sans-serif;
+  font-size: 24px;
+  /*font-family: 'Josefin Sans', sans-serif;*/
   /*font-weight: bold;*/
 }
 .navbar-inverse .navbar-nav>li>a:focus{
     color:#ffffff;
-    background-color:#2d6797
+    background-color:#508dd6;
 }
 .navbar-inverse .navbar-nav>li>a:hover{
     color:#ffffff;
-    background-color:#2d6797
+    background-color:#508dd6;
 }
 .navbar-inverse .navbar-nav>.active>a { 
     color:#ffffff;
-    background-color:#2d6797;
+    background-color:#508dd6;
 }
 .navbar-inverse .navbar-nav>.active>a:focus { 
     color:#ffffff;
-    background-color:#2d6797;
+    background-color:#508dd6;
 }

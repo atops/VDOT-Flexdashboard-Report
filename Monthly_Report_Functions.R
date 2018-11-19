@@ -47,7 +47,8 @@ LIGHT_PURPLE = "#CAB2D6"; PURPLE = "#6A3D9A"
 LIGHT_BROWN = "#FFFF99";  BROWN = "#B15928"
 
 RED2 = "#e41a1c"
-GDOT_BLUE = "#256194"
+VDOT_BLUE = "#005da9"
+#GDOT_BLUE = "#256194"
 
 SUN = 1; MON = 2; TUE = 3; WED = 4; THU = 5; FRI = 6; SAT = 7
 
@@ -58,7 +59,7 @@ Sys.setenv("AWS_ACCESS_KEY_ID" = aws_conf$AWS_ACCESS_KEY_ID,
            "AWS_SECRET_ACCESS_KEY" = aws_conf$AWS_SECRET_ACCESS_KEY,
            "AWS_DEFAULT_REGION" = aws_conf$AWS_DEFAULT_REGION)
 
-if (Sys.info()["nodename"] %in% c("GOTO3213490", "Larry")) { # The SAM or Larry
+if (Sys.info()["nodename"] %in% c("GOTO3213490", "Larry")) { # The SAM or Larry # VDOT -- update if we need a proxy
     set_config(
         use_proxy("gdot-enterprise", port = 8080,
                   username = Sys.getenv("GDOT_USERNAME"),
@@ -68,28 +69,25 @@ if (Sys.info()["nodename"] %in% c("GOTO3213490", "Larry")) { # The SAM or Larry
     Sys.setenv(TZ="America/New_York")
 }
 
+SPM_BUCKET = "vdot-spm"
 
 get_atspm_connection <- function() {
     
     if (Sys.info()["sysname"] == "Windows") {
         
         dbConnect(odbc::odbc(),
-                  dsn = "sqlodbc",
-                  uid = Sys.getenv("ATSPM_USERNAME"),
-                  pwd = Sys.getenv("ATSPM_PASSWORD"))
+                  dsn = "vdot_atspm",
+                  uid = Sys.getenv("VDOT_ATSPM_USERNAME"),
+                  pwd = Sys.getenv("VDOT_ATSPM_PASSWORD"))
         
     } else if (Sys.info()["sysname"] == "Linux") {
         
-        dbConnect(odbc::odbc(),  # RODBCDBI::ODBC(),#  
-                  #dsn = "sqlodbc",
-                  #user = Sys.getenv("ATSPM_USERNAME"),
-                  #password = Sys.getenv("ATSPM_PASSWORD"))
-		          
+        dbConnect(odbc::odbc(),  
                   driver = "FreeTDS",
-                  server = Sys.getenv("ATSPM_SERVER_INSTANCE"),
-                  database = Sys.getenv("ATSPM_DB"),
-		          uid = Sys.getenv("ATSPM_USERNAME"),
-                  pwd = Sys.getenv("ATSPM_PASSWORD"))
+                  server = Sys.getenv("VDOT_ATSPM_SERVER_INSTANCE"),
+                  database = Sys.getenv("VDOT_ATSPM_DB"),
+		          uid = Sys.getenv("VDOT_ATSPM_USERNAME"),
+                  pwd = Sys.getenv("VDOT_ATSPM_PASSWORD"))
     }
 } 
 
@@ -100,19 +98,27 @@ week <- function(d) {
 }
 
 get_month_abbrs <- function(start_date, end_date) {
-    sapply(seq(ymd(start_date), ymd(end_date), by = "1 month"),
-                      function(date_) { 
-                          d <- ymd(date_)
-                          y <- year(d)
-                          m <- month(d)
-                          s <- paste(y, sprintf("%02d", m), sep = "-")
-                      })
+    start_date <- ymd(start_date)
+    day(start_date) <- 1
+    end_date <- ymd(end_date)
+    
+    sapply(seq(start_date, end_date, by = "1 month"), as.character)
+    
+    #sapply(seq(ymd(start_date), ymd(end_date), by = "1 month"),
+    #                  function(date_) { 
+    #                      d <- ymd(date_)
+    #                      y <- year(d)
+    #                      m <- month(d)
+    #                      s <- paste(y, sprintf("%02d", m), sep = "-")
+    #                  })
 }
 
-bind_rows_keep_factors <- function(dfs) {
+# Takes a list of dataframe or mulitple dataframes as list(df1, df2, df3)
+#  and binds rows while keeping factors
+bind_rows_keep_factors <- function(...) {
     ## Identify all factors
     factors <- unique(unlist(
-        map(list(...), ~ select_if(..., is.factor) %>% names())
+        map(..., ~ select_if(..., is.factor) %>% names())
     ))
     ## Bind dataframes, convert characters back to factors
     suppressWarnings(bind_rows(...)) %>% 
@@ -128,26 +134,20 @@ match_type <- function(val, val_type_to_match) {
 write_fst_ <- function(df, fn, append = FALSE) {
     if (append == TRUE & file.exists(fn)) {
         
-        factors <- unique(unlist(
-            map(list(df), ~ select_if(df, is.factor) %>% names())
-        ))
-            
         df_ <- read_fst(fn)
-        df_ <- bind_rows(df, df_)  %>% 
-            mutate_at(vars(one_of(factors)), factor)
+        df_ <- bind_rows_keep_factors(list(df, df_)) %>% distinct()
     } else {
         df_ <- df
     }
-    write_fst(distinct(df_), fn)
+    write_fst(df_, fn)
 }
 
 get_corridors <- function(corr_fn) {
     readxl::read_xlsx(corr_fn) %>% 
         tidyr::unite(Name, c(`Main Street Name`, `Side Street Name`), sep = ' @ ') %>%
-        transmute(SignalID=factor(`GDOT MaxView Device ID`), 
-                  Zone = as.factor(Zone), 
-                  Zone_Group = District,
-                  Corridor = as.factor(Group),
+        transmute(SignalID = factor(SignalID), #SignalID=factor(`GDOT MaxView Device ID`), # VDOT -- update
+                  Signal_Group = factor(`Signal Group`),
+                  Corridor = factor(Corridor),
                   Milepost = as.numeric(Milepost),
                   Agency = Agency,
                   Name = Name,
@@ -157,106 +157,7 @@ get_corridors <- function(corr_fn) {
         mutate(Description = paste(SignalID, Name, sep = ": "))
 }
 
-get_corridor_name <- function(string) {
-    dplyr::case_when(
-        
-        # From Inrix, Excel Monthly Report Files
-        
-        grepl(pattern = "Z1.*( |-)13", string) ~ "SR 13/42/155",
-        grepl(pattern = "Z1.*( |-)141", string) ~ "SR 141S",
-        grepl(pattern = "Z1.*( |-)155", string) ~ "SR 13/42/155",
-        grepl(pattern = "Z1.*( |-)237", string) ~ "SR 237",
-        grepl(pattern = "Z1.*( |-)42", string) ~ "SR 13/42/155",
-        grepl(pattern = "Z1.*( |-)9", string) ~ "SR 9-Atlanta",
-        
-        grepl(pattern = "Z2.*( |-)120", string) ~ "SR 120W",
-        grepl(pattern = "Z2.*( |-)140", string) ~ "SR 140-Roswell",
-        grepl(pattern = "Z2.*( |-)280", string) ~ "SR 280",
-        grepl(pattern = "Z2.*( |-)360", string) ~ "SR 360",
-        grepl(pattern = "Z2.*( |-)3", string) ~ "SR 3N",
-        grepl(pattern = "Z2.*( |-)92", string) ~ "SR 92",
-        grepl(pattern = "Z2.*( |-)9", string) ~ "SR 9N",
-        
-        grepl(pattern = "Z3.*( |-)138E", string) ~ "SR 138E",
-        grepl(pattern = "Z3.*( |-)138S", string) ~ "SR 138S",
-        grepl(pattern = "Z3.*( |-)3S", string) ~ "SR 3S",
-        grepl(pattern = "Z3.*( |-)85", string) ~ "SR 85",
-        
-        grepl(pattern = "Z4.*( |-)278", string) ~ "US 278",
-        grepl(pattern = "Z4.*( |-)3", string) ~ "SR 3",
-        grepl(pattern = "Z4.*( |-)5", string) ~ "SR 5",
-        grepl(pattern = "Z4.*( |-)6", string) ~ "SR 6",
-        
-        grepl(pattern = "Z5.*SR( |-)10", string) ~ "SR 10",
-        grepl(pattern = "Z5.*SR( |-)12", string) ~ "SR 12",
-        grepl(pattern = "Z5.*( |-)154", string) ~ "SR 154",
-        grepl(pattern = "Z5.*( |-)155", string) ~ "SR 155S",
-        grepl(pattern = "Z5.*( |-)42", string) ~ "SR 42",
-        grepl(pattern = "Z5.*( |-)8W( |-)DeKalb", string) ~ "SR 8W-DeKalb",
-        grepl(pattern = "Z5.*( |-)8W( |-)", string) ~ "SR 8W-Ponce",
-        
-        grepl(pattern = "Z6.*( |-)120", string) ~ "SR 120E",
-        grepl(pattern = "Z6.*( |-)140", string) ~ "SR 140-Gwinnett",
-        grepl(pattern = "Z6.*( |-)141", string) ~ "SR 141N",
-        grepl(pattern = "Z6.*( |-)20( |-)", string) ~ "SR 20",
-        grepl(pattern = "Z6.*( |-)8.*( |-)DeKalb", string) ~ "SR 8E-DeKalb",
-        grepl(pattern = "Z6.*( |-)8.*( |-)Gwinnett", string) ~ "SR 8E-Gwinnett",
-        grepl(pattern = "Z6.*( |-)9", string) ~ "SR 9-Alpharetta",
-        
-        grepl(pattern = "North(.*)Ave", string) ~ "North Ave",
-        
-        # From TEAMS Report
-        
-        # Zone 1
-        startsWith(string, "SR 13") ~ "SR 13/42/155",
-        startsWith(string, "SR 141-Fulton") ~ "SR 141S",
-        startsWith(string, "SR 141-Dekalb") ~ "SR 141S",
-        startsWith(string, "SR 155N") ~ "SR 13/42/155",
-        startsWith(string, "SR 237") ~ "SR 237",
-        startsWith(string, "SR 42") ~ "SR 13/42/155",
-        startsWith(string, "SR 9-Fulton") ~ "SR 9-Atlanta", # Some of this is SR9-Alpharetta (Z6)
-        # Zone 2
-        startsWith(string, "SR 120-Cobb") ~ "SR 120W",
-        startsWith(string, "SR 140-Fulton") ~ "SR 140-Roswell",
-        startsWith(string, "SR 280") ~ "SR 280",
-        startsWith(string, "SR 360") ~ "SR 360",
-        startsWith(string, "SR 3-Cobb") ~ "SR 3N",
-        startsWith(string, "SR 92") ~ "SR 92",
-        # Zone 3
-        startsWith(string, "SR 138E") ~ "SR 138E",
-        startsWith(string, "SR 138S") ~ "SR 138S",
-        startsWith(string, "SR 3-Clayton") ~ "SR 3S",
-        startsWith(string, "SR 3-Henry") ~ "SR 3S",
-        startsWith(string, "SR 314-Fayette") ~ "SR 3S",
-        startsWith(string, "SR 85") ~ "SR 85",
-        startsWith(string, "SR 331-Clayton") ~ "SR 85",
-        # Zone 4
-        startsWith(string, "US 278") ~ "US 278",
-        startsWith(string, "SR 3-Fulton") ~ "SR 3",
-        startsWith(string, "SR 5") ~ "SR 5",
-        startsWith(string, "SR 6") ~ "SR 6",
-        # Zone 5
-        startsWith(string, "SR 10") ~ "SR 10",
-        startsWith(string, "SR 12") ~ "SR 12",
-        startsWith(string, "SR 154") ~ "SR 154",
-        startsWith(string, "SR 155S") ~ "SR 155S",
-        startsWith(string, "SR 8-Dekalb") ~ "SR 8W-DeKalb", # Some of this is 8E-Dekalb (Z6)
-        startsWith(string, "SR 8-Fulton") ~ "SR 8W-Ponce",
-        # Zone 6
-        startsWith(string, "SR 120-Fulton") ~ "SR 120E",
-        startsWith(string, "SR 140-Gwinnett") ~ "SR 140-Gwinnett",
-        startsWith(string, "SR 141-Forsyth") ~ "SR 141N",
-        startsWith(string, "SR 141-Gwinnett") ~ "SR 141N",
-        startsWith(string, "SR 20") ~ "SR 20",
-        startsWith(string, "SR 8-Gwinnett") ~ "SR 8E-Gwinnett",
-        
-        startsWith(string, "-") ~ "",
-
-        # Catchall. Return itself.
-        TRUE ~ string)
-}
-
-get_tmc_routes <- function(pth = "Inrix/For_Monthly_Report/2018-09/") {
+get_tmc_routes <- function(pth = "Inrix/For_Monthly_Report/2018-09/") { # VDOT -- Need to update pth
 
     fns <- list.files(pth, pattern = "*.zip", recursive = TRUE)
     
@@ -276,66 +177,6 @@ get_det_config <- function(date_) {
                   CallPhase.atspm = as.integer(CallPhase_atspm),
                   CallPhase.maxtime = as.integer(CallPhase_maxtime),
                   TimeFromStopBar = TimeFromStopBar)
-}
-# this has been rewritten in Python and runs daily where it makes more sense
-get_det_config_older <- function(date_) {
-    
-    fn <- glue("../ATSPM_Det_Config_{date_}.csv")
-    if (!file.exists(fn)) {
-        aws.s3::save_object(object = glue("atspm_det_config/date={date_}/ATSPM_Det_Config.csv"),
-                           bucket = "gdot-devices", 
-                           file = fn)}
-    adc_ <- read_csv(fn)
-    adc <- adc_ %>% 
-        select(SignalID, 
-               Detector, 
-               ProtPhase = ProtectedPhaseNumber, 
-               PermPhase = PermissivePhaseNumber, 
-               TimeFromStopBar, 
-               IPAddress) %>% 
-        mutate(CallPhase = if_else(ProtPhase > 0, ProtPhase, PermPhase)) %>%
-        replace_na(list(TimeFromStopBar = 0)) %>% 
-        mutate(SignalID = factor(SignalID), 
-               Detector = factor(Detector), 
-               CallPhase = factor(CallPhase)) %>%
-        filter(SignalID %in% signals_list)
-    
-    fn <- glue("../MaxTime_Det_Plans_{date_}.csv")
-    if (!file.exists(fn)) {
-        aws.s3::save_object(object = glue("maxtime_det_plans/date={date_}/MaxTime_Det_Plans.csv"),
-                            bucket = "gdot-devices", 
-                            file = fn)}
-    mdp_ <- read_csv(fn)
-    mdp <- mdp_ %>%
-        select(SignalID, Detector, CallPhase) %>% 
-        mutate(SignalID = factor(SignalID),
-               Detector = factor(Detector),
-               CallPhase = factor(CallPhase),
-               TimeFromStopBar = -1) %>%
-        filter(SignalID %in% signals_list)
-    
-    
-    det_config <- full_join(adc, mdp, 
-                            by = c("SignalID", "Detector"), 
-                            suffix = c(".atspm", ".maxtime")) %>% 
-        select(SignalID, 
-               Detector, 
-               CallPhase.atspm, 
-               CallPhase.maxtime, #) %>% #, 
-               TimeFromStopBar = TimeFromStopBar.atspm) %>% 
-        filter(!(is.na(SignalID) | is.na(Detector))) %>% # | is.na(CallPhase.atspm))) %>%
-        
-        mutate(CallPhase = ifelse(is.na(CallPhase.maxtime), 
-                                  as.integer(as.character(CallPhase.atspm)), 
-                                  as.integer(as.character(CallPhase.maxtime)))) %>%
-        mutate(SignalID = as.character(SignalID), 
-               Detector = as.integer(Detector), 
-               CallPhase = as.integer(CallPhase),
-               TimeFromStopBar = round(TimeFromStopBar, 1))
-    
-    write_feather(det_config, glue("../ATSPM_Det_Config_Good_{date_}.feather"))
-    
-    det_config
 }
 
 
@@ -363,8 +204,7 @@ get_gaps <- function(df, signals_list) {
     ts <- df %>% 
         collect() %>%
         distinct(SignalID, Timestamp) %>%
-	    #mutate(SignalID = factor(SignalID)) %>%
-        
+
         bind_rows(., bookends) %>%
         distinct() %>%
         mutate(Date = date(Timestamp)) %>%
@@ -542,8 +382,6 @@ get_filtered_counts <- function(counts, interval = "1 hour") { # interval (e.g.,
                CallPhase = factor(CallPhase)) %>%
         filter(!is.na(CallPhase))
 
-    # -- New Method ---------------- --
-    
     # Identify detectors/phases from detector config file. Expand.
     #  This ensures all detectors are included in the bad detectors calculation.
     all_days <- unique(date(counts$Timeperiod))
@@ -579,47 +417,7 @@ get_filtered_counts <- function(counts, interval = "1 hour") { # interval (e.g.,
                                  abs(delta_vol) == 0,
                              0, 1)) %>%
         select(-vol0)
-    # -- End New Method ------------ --
-    
-    
-    # # define included periods. Only include dates in the counts data. Only include DOW in counts data.
-    # all_periods <- seq(min(counts$Timeperiod), max(counts$Timeperiod), by = interval)
-    # all_periods <- all_periods[wday(all_periods) %in% unique(wday(counts$Timeperiod))]
-    # 
-    # 
-    # # # define excluded detectors
-    # # num_days <- length(unique(date(counts$Timeperiod)))
-    # # 
-    # # excluded_detectors <- counts %>%
-    # #     group_by(SignalID, CallPhase, Detector) %>% 
-    # #     summarize(Total_Volume = sum(vol, na.rm = TRUE)) %>% 
-    # #     dplyr::filter(Total_Volume < (100 * num_days)) %>%
-    # #     select(-Total_Volume)
-    # 
-    # # Expand over all SignalID, Detector, CallPhase, Timeperiods
-    # expanded_counts <- counts %>% 
-    #     
-    #     complete(nesting(SignalID, Detector, CallPhase), Timeperiod = all_periods) %>%
-    #     
-    #     mutate(Date = date(Timeperiod),
-    #            vol = replace_na(vol, 0)) %>%
-    #     #anti_join(excluded_detectors) %>%
-    #     
-    #     mutate(SignalID = factor(SignalID), 
-    #            Detector = factor(Detector), 
-    #            CallPhase = factor(CallPhase),
-    #            vol0 = ifelse(is.na(vol), 0, vol)) %>%
-    #     group_by(SignalID, CallPhase, Detector) %>% 
-    #     arrange(SignalID, CallPhase, Detector, Timeperiod) %>% 
-    #     mutate(delta_vol = vol0 - lag(vol0),
-    #            Good = ifelse(is.na(vol) | 
-    #                              vol > 1000 | 
-    #                              is.na(delta_vol) | 
-    #                              abs(delta_vol) > 500 | 
-    #                              abs(delta_vol) == 0,
-    #                          0, 1)) %>%
-    #     select(-vol0)
-    
+
     
     # bad day = any of the following:
     #    too many bad hours (60%) based on the above criteria
@@ -643,88 +441,8 @@ get_filtered_counts <- function(counts, interval = "1 hour") { # interval (e.g.,
                Hour = Month_Hour - months(month(Month_Hour) - 1))
     
     filtered_counts
-    
-    # -------------------------------------------------------------------
-    
 }
 
-get_filtered_counts_older <- function(counts, interval = "1 hour") { # interval (e.g., "1 hour", "15 min")
-    
-    counts <- counts %>%
-        mutate(SignalID = factor(SignalID),
-               Detector = factor(Detector),
-               CallPhase = factor(CallPhase))
-    
-    # define included detectors
-    all_periods <- seq(min(counts$Timeperiod), max(counts$Timeperiod), by = interval)
-    
-    num_days <- length(unique(date(counts$Timeperiod)))
-    all_periods <- all_periods[wday(all_periods) %in% unique(wday(counts$Timeperiod))]
-    
-    included_detectors <- counts %>% 
-        filter(!is.na(CallPhase)) %>%
-        group_by(SignalID, CallPhase, Detector) %>% 
-        summarize(Total_Volume = sum(vol, na.rm = TRUE)) %>% 
-        dplyr::filter(Total_Volume > (100 * num_days)) %>%
-        select(-Total_Volume)
-    
-    dtlevels <- as.character(sort(as.integer(levels(included_detectors$Detector))))
-    cplevels <- as.character(sort(as.integer(levels(included_detectors$CallPhase))))
-    
-    #  expand to all detectors and time periods
-    e <- expand.grid(temp = unique(mutate(included_detectors, 
-                                          new = paste(SignalID, CallPhase, Detector, sep = '|'))$new),
-                     Timeperiod = all_periods) %>%
-        separate(temp, c("SignalID","CallPhase","Detector")) %>%
-        mutate(SignalID = factor(SignalID), 
-               Detector = factor(Detector, levels = dtlevels), 
-               CallPhase = factor(CallPhase, levels = cplevels))
-    
-    # Bad hour = any of the following:
-    #    missing data (NA)
-    #    volume > 1000
-    #    absolute change in volume from previous hour > 500
-    #    change in volume from previous hour = 0
-    expanded_counts <- left_join(e, counts) %>% 
-        mutate(SignalID = factor(SignalID), 
-               Detector = factor(Detector), 
-               CallPhase = factor(CallPhase),
-               vol0 = ifelse(is.na(vol), 0, vol)) %>%
-        group_by(SignalID, CallPhase, Detector) %>% 
-        arrange(SignalID, CallPhase, Detector, Timeperiod) %>% 
-        mutate(delta_vol = vol0 - lag(vol0),
-               Good = ifelse(is.na(vol) | 
-                                 vol > 1000 | 
-                                 is.na(delta_vol) | 
-                                 abs(delta_vol) > 500 | 
-                                 abs(delta_vol) == 0,
-                             0, 1)) %>%
-        select(-vol0)
-
-    # bad day = any of the following:
-    #    too many bad hours (60%) based on the above criteria
-    #    mean absolute change in hourly volume > 200 
-    bad_days <- expanded_counts %>% 
-        filter(hour(Timeperiod) > 5) %>%
-        group_by(SignalID, CallPhase, Detector, Date = date(Timeperiod)) %>% 
-        summarize(Good = sum(Good, na.rm = TRUE), 
-                  All = n(), 
-                  Pct_Good = as.integer(sum(Good, na.rm = TRUE)/n()*100),
-                  mean_abs_delta = mean(abs(delta_vol), na.rm = TRUE)) %>% 
-        mutate(Good_Day = as.integer(ifelse(Pct_Good >= 60 & mean_abs_delta < 200, 1, 0))) # manually calibrated
-    
-    # counts with the bad days taken out
-    filtered_counts <- left_join(mutate(expanded_counts, Date=date(Timeperiod)), 
-                                 select(bad_days, SignalID, CallPhase, Detector, Date, mean_abs_delta, Good_Day)) %>%
-        mutate(vol = ifelse(Good_Day==1, vol, NA),
-               Month_Hour = Timeperiod - days(day(Timeperiod) - 1),
-               Hour = Month_Hour - months(month(Month_Hour) - 1))
-    
-    filtered_counts
-
-    # -------------------------------------------------------------------
-
-}
 get_adjusted_counts <- function(filtered_counts) {
     
     filtered_counts <- mutate(filtered_counts, DOW = wday(Timeperiod))
@@ -805,7 +523,7 @@ get_spm_data_aws <- function(start_date, end_date, signals_list, table, TWR_only
     if (Sys.info()["nodename"] == "GOTO3213490") { # The SAM
 
         conn <- dbConnect(drv, "jdbc:awsathena://athena.us-east-1.amazonaws.com:443/",
-                          s3_staging_dir = 's3://gdot-spm-athena',
+                          s3_staging_dir = 's3://gdot-spm-athena', # VDOT -- update
                           user = Sys.getenv("AWS_ACCESS_KEY_ID"),
                           password = Sys.getenv("AWS_SECRET_ACCESS_KEY"),
                           ProxyHost = "gdot-enterprise",
@@ -815,7 +533,7 @@ get_spm_data_aws <- function(start_date, end_date, signals_list, table, TWR_only
     } else {
         
         conn <- dbConnect(drv, "jdbc:awsathena://athena.us-east-1.amazonaws.com:443/",
-                          s3_staging_dir = 's3://gdot-spm-athena',
+                          s3_staging_dir = 's3://gdot-spm-athena', # VDOT -- update
                           user = Sys.getenv("AWS_ACCESS_KEY_ID"),
                           password = Sys.getenv("AWS_SECRET_ACCESS_KEY"))
     }
@@ -848,29 +566,6 @@ get_detection_events <- function(start_date, end_date, signals_list) {
     get_spm_data_aws(start_date, end_date, signals_list, table="DetectionEvents")
 }
 
-# get_detector_count <- function(signals_list) {
-#     
-#     conn <- get_atspm_connection()
-#     
-#     det <- tbl(conn, "DetectorConfig") %>%
-#         dplyr::filter(SignalID %in% signals_list & CallPhase %in% c(2,6)) %>%
-#         mutate(SignalID = as.character(SignalID)) %>%
-#         collect() %>%
-#         group_by(SignalID, CallPhase) %>%
-#         summarize(Detectors = n())
-#     
-#     dbDisconnect(conn)
-#     
-#     det
-# }
-
-# get_bad_detectors <- function(filtered_counts_1hr) {
-#     filtered_counts_1hr %>% 
-#         ungroup() %>% 
-#         filter(Good_Day == 0) %>% 
-#         distinct(Date, SignalID, Detector) %>% 
-#         arrange(Date, SignalID, Detector)
-# }
 
 get_detector_uptime <- function(filtered_counts_1hr) {
     filtered_counts_1hr %>%
@@ -1027,30 +722,6 @@ get_qs <- function(detection_events) {
     # SignalID | CallPhase | Date | Date_Hour | DOW | Week | qs | cycles | qs_freq
 }
 
-# SPM Travel Time Index, Buffer Time Index
-# get_tt_xl <- function(fns, rts) {
-#     
-#     dfs <- mapply(function(f,r) {
-#         df <- readxl::read_excel(f) %>% mutate(Corridor = r)
-#     }, fns, rts, SIMPLIFY = FALSE)
-#     
-#     rbindlist(dfs) %>% 
-#         mutate(miles = speed /3600 * travel_time_seconds, 
-#                ref_sec = miles/reference_speed * 3600) %>%
-#         group_by(Corridor = factor(Corridor), measurement_tstamp) %>%
-#         summarize(travel_time_seconds = sum(travel_time_seconds, na.rm = TRUE),
-#                   ref_sec = sum(ref_sec, na.rm = TRUE)) %>%
-#         ungroup() %>%
-#         mutate(tti = travel_time_seconds/ref_sec, 
-#                hour = measurement_tstamp - days(day(measurement_tstamp) - 1)) %>%
-#         group_by(Corridor, hour) %>%
-#         summarize(tti = mean(travel_time_seconds/ref_sec, na.rm = TRUE),
-#                   bti = quantile(travel_time_seconds, c(0.90))/mean(ref_sec, na.rm = TRUE)) %>% 
-#         tidyr::gather(idx, value, tti, bti) %>% 
-#         as_tibble()
-#     
-#     # Corridor | hour | idx | value
-# }
 get_tt_csv <- function(fns) {
 
     dfs <- lapply(fns, function(f) {
@@ -1159,13 +830,13 @@ group_corridors_ <- function(df, per_, var_, wt_, gr_ = group_corridor_by_) {
     
     per_ <- as.name(per_)
     
-    zgs <- lapply(c("RTOP1", "RTOP2", "D1", "D2", "D3", "D4", "D5", "D6", "Zone 7", "Cobb County"), function(zg) {
+    zgs <- lapply(c("RTOP1", "RTOP2", "D1", "D2", "D3", "D4", "D5", "D6", "Zone 7", "Cobb County"), function(zg) { # VDOT -- update
         df %>%
             filter(Zone_Group == zg) %>%
             gr_(per_, var_, wt_, zg)
     })
     all_rtop_df_out <- df %>%
-        filter(Zone_Group %in% c("RTOP1", "RTOP2")) %>%
+        filter(Zone_Group %in% c("RTOP1", "RTOP2")) %>% # VDOT -- update
         gr_(per_, var_, wt_, "All RTOP")
 
     dplyr::bind_rows(select_(df, "Corridor", "Zone_Group", per_, var_, wt_, "delta"),
@@ -1190,8 +861,6 @@ get_daily_avg <- function(df, var_, wt_ = "ones", peak_only = FALSE) {
     }
 
     df %>%
-        #complete(nesting(SignalID, CallPhase), Date = full_seq(Date, 1)) %>%
-        #expand_values("Date") %>%
         group_by(SignalID, Date) %>% 
         summarize(!!var_ := weighted.mean(!!var_, !!wt_, na.rm = TRUE), # Mean of phases 2,6
                   !!wt_ := sum(!!wt_, na.rm = TRUE)) %>% # Sum of phases 2,6
@@ -1208,7 +877,6 @@ get_daily_sum <- function(df, var_, per_) {
     
     df %>%
         complete(nesting(SignalID, CallPhase), !!var_ := full_seq(!!var_, 1)) %>%
-        #expand_values(per_) %>%
         group_by(SignalID, !!per_) %>% 
         summarize(!!var_ := sum(!!var_, na.rm = TRUE)) %>%
         mutate(delta = ((!!var_) - lag(!!var_))/lag(!!var_)) %>%
@@ -1280,7 +948,6 @@ get_cor_weekly_avg_by_day <- function(df, corridors, var_, wt_ = "ones") {
     cor_df_out <- weighted_mean_by_corridor_(df, "Date", corridors, var_, wt_) %>%
         filter(!is.nan(!!var_))
     
-    # refactored averaging by RTOP1, RTOP2, All RTOP -- this is new
     group_corridors_(cor_df_out, "Date", var_, wt_) %>%
         mutate(Week = week(Date))
 }
@@ -1383,7 +1050,6 @@ get_cor_weekly_avg_by_hr <- function(df, corridors, var_, wt_="ones") {
     
     cor_df_out <- weighted_mean_by_corridor_(df, "Hour", corridors, var_, wt_)
     
-    # refactored averaging by RTOP1, RTOP2, All RTOP -- this is new
     group_corridors_(cor_df_out, "Hour", var_, wt_)
 }
 
@@ -1460,40 +1126,6 @@ get_cor_monthly_avg_by_hr <- function(df, corridors, var_, wt_ = "ones") {
     group_corridors_(cor_df_out, "Hour", var_, wt_)
 }
 
-# Device Uptime from Excel files from Field Engineers
-get_device_uptime_from_xl <- function(fn, range) {
-    
-    h <- names(readxl::read_excel(fn, range = "Device Status!A5:U5"))
-    df <- readxl::read_excel(fn, range = range)
-    names(df) <- h
-    
-    df[1,1] <- "Functioning"
-    df[2,1] <- "Total"
-    
-    df %>% gather(Month, num, -X__1) %>% 
-        spread(key = X__1, value = num) %>%
-        transmute(Corridor = "Placeholder",
-                  Month = dmy(paste0("1-", Month)),
-                  up = as.integer(Functioning),
-                  num = as.integer(Total),
-                  uptime = up/num,
-                  Filename = fn) %>% 
-        filter(!is.na(up)) %>% 
-        arrange(Month) %>%
-        mutate(Corridor = get_corridor_name(fn))
-}
-get_device_uptime_from_xl_multiple <- function(fns, range, corridors) {
-    dfs <- lapply(fns, function(x) get_device_uptime_from_xl(x, range))
-    df <- bind_rows(dfs)
-    
-    corrs <- corridors %>% distinct(Corridor, Zone_Group) %>%
-        mutate(Corridor = factor(Corridor),
-               SignalID = factor(0))
-    df_ <- left_join(df, corrs)
-    
-    df_ %>% select(Zone_Group, Corridor, Month, up, num, uptime)
-    
-}
 # -- end Generic Aggregation Functions
 
 get_daily_detector_uptime <- function(filtered_counts) {
@@ -1506,7 +1138,6 @@ get_daily_detector_uptime <- function(filtered_counts) {
     fc <- anti_join(filtered_counts, bad_comms)
     
     ddu <- fc %>% 
-        #filter(!wday(Timeperiod) %in% c(1,7)) %>%
         mutate(Date_Hour = Timeperiod,
                Date = date(Date_Hour)) %>%
         select(SignalID, CallPhase, Detector, Date, Date_Hour, Good_Day) %>%
@@ -1621,7 +1252,7 @@ get_cor_monthly_qs_by_day <- function(monthly_qs_by_day, corridors) {
 get_cor_monthly_tti <- function(cor_monthly_tti_by_hr, corridors) {
     cor_monthly_tti_by_hr %>% 
         mutate(Month = as_date(Hour)) %>%
-        filter(!Corridor %in% c("RTOP1", "RTOP2", "All RTOP", "D5", "Zone 7")) %>%
+        filter(!Corridor %in% c("RTOP1", "RTOP2", "All RTOP", "D5", "Zone 7")) %>% # VDOT -- update
         get_cor_monthly_avg_by_day(corridors, "tti", "pct")
 }
 get_cor_monthly_pti <- function(cor_monthly_pti_by_hr, corridors) {
@@ -1825,76 +1456,6 @@ get_cor_monthly_aog_peak <- function(cor_monthly_aog_by_hr) {
     list("am" = as_tibble(am), "pm" = as_tibble(pm))
 }
 
-# Device Uptime from Excel
-get_veh_uptime_from_xl_monthly_reports <- function(fns, corridors) {
-    get_device_uptime_from_xl_multiple(fns, "Device Status!A5:U7", corridors)
-}
-get_ped_uptime_from_xl_monthly_reports <- function(fn, corridors) {
-    get_device_uptime_from_xl_multiple(fn, "Device Status!A9:U11", corridors)
-}
-get_cctv_uptime_from_xl_monthly_reports <- function(fns, corridors) {
-    get_device_uptime_from_xl_multiple(fns, "Device Status!A13:U15", corridors)
-}
-
-get_det_uptime_from_manual_xl <- function(fn, date_string) {
-    
-    xl <- readxl::read_excel(fn) %>% 
-        fill(Corridor) %>%
-        mutate_all(stringi::stri_trim) %>%
-        mutate(Zone_Group = case_when(
-            startsWith(as.character(Corridor), "Z1") ~ "RTOP1",
-            startsWith(as.character(Corridor), "Z2") ~ "RTOP1",
-            startsWith(as.character(Corridor), "Z3") ~ "RTOP1",
-            TRUE ~ "RTOP2")
-        ) %>%
-        transmute(xl_Corridor = Corridor,
-                  Corridor = factor(get_corridor_name(Corridor)),
-                  Zone_Group = Zone_Group,
-                  Month = ymd(date_string),
-                  Type = factor(`Detector Type`),
-                  up = as.integer(`# of Operational Detectors`),
-                  num = as.integer(`Total # of Detectors`),
-                  uptime = as.double(up)/num) %>% 
-        group_by(Corridor, Zone_Group, Month, Type) %>% 
-        summarize(uptime = weighted.mean(uptime, num, na.rm = TRUE),
-                  up = sum(up, na.rm = TRUE),
-                  num = sum(num, na.rm = TRUE)) %>%
-        ungroup() %>%
-        select(Zone_Group, Corridor, Month, Type, up, num, uptime)
-    xl
-}
-get_cor_monthly_xl_uptime <- function(df) {
-    
-    # By Corridor
-    a <- df %>% group_by(Zone_Group, Corridor, Month) %>%
-        summarize(uptime = weighted.mean(uptime, num, na.rm = TRUE),
-                  up = sum(up, na.rm = TRUE),
-                  num = sum(num, na.rm = TRUE)) %>%
-        ungroup()
-
-    # RTOP1 and RTOP2
-    b <- a %>% 
-        filter(Zone_Group %in% c("RTOP1", "RTOP2")) %>%
-        group_by(Zone_Group, Corridor = Zone_Group, Month) %>%
-        summarize(uptime = weighted.mean(uptime, num, na.rm = TRUE),
-                  up = sum(up, na.rm = TRUE),
-                  num = sum(num, na.rm = TRUE))
-    
-    # All RTOP
-    c <- a %>% 
-        filter(Zone_Group %in% c("RTOP1", "RTOP2")) %>%
-        group_by(Zone_Group = "All RTOP", Corridor = Zone_Group, Month) %>%
-        summarize(uptime = weighted.mean(uptime, num, na.rm = TRUE),
-                  up = sum(up, na.rm = TRUE),
-                  num = sum(num, na.rm = TRUE))
-    
-    bind_rows(a, b, c) %>%
-        arrange(Zone_Group, Corridor, Month) %>% 
-        group_by(Zone_Group, Corridor) %>%
-        mutate(delta = (uptime - lag(uptime))/lag(uptime)) %>%
-        ungroup()
-    
-}
 
 get_cor_weekly_cctv_uptime <- function(daily_cctv_uptime) {
     
@@ -2116,270 +1677,6 @@ get_quarterly <- function(monthly_df, var_, wt_="ones", operation = "avg") {
         mutate(delta = ((!!var_) - lag(!!var_))/lag(!!var_))
 }
 
-# Activities
-tidy_teams <- function(df) {
-    
-    # set unique id based on creation date, time, lat/long
-    df$cdn <- sapply(lapply(as.character(df$`Created by`), charToRaw), function(x) sum(as.numeric(x), na.rm = TRUE))
-    df$id <- as.numeric(mdy_hms(df$`Created on`))/1e8 + df$cdn + abs(df$Latitude) + abs(df$Longitude)
-    
-    df %>% distinct() %>%
-        
-
-        mutate(`Task Type` = ifelse(`Task Type` == "- Preventative Maintenance", "04 - Preventative Maintenance", `Task Type`),
-               `Task Source` = ifelse(`Task Source` == "P Program", "RTOP Program", `Task Source`),
-               `Task Subtype` = ifelse(`Task Subtype` == "ection Check", "Detection Check", `Task Subtype`),
-               Priority = ifelse(Priority == "mal", "Normal", Priority)) %>%
-
-                
-        #unite(Location, `Location Groups`, County, sep = "-") %>%
-        transmute(Id = id,
-                  Task_Type = factor(`Task Type`),
-                  Task_Subtype = factor(`Task Subtype`),
-                  Task_Source = factor(`Task Source`),
-                  Priority = factor(Priority),
-                  Status = factor(Status),
-                  #Corridor = get_corridor_name(Location),
-                  #Location = factor(Location),
-                  `Created on` = `Created on`,
-                  `Date Reported` = `Date Reported`,
-                  `Date Resolved` = `Date Resolved`,
-                  `Time To Resolve In Days` = `Time To Resolve In Days`,
-                  Maintained_by = ifelse(
-                      grepl(pattern = "District 1", `Maintained by`), "D1",
-                      ifelse(grepl(pattern = "District 6", `Maintained by`), "D6",
-                             ifelse(grepl(pattern = "Consultant|GDOT", `Maintained by`), "D6",
-                                    as.character(`Maintained by`))))) %>%
-        filter(!is.na(`Date Reported`)) %>% as_tibble()
-    
-}
-# read_teams_csv <- function(csv_fn) {
-#     df <- read_csv(csv_fn) %>%
-#         mutate(`Task Type` = as.character(`Task Type`),
-#                `Due Date` = mdy(`Due Date`),
-#                `Date Reported` = mdy(`Date Reported`),
-#                `Date Resolved` = mdy(`Date Resolved`),
-#                `Time To Resolve In Days` = as.integer(`Time To Resolve In Days`),
-#                `Time To Resolve In Hours` = as.integer(`Time To Resolve In Hours`),
-#                `Overdue In Days` = as.integer(`Overdue In Days`),
-#                `Overdue In Hours` = as.integer(`Overdue In Hours`),
-#                `Created on` = mdy_hms(`Created on`),
-#                `Modified on` = mdy_hms(`Modified on`),
-#                `Latitude` = as.numeric(`Latitude`),
-#                `Longitude` = as.numeric(`Longitude`)) %>%
-#         
-#         select(`Due Date`,
-#             `Task Type`,
-#             `Task Subtype`,
-#             `Task Source`,
-#             `Priority`,
-#             `Status`,
-#             `Date Reported`,
-#             `Date Resolved`,
-#             `Time To Resolve In Days`,
-#             `Time To Resolve In Hours`,
-#             `Overdue In Days`,
-#             `Overdue In Hours`,
-#             `Maintained by`,
-#             `Owned by`,
-#             `County`,
-#             `City`,
-#             `Custom Identifier`,
-#             `Primary Route`,
-#             `Secondary Route`,
-#             `Created on`,
-#             `Created by`,
-#             `Modified on`,
-#             `Modified by`,
-#             `Latitude`,
-#             `Longitude`)
-#     
-#     names(df) <- gsub("\\.", " ", names(df))
-#     
-#     # routes <- c("SR 10","SR 12","SR 120","SR 124","SR 13","SR 138E","SR 138S","SR 13N",
-#     #             "SR 13S","SR 140","SR 141","SR 154","SR 155N","SR 155S","SR 20","SR 237",
-#     #             "SR 280","SR 3","SR 314","SR 331","SR 360","SR 42","SR 5","SR 6","SR 8",
-#     #             "SR 8/US 278","SR 85","SR 9","SR 92","US 278")
-#     # df2 <- mutate(df, `Location Groups` = "",
-#     #               `Overdue In Hours` = as.integer(`Overdue In Hours`))
-#     # for (rt in routes) {
-#     #     df2 <- dplyr::mutate(df2, `Location Groups` = ifelse(grepl(rt, `Custom Identifier`), rt, `Location Groups`))
-#     # }
-#     #tidy_teams(df2)
-#     #as_tibble(df2)
-#     as_tibble(df)
-# }
-
-
-
-
-get_teams_tasks <- function(tasks_fn = "TEAMS_Reports/tasks.csv.zip",
-                            locations_fn = "TEAMS_Reports/TEAMS_Locations_Report.csv") {
-    
-    conn <- get_atspm_connection()
-    
-    # Data Frames
-    locs <- readr::read_csv(locations_fn)
-    sigs <- dbReadTable(conn, "Signals") %>%
-        as_tibble() %>%
-        mutate(SignalID = factor(SignalID),
-               Latitude = as.numeric(Latitude),
-               Longitude = as.numeric(Longitude)) %>%
-        filter(Latitude != 0)
-    
-    dbDisconnect(conn)
-    
-    corridors <- read_feather("corridors.feather")
-    
-    # sf (spatial - point) objects
-    locs.sp <- sf::st_as_sf(locs, coords = c("Latitude", "Longitude")) %>%
-        sf::st_set_crs(4326)
-    sigs.sp <- sf::st_as_sf(sigs, coords = c("Latitude", "Longitude")) %>%
-        sf::st_set_crs(4326)
-    
-    # Join TEAMS Locations to Tasks via lat/long -- get closest, only if within 100 m
-    
-    # Get the row index in locs.sp that is closest to each row in ints.sp
-    idx <- apply(st_distance(sigs.sp, locs.sp, byid = TRUE), 1, which.min)
-    # Reorder locs.sp so each row is the one corresponding to each ints.sp row
-    locs.sp <- locs.sp[idx,]
-    
-    # Get vector of distances between closest items (row-wise)
-    dist_vector <- sf::st_distance(sigs.sp, locs.sp, by_element = TRUE)
-    # Make into a data frame
-    dist_dataframe <- data.frame(m = as.integer(dist_vector))
-    
-    # Bind data frames to map Locationid (TEAMS) to SignalID (ATSPM) with distance
-    locations <- bind_cols(sigs.sp, locs.sp, dist_dataframe) %>% 
-        select(LocationId = `DB Id`, SignalID, m, `Maintained By`, City, County) %>%
-        filter(m < 100)
-    
-    # Get tasks and join locations, corridors
-    tasks <- readr::read_csv(tasks_fn) %>% 
-        select(-`Maintained by`) %>%
-        left_join(locations) %>%
-        filter(!is.na(m)) %>%
-        mutate(SignalID = factor(SignalID)) %>%
-        left_join(corridors)
-    
-    all_tasks <- tasks %>% 
-        mutate(Zone_Group = if_else(`Maintained By` == "District 1", 
-                                  "D1", 
-                                  Zone_Group),
-               Zone_Group = if_else(`Maintained By` == "District 6", 
-                                  "D6", 
-                                  Zone_Group),
-               `Task Type` = as.character(`Task Type`),
-               `Due Date` = mdy_hms(`Due Date`),
-               `Date Reported` = mdy_hms(`Date Reported`),
-               `Date Resolved` = mdy_hms(`Date Resolved`),
-               `Time To Resolve In Days` = floor((`Date Resolved` - `Date Reported`)/ddays(1)),
-               `Time To Resolve In Hours` = floor((`Date Resolved` - `Date Reported`)/dhours(1)),
-               #`Overdue In Days` = as.integer(`Overdue In Days`),
-               #`Overdue In Hours` = as.integer(`Overdue In Hours`),
-               `Created on` = mdy_hms(`Created on`),
-               `Modified on` = mdy_hms(`Modified on`),
-               `Latitude` = as.numeric(`Latitude`),
-               `Longitude` = as.numeric(`Longitude`),
-               
-               `Task Type` = ifelse(`Task Type` == "- Preventative Maintenance", "04 - Preventative Maintenance", `Task Type`),
-               `Task Source` = ifelse(`Task Source` == "P Program", "RTOP Program", `Task Source`),
-               `Task Subtype` = ifelse(`Task Subtype` == "ection Check", "Detection Check", `Task Subtype`),
-               Priority = ifelse(Priority == "mal", "Normal", Priority),
-               
-               Zone_Group = 
-                   dplyr::case_when(
-                       
-                       `Maintained By` == "District 1" ~ "D1",
-                       `Maintained By` == "District 6" ~ "D6",
-                       
-                       TRUE ~ Zone_Group),
-               
-               Task_Type = factor(`Task Type`),
-               Task_Subtype = factor(`Task Subtype`),
-               Task_Source = factor(`Task Source`),
-               Priority = factor(Priority),
-               Status = factor(Status),
-               
-               `Date Reported` = date(`Date Reported`),
-               `Date Resolved` = date(`Date Resolved`),
-               
-               All = factor("all")) %>%
-        
-        select(Due_Date = `Due Date`,
-               Task_Type = `Task Type`,
-               Task_Subtype = `Task Subtype`,
-               Task_Source = `Task Source`,
-               Priority,
-               Status,
-               `Date Reported`,
-               `Date Resolved`,
-               `Time To Resolve In Days`,
-               `Time To Resolve In Hours`,
-               #`Overdue In Days`,
-               #`Overdue In Hours`,
-               Maintained_by = `Maintained By`,
-               Owned_by = `Owned by`,
-               #`County`,
-               #`City`,
-               `Custom Identifier`,
-               `Primary Route`,
-               `Secondary Route`,
-               Created_on = `Created on`,
-               Created_by = `Created by`,
-               Modified_on = `Modified on`,
-               Modified_by = `Modified by`,
-               Latitude,
-               Longitude,
-               SignalID,
-               Zone,
-               Zone_Group,
-               Corridor,
-               All) %>%
-
-        filter(!is.na(`Date Reported`),
-               !(Zone_Group == "Zone 7" & `Date Reported` < "2018-05-01"))
-    
-    # Dupicate RTOP1 and RTOP2 as "All RTOP" and add to tasks
-    all_tasks %>% 
-        bind_rows(all_tasks %>% 
-                      filter(Zone_Group == "RTOP1") %>% 
-                      mutate(Zone_Group = "All RTOP"), 
-                  all_tasks %>% 
-                      filter(Zone_Group == "RTOP2") %>% 
-                      mutate(Zone_Group = "All RTOP"))
-}
-
-
-
-get_outstanding_events <- function(teams, group_var) {
-    
-    rep <- teams %>% 
-        filter(!is.na(`Date Reported`)) %>%
-        mutate(Month = `Date Reported` - days(day(`Date Reported`) - 1)) %>%
-        arrange(Month) %>%
-        group_by_(group_var, quote(Zone_Group), quote(Month)) %>%
-        summarize(Rep = n()) %>% 
-        group_by_(quote(Zone_Group), group_var) %>%
-        mutate(cumRep = cumsum(Rep))
-    
-    res <- teams %>% 
-        filter(!is.na(`Date Resolved`)) %>%
-        mutate(Month = `Date Resolved` - days(day(`Date Resolved`) -1)) %>%
-        arrange(Month) %>%
-        group_by_(group_var, quote(Zone_Group), quote(Month)) %>%
-        summarize(Res = n()) %>% 
-        group_by_(quote(Zone_Group), group_var) %>%
-        mutate(cumRes = cumsum(Res))
-    
-    left_join(rep, res) %>% 
-        fill(cumRes, .direction = "down") %>% 
-        replace_na(list(Rep = 0, cumRep = 0, 
-                        Res = 0, cumRes = 0)) %>% 
-        group_by_(quote(Zone_Group), group_var) %>%
-        mutate(outstanding = cumRep - cumRes) %>%
-        ungroup()
-}
 
 readRDS_multiple <- function(pattern) {
     lf <- list.files(pattern = pattern)
@@ -2438,150 +1735,3 @@ db_build_data_for_signal_dashboard <- function(month_abbrs, corridors, pth = '.'
     })
 }
 
-# build_data_for_signal_dashboard <- function(month_abbrs, 
-#                                             corridors, 
-#                                             pth = ".", 
-#                                             upload_to_s3 = FALSE) {
-#     
-#     write_signal_data <- function(df, data_name) {
-#         
-#         sid <- as.character(df$SignalID[1])
-#         fn <- file.path(pth, glue("{sid}.rds"))
-#         if (file.exists(fn)) {
-#             data <- readRDS(fn)
-#         } else {
-#             data <- list()
-#         }
-#         if (!data_name %in% names(data)) {
-#             data[[data_name]] <- data.frame()
-#             print(glue("{sid} {data_name} is new"))
-#         }
-#         data[[data_name]] <- rbind(data[[data_name]], df)
-#         saveRDS(data, fn)
-#         return(head(df,1))
-#     }
-#     
-#     
-#     
-#     lapply(month_abbrs, function(month_abbr) { 
-#         
-#         print(month_abbr)
-#         
-#         result <- tryCatch({
-#             rc <- f("counts_1hr_", month_abbr, daily = TRUE) %>% 
-#                 filter(SignalID %in% levels(corridors$SignalID))
-#             rc %>% group_by(SignalID) %>% do(write_signal_data(., "rc"))
-#             rm(rc); gc()
-#         }, error = function(e) {
-#             print(e)
-#             print(glue("No data for raw counts for {month_abbr}"))
-#         }, finally = {
-#         })
-#         
-#         result <- tryCatch({
-#             fc <- f("filtered_counts_1hr_", month_abbr)
-#             fc %>% group_by(SignalID) %>% do(write_signal_data(., "fc"))
-#             rm(fc); gc()
-#         }, error = function(e) {
-#             print(e)
-#             print(glue("No data for filtered counts for {month_abbr}"))
-#         })
-#         
-#         result <- tryCatch({
-#             ddu <- f("ddu_", month_abbr)
-#             ddu %>% group_by(SignalID) %>% do(write_signal_data(., "ddu"))
-#             rm(ddu); gc()
-#         }, error = function(e) {
-#             print(glue("No data for detector uptime for {month_abbr}"))
-#         })
-#         
-#         result <- tryCatch({
-#             cu <- f("cu_", month_abbr)
-#             cu %>% group_by(SignalID) %>% do(write_signal_data(., "cu"))
-#             rm(cu); gc()
-#         }, error = function(e) {
-#             print(glue("No data for comm uptime for {month_abbr}"))
-#         })
-#         
-#         result <- tryCatch({
-#             vpd <- f("vpd_", month_abbr)
-#             vpd %>% group_by(SignalID) %>% do(write_signal_data(., "vpd"))
-#             rm(vpd); gc()
-#         }, error = function(e) {
-#             print(glue("No data for raw_counts for {month_abbr}"))
-#         })
-#         
-#         result <- tryCatch({
-#             tp <- f("tp_", month_abbr)
-#             tp %>% group_by(SignalID) %>% do(write_signal_data(., "tp"))
-#             rm(tp); gc()
-#         }, error = function(e) {
-#             print(glue("No data for throughput for {month_abbr}"))
-#         })
-#         
-#         result <- tryCatch({
-#             aog <- f("aog_", month_abbr)
-#             aog %>% group_by(SignalID) %>% do(write_signal_data(., "aog"))
-#             rm(aog); gc()
-#         }, error = function(e) {
-#             print(glue("No data for arrivals on green for {month_abbr}"))
-#         })
-#         
-#         result <- tryCatch({
-#             sf <- f("sf_", month_abbr)
-#             sf %>% group_by(SignalID) %>% do(write_signal_data(., "sf"))
-#             rm(sf); gc()
-#         }, error = function(e) {
-#             print(glue("No data for split failures for {month_abbr}"))
-#         })
-#         
-#         result <- tryCatch({
-#             qs <- f("qs_", month_abbr)
-#             qs %>% group_by(SignalID) %>% do(write_signal_data(., "qs"))
-#             rm(qs); gc()
-#         }, error = function(e) {
-#             print(glue("No data for queue spillback for {month_abbr}"))
-#         })
-#     })
-#     if (upload_to_s3 == TRUE) {
-#         lapply(list.files(pth, pattern = "*.rds"), function(fn) {
-#             aws.s3::put_object(file = file.path(pth, fn), 
-#                                object = glue("signal_dashboards/{fn}"), 
-#                                bucket = "gdot-devices")
-#         })
-#     }
-# }
-
-
-
-
-patch_april <- function(df, df4) {
-    
-    f <- function(df_, df4_) {
-        
-        if ("Date" %in% names(df4_)) {
-            dat <- as.name("Date")
-        } else if ("Hour" %in% names(df4_)) {
-            dat <- as.name("Hour")
-        } else if ("Month" %in% names(df4_)) {
-            dat <- as.name("Month")
-        }
-        
-        df_ <- df_ %>% filter(month(!!dat) != 4)
-        df4_ <- df4_ %>% filter(month(!!dat) == 4)
-        
-        bind_rows(df_, df4_) %>% 
-            arrange(Zone_Group, Corridor, !!dat) %>%
-            mutate(Corridor = factor(Corridor),
-                   Zone_Group = factor(Zone_Group))
-    }
-    
-    if (names(df4)[1] == "am") {
-        am <- f(df$am, df4$am)
-        pm <- f(df$pm, df4$pm)
-        result <- list("am" = am, "pm" = pm)
-    } else {
-        result <- f(df, df4)
-    }
-    result
-}

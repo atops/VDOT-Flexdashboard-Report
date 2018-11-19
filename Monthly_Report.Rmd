@@ -1,0 +1,1372 @@
+---
+title: "VDOT ATSPM Dashboard (beta)"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: scroll
+    logo: VDOT_Logo.gif
+    favicon: VDOT_Logo.gif 
+    css: style.css
+    includes:
+        in_header: google_analytics.html
+runtime: shiny
+---
+
+
+```{r global, cache = TRUE, include = FALSE, warning = FALSE}
+# FLEXDASHBOARD - BETA
+
+
+source("Monthly_Report_UI_Functions.R")
+#load("Monthly_Report_UI_Functions.Rdata")
+
+
+FIG_WIDTH = 14
+FIG_HEIGHT = 7
+
+```
+
+
+
+
+
+
+
+
+
+Inputs {.sidebar}
+=====================================
+
+VDOT ATSPM Performance Dashboard
+
+Past month reports can be viewed back to `r tail(conf$report_months, 1)`.
+
+```{r sidebar, warning = FALSE, cache = FALSE}
+# shiny inputs defined here
+
+# VDOT -- update
+
+month_options <- conf$report_months
+
+signal_group_options <- conf$signal_groups
+
+selectInput("month", "Month:",
+                       choices = month_options,
+                       selected = conf$selected_month)
+
+selectInput("signal_group", "Signal Group:",
+                       choices = signal_group_options,
+                       selected = "Northwest Region")
+
+
+
+# DRILL DOWN WITHIN CORRIDORS TO SEE ALL SIGNALS
+conditionalPanel("input.signal_group == 'Northwest Region'",
+                 selectInput("corridor_nwro", "Corridor",
+                             choices = c("All Corridors", 
+                                         as.character(unique(filter(
+                                             corridors, Signal_Group == "Northwest Region")$Corridor
+                                         ))),
+                             selected = "All Corridors"))
+
+conditionalPanel("input.signal_group == 'Northern Region'",
+                 selectInput("corridor_nro", "Corridor:",
+                             choices = c("All Corridors", 
+                                         as.character(unique(filter(
+                                             corridors, Signal_Group == "Northern Region")$Corridor
+                                         ))),
+                             selected = "All Corridors"))
+
+conditionalPanel("input.signal_group == 'Southwest Region'",
+                 selectInput("corridor_swro", "Corridor:",
+                             choices = c("All Corridors", 
+                                         as.character(unique(filter(
+                                             corridors, Signal_Group == "Southwest Region")$Corridor
+                                         ))),
+                             selected = "All Corridors"))
+
+conditionalPanel("input.signal_group == 'Eastern Region'",
+                 selectInput("corridor_ero", "Corridor:",
+                             choices = c("All Corridors", 
+                                         as.character(unique(filter(
+                                             corridors, Signal_Group == "Eastern Region")$Corridor
+                                         ))),
+                             selected = "All Corridors"))
+
+conditionalPanel("input.signal_group == 'Central Region'",
+                 selectInput("corridor_cro", "Corridor:",
+                             choices = c("All Corridors", 
+                                         as.character(unique(filter(
+                                             corridors, Signal_Group == "Central Region")$Corridor
+                                         ))),
+                             selected = "All Corridors"))
+
+
+current_month <- reactive(lubridate::dmy(paste(1, input$month)))
+current_quarter <- reactive(as.character(lubridate::quarter(current_month(), with_year = TRUE)))
+
+
+corridor <- reactive(
+    if (input$signal_group == "Northwest Region") {
+        input$corridor_nwro
+    } else if (input$signal_group == "Northern Region") {
+        input$corridor_nro
+    } else if (input$signal_group == "Southwest Region") {
+        input$corridor_swro
+    } else if (input$signal_group == "Eastern Region") {
+        input$corridor_ero
+    } else if (input$signal_group == "Central Region") {
+        input$corridor_cro
+    } else {
+        "All Corridors"
+    })
+
+    
+signal_group <- reactive(
+    if (corridor() == "All Corridors") {
+        input$signal_group
+    } else {
+        corridor()
+    }
+)
+
+
+mr <- reactive(
+    if (corridor() == "All Corridors") {
+        cor
+    } else {
+        sig
+    }
+)
+
+
+filtered_corridors <- reactive({
+    if (corridor() == "All Corridors") {
+        corridors %>%
+            filter(signal_group %in% input$signal_group) %>%
+            select(-Description, -Asof)
+    } else {
+        corridors %>%
+            filter(Corridor == corridor()) %>%
+            select(-Description, -Asof)
+    }
+})
+
+filtered_signalids <- reactive(paste0(filtered_corridors()$SignalID, ": ",
+                                      filtered_corridors()$Name))
+
+# renderText({"\nSelected Month"})
+# renderPrint({current_month()})
+
+# renderText({"Selected Zone Group"})
+# renderPrint({signal_group()})
+
+# renderText({"Selected Corridor"})
+# renderPrint({corridor()})
+```
+
+
+
+
+
+
+
+
+
+One-Month Summary
+=====================================
+
+Row {data-height = 50}
+-------------------------------------
+
+### Performance <a id = "page_performance"></a>
+
+Arterial performance measures (% change from previous month)
+
+Row
+-------------------------------------
+
+### Throughput [vph] {.value-box}
+
+```{r cache = FALSE}
+renderValueBox({
+  valueBox(
+      value = get_valuebox(mr()$mo$tp, "vph", as_int, 
+                           zone = signal_group(), mo = current_month(), break_ = TRUE),
+      icon = "fa-bar-chart",
+    color = VDOT_BLUE
+  )
+})
+```
+
+### Arrivals on Green {.value-box}
+
+```{r}
+renderValueBox({
+  valueBox(
+      value = get_valuebox(mr()$mo$aogd, "aog", as_pct, 
+                           zone = signal_group(), mo = current_month(), break_ = TRUE),
+      icon = "fa-car",
+    color = VDOT_BLUE
+  )
+})
+```
+
+### Spillback Rate {.value-box}
+
+```{r}
+renderValueBox({
+  valueBox(
+      value = get_valuebox(mr()$mo$qsd, "qs_freq", as_pct, 
+                           zone = signal_group(), mo = current_month(), break_ = TRUE),
+      icon = "fa-car",
+    color = VDOT_BLUE
+  )
+})
+```
+
+### Split Failures {.value-box}
+
+```{r}
+renderValueBox({
+  valueBox(
+      value = get_valuebox(mr()$mo$sfd, "sf_freq", as_pct, 
+                           zone = signal_group(), mo = current_month(), break_ = TRUE),
+      icon = "fa-car",
+    color = VDOT_BLUE
+  )
+})
+```
+
+### Travel Time Index {.value-box}
+
+```{r}
+renderValueBox({
+  valueBox(
+      value = get_valuebox(cor$mo$tti, "tti", as_2dec, 
+                           zone = signal_group(), mo = current_month(), break_ = TRUE),
+      icon = "fa-dashboard",
+    color = VDOT_BLUE
+  )
+})
+```
+
+### Planning Time Index {.value-box}
+
+```{r}
+renderValueBox({
+  valueBox(
+      value = get_valuebox(cor$mo$pti, "pti", as_2dec, 
+                           zone = signal_group(), mo = current_month(), break_ = TRUE),
+      icon = "fa-dashboard",
+    color = VDOT_BLUE
+  )
+})
+```
+
+
+Row {data-height = 50}
+-------------------------------------
+
+### Volume-Based Measures
+
+Corridor volumes (% change from previous month)
+
+Row
+-------------------------------------
+
+
+### Traffic Volume [veh/day] {.value-box}
+
+```{r}
+renderValueBox({
+  valueBox(
+    value = get_valuebox(mr()$mo$vpd, "vpd", as_int, 
+                           zone = signal_group(), mo = current_month(), break_ = FALSE),
+    icon = "fa-area-chart",
+    color = VDOT_BLUE
+  )
+})
+```
+
+### AM Peak Volume [veh/hr] {.value-box}
+
+```{r}
+renderValueBox({
+  valueBox(
+      value = get_valuebox(mr()$mo$vphp$am, "vph", as_int, 
+                           zone = signal_group(), mo = current_month(), break_ = FALSE),
+      icon = "fa-area-chart",
+    color = VDOT_BLUE
+  )
+})
+```
+
+### PM Peak Volume [veh/hr] {.value-box}
+
+```{r}
+renderValueBox({
+  valueBox(
+      value = get_valuebox(mr()$mo$vphp$pm, "vph", as_int, 
+                           zone = signal_group(), mo = current_month(), break_ = FALSE),
+      icon = "fa-area-chart",
+    color = VDOT_BLUE
+  )
+})
+```
+
+### {.value-box}
+
+```{r}
+renderValueBox({
+  valueBox(
+    value = NULL,
+    icon = NULL,
+    color = "gray80"
+  )
+})
+```
+
+Row {data-height = 50}
+-------------------------------------
+
+### Equipment Measures
+
+Device and Communications Uptime (% change from previous month)
+
+Row
+-------------------------------------
+
+### Vehicle Detector Availability {.value-box}
+
+```{r}
+renderValueBox({
+  valueBox(
+      value = get_valuebox(cor$mo$veh, "uptime", as_pct, 
+                           zone = signal_group(), mo = current_month(), break_ = FALSE),
+      icon = "fa-car",
+    color = VDOT_BLUE
+  )
+})
+```
+
+### Pedestrian Detector Availability {.value-box}
+
+```{r}
+renderValueBox({
+  valueBox(
+      value = get_valuebox(cor$mo$ped, "uptime", as_pct, 
+                           zone = signal_group(), mo = current_month(), break_ = FALSE),
+      icon = "fa-child",
+    color = VDOT_BLUE
+  )
+})
+```
+
+
+### Communications Uptime {.value-box}
+
+```{r}
+renderValueBox({
+  valueBox(
+      value = get_valuebox(mr()$mo$cu, "uptime", as_pct, 
+                           zone = signal_group(), mo = current_month(), break_ = FALSE),
+      icon = "ion-paper-airplane", #"fa-user" #
+    color = VDOT_BLUE
+  )
+})
+```
+
+### {.value-box}
+
+```{r}
+renderValueBox({
+  valueBox(
+    value = NULL,
+    icon = NULL,
+    color = "gray80"
+  )
+})
+```
+
+
+
+
+
+
+
+
+
+Quarter Summary
+=====================================
+
+Row {data-height = 50}
+-------------------------------------
+
+### Performance
+
+Arterial performance measures (% change from previous quarter)
+
+Row
+-------------------------------------
+
+### Throughput [vph] {.value-box}
+
+```{r}
+renderValueBox({
+  valueBox(
+      value = get_valuebox(cor$qu$tp, "vph", as_int, 
+                           zone = signal_group(), 
+                           mo = current_month(), 
+                           qu = current_quarter(), break_ = TRUE),
+      icon = "fa-bar-chart",
+      color = VDOT_BLUE
+  )
+})
+```
+
+### Arrivals on Green {.value-box}
+
+```{r}
+renderValueBox({
+  valueBox(
+      value = get_valuebox(cor$qu$aogd, "aog", as_pct, 
+                           zone = signal_group(), 
+                           mo = current_month(), 
+                           qu = current_quarter(), break_ = TRUE),
+      icon = "fa-car",
+      color = VDOT_BLUE_LIGHT
+  )
+})
+```
+
+### Spillback Rate {.value-box}
+
+```{r}
+renderValueBox({
+  valueBox(
+      value = get_valuebox(cor$qu$qsd, "qs_freq", as_pct, 
+                           zone = signal_group(), 
+                           mo = current_month(), 
+                           qu = current_quarter(), break_ = TRUE),
+      icon = "fa-car",
+      color = VDOT_BLUE
+  )
+})
+```
+
+### Split Failures {.value-box}
+
+```{r}
+renderValueBox({
+  valueBox(
+      value = get_valuebox(cor$qu$sfd, "sf_freq", as_pct, 
+                           zone = signal_group(), 
+                           mo = current_month(), 
+                           qu = current_quarter(), break_ = TRUE),
+      icon = "fa-car",
+      color = VDOT_BLUE_LIGHT
+  )
+})
+```
+
+### Travel Time Index {.value-box}
+
+```{r}
+renderValueBox({
+  valueBox(
+      value = get_valuebox(cor$qu$tti, "tti", as_2dec, 
+                           zone = signal_group(), 
+                           mo = current_month(), 
+                           qu = current_quarter(), break_ = TRUE),
+      icon = "fa-dashboard",
+      color = VDOT_BLUE
+  )
+})
+```
+
+### Planning Time Index {.value-box}
+
+```{r}
+renderValueBox({
+  valueBox(
+      value = get_valuebox(cor$qu$pti, "pti", as_2dec, 
+                           zone = signal_group(), 
+                           mo = current_month(), 
+                           qu = current_quarter(), break_ = TRUE),
+      icon = "fa-dashboard",
+      color = VDOT_BLUE_LIGHT
+  )
+})
+```
+
+
+Row {data-height = 50}
+-------------------------------------
+
+### Volume-Based Measures
+
+Corridor volumes (% change from previous quarter)
+
+Row
+-------------------------------------
+
+
+### Traffic Volume [veh/day] {.value-box}
+
+```{r}
+renderValueBox({
+  valueBox(
+    value = get_valuebox(cor$qu$vpd, "vpd", as_int, 
+                           zone = signal_group(), 
+                           mo = current_month(), 
+                           qu = current_quarter(), break_ = FALSE),
+    icon = "fa-area-chart",
+      color = VDOT_ORANGE_RGB
+  )
+})
+```
+
+### AM Peak Volume [veh/hr] {.value-box}
+
+```{r}
+renderValueBox({
+  valueBox(
+      value = get_valuebox(cor$qu$vphpa, "vph", as_int, 
+                           zone = signal_group(), 
+                           mo = current_month(),
+                           qu = current_quarter(), break_ = FALSE),
+      icon = "fa-area-chart",
+      color = VDOT_ORANGE
+  )
+})
+```
+
+### PM Peak Volume [veh/hr] {.value-box}
+
+```{r}
+renderValueBox({
+  valueBox(
+      value = get_valuebox(cor$qu$vphpp, "vph", as_int, 
+                         zone = signal_group(), 
+                         mo = current_month(), 
+                         qu = current_quarter(), break_ = FALSE),
+      icon = "fa-area-chart",
+      color = VDOT_ORANGE_RGB
+  )
+})
+```
+
+
+### {.value-box}
+
+```{r}
+renderValueBox({
+  valueBox(
+    value = NULL,
+    icon = NULL,
+    color = "gray80"
+  )
+})
+```
+
+Row {data-height = 50}
+-------------------------------------
+
+### Equipment Measures
+
+Device and Communications Uptime (% change from previous quarter)
+
+Row
+-------------------------------------
+
+### Vehicle Detector Availability [manually collected] {.value-box}
+
+```{r}
+renderValueBox({
+  valueBox(
+      value = get_valuebox(cor$qu$veh, "uptime", as_pct, 
+                         zone = signal_group(), 
+                         mo = current_month(), 
+                         qu = current_quarter(), break_ = FALSE),
+      icon = "fa-car",
+      color = VDOT_BLUE
+  )
+})
+```
+
+### Pedestrian Detector Availability [manually collected] {.value-box}
+
+```{r}
+
+renderValueBox({
+  valueBox(
+    value = get_valuebox(cor$qu$ped, "uptime", as_pct, 
+                         zone = signal_group(), 
+                         mo = current_month(), 
+                         qu = current_quarter(), break_ = FALSE),
+    icon = "fa-child",
+      color = VDOT_BLUE_LIGHT 
+  )
+})
+```
+
+
+
+### Communications Uptime {.value-box}
+
+```{r}
+renderValueBox({
+  valueBox(
+      value = get_valuebox(cor$qu$cu, "uptime", as_pct, 
+                         zone = signal_group(), 
+                         mo = current_month(), 
+                         qu = current_quarter(), break_ = FALSE),
+      icon = "ion-paper-airplane",
+      color = VDOT_BLUE_LIGHT
+  )
+})
+```
+
+
+
+
+
+
+
+
+
+
+Summary Trend
+=====================================
+
+Row
+-------------------------------------
+
+### Performance
+
+
+```{r summary_left, eval = TRUE, warning = FALSE}
+fillCol(
+    renderPlotly({ 
+        data.set <- filter(mr()$mo$tp, Corridor==signal_group() & Month <= current_month())
+        validate(need(nrow(data.set) > 0, "No Data"))
+        perf_plot(data.set, "vph", "Throughput", RED2, as_int) 
+    }),
+    renderPlotly({ 
+        data.set <- filter(mr()$mo$aogd, Corridor==signal_group() & Month <= current_month())
+        validate(need(nrow(data.set) > 0, "No Data"))
+        perf_plot(data.set, "aog", "Arrivals on Green\nGoal: 80%", RED2, as_pct, ".1%") 
+    }),
+    renderPlotly({ 
+        data.set <- filter(mr()$mo$qsd, Corridor==signal_group() & Month <= current_month())
+        validate(need(nrow(data.set) > 0, "No Data"))
+        perf_plot(data.set, "qs_freq", "Queue\nSpillback", RED2, as_pct, ".1%")
+    }),
+    renderPlotly({ 
+        data.set <- filter(mr()$mo$sfd, Corridor==signal_group() & Month <= current_month())
+        validate(need(nrow(data.set) > 0, "No Data"))
+        perf_plot(data.set, "sf_freq", "Split\nFailure", RED2, as_pct, ".1%")
+    }),
+    renderPlotly({ 
+        data.set <- filter(cor$mo$tti, Corridor==signal_group() & Month <= current_month())
+        validate(need(nrow(data.set) > 0, "No Data"))
+        perf_plot(data.set, "tti", "Travel Time\nIndex", RED2, as_2dec, ".2f") 
+    }),
+    renderPlotly({ 
+        data.set <- filter(cor$mo$pti, Corridor==signal_group() & Month <= current_month())
+        validate(need(nrow(data.set) > 0, "No Data"))
+        perf_plot(data.set, "pti", "Planning Time\nIndex", RED2, as_2dec, ".2f")
+    }),
+    height = 700)
+```
+
+### Volumes and Equipment
+
+```{r summary_right, eval = TRUE, warning = FALSE}
+
+fillCol(
+    renderPlotly({ 
+        data.set <- filter(mr()$mo$vpd, Corridor==signal_group() & Month <= current_month())
+        validate(need(nrow(data.set) > 0, "No Data"))
+        perf_plot(data.set, "vpd", "Daily\nVolume", VDOT_BLUE, as_int)
+    }),
+    
+    renderPlotly({ 
+        data.set <- filter(mr()$mo$vphp$am, Corridor==signal_group() & Month <= current_month())
+        validate(need(nrow(data.set) > 0, "No Data"))
+        perf_plot(data.set, "vph", "AM Hourly\nVolume", VDOT_BLUE, as_int)
+    }),
+    renderPlotly({ 
+        data.set <- filter(mr()$mo$vphp$pm, Corridor==signal_group() & Month <= current_month())
+        validate(need(nrow(data.set) > 0, "No Data"))
+        perf_plot(data.set, "vph", "PM Hourly\nVolume", VDOT_BLUE, as_int)
+    }),
+
+    renderPlotly({ 
+        data.set <- filter(cor$mo$du, Corridor==signal_group() & Month <= current_month())
+        validate(need(nrow(data.set) > 0, "No Data"))
+        perf_plot(data.set, "uptime.all", "Detector\nUptime\nGoal: 95%", ORANGE, as_pct, ".1%")
+    }),
+    renderPlotly({ 
+        data.set <- filter(cor$mo$ped, 
+                          Corridor==signal_group() & Month <= current_month() & Month >= ymd("2017-07-01"))
+        validate(need(nrow(data.set) > 0, "No Data"))
+        perf_plot(data.set, "uptime", "Ped Detector\nUptime\nGoal: 95%", ORANGE, as_pct, ".1%")
+    }),
+    renderPlotly({ 
+        data.set <- filter(mr()$mo$cctv, 
+                          Corridor==signal_group() & Month <= current_month() & Month >= ymd("2017-07-01"))
+        validate(need(nrow(data.set) > 0, "No Data"))
+        perf_plot(data.set, "uptime", "CCTV\nUptime\nGoal: 95%", ORANGE, as_pct, ".1%")
+    }),
+    renderPlotly({ 
+        data.set <- filter(mr()$mo$cu, Corridor==signal_group() & Month <= current_month())
+        validate(need(nrow(data.set) > 0, "No Data"))
+        perf_plot(data.set, "uptime", "Communications\nUptime\nGoal: 95%", ORANGE, as_pct, ".1%")
+    }),
+    height = 800)
+```
+
+
+
+
+
+
+
+
+
+Performance
+=====================================
+
+Row
+-------------------------------------
+
+### Throughput (vph) {.value-box}
+
+```{r, warning = FALSE}
+renderValueBox({
+  valueBox(
+      value = get_valuebox(mr()$mo$tp, "vph", as_int,
+                           zone = signal_group(), mo = current_month(), break_ = TRUE),
+      icon = "fa-bar-chart"
+  )
+})
+```
+
+### Arrivals on Green {.value-box}
+
+```{r, warning = FALSE}
+renderValueBox({
+  valueBox(
+      value = get_valuebox(mr()$mo$aogd, "aog", as_pct,
+                           zone = signal_group(), mo = current_month(), break_ = TRUE),
+      icon = "fa-car"
+  )
+})
+```
+
+### Spillback Rate {.value-box}
+
+```{r, warning = FALSE}
+renderValueBox({
+  valueBox(
+      value = get_valuebox(mr()$mo$qsd, "qs_freq", as_pct,
+                           zone = signal_group(), mo = current_month(), break_ = TRUE),
+      icon = "fa-car"
+  )
+})
+```
+
+### Split Failures {.value-box}
+
+```{r}
+renderValueBox({
+  valueBox(
+      value = get_valuebox(mr()$mo$sfd, "sf_freq", as_pct,
+                           zone = signal_group(), mo = current_month(), break_ = TRUE),
+      icon = "fa-car"
+  )
+})
+```
+
+### Travel Time Index {.value-box}
+
+```{r, warning = FALSE}
+renderValueBox({
+  valueBox(
+      value = get_valuebox(cor$mo$tti, "tti", as_2dec,
+                           zone = signal_group(), mo = current_month(), break_ = TRUE),
+      icon = "fa-dashboard"
+  )
+})
+```
+
+### Planning Time Index {.value-box}
+
+```{r, warning = FALSE}
+renderValueBox({
+  valueBox(
+      value = get_valuebox(cor$mo$pti, "pti", as_2dec,
+                           zone = signal_group(), mo = current_month(), break_ = TRUE),
+      icon = "fa-dashboard"
+  )
+})
+```
+
+
+Row {.tabset .tabset-fade}
+-------------------------------------
+
+
+### Throughput
+
+```{r, fig.width = FIG_WIDTH, fig.height = FIG_HEIGHT, eval = TRUE, warning = FALSE}
+renderPlotly({
+    get_bar_line_dashboard_plot(mr()$wk$tp, mr()$mo$tp, NULL,
+                                "vph", "integer", highlight_color = RED2,
+                                month_ = current_month(), zone_group_ = signal_group(),
+                                x_bar_title = "Vehicles per Hour",
+                                x_line1_title = paste(input$month, "Throughput (vph)"),
+                                plot_title = "Throughput (peak veh/hr) Trend")
+})
+```
+
+
+### Arrivals on Green
+
+```{r, fig.width = FIG_WIDTH, fig.height = FIG_HEIGHT, warning = FALSE}
+renderPlotly({
+    get_bar_line_dashboard_plot(mr()$wk$aog, mr()$mo$aogd, mr()$mo$aogh,
+                                "aog", "percent", highlight_color = RED2,
+                                month_ = current_month(), zone_group_ = signal_group(),
+                                x_bar_title = paste(input$month, "AOG"),
+                                x_line1_title = "AOG Trend",
+                                x_line2_title = paste(input$month, "AOG by TOD"),
+                                plot_title = "Percent Arrivals on Green")
+})
+```
+
+
+### Queue Spillback Rate
+
+```{r, fig.width = FIG_WIDTH, fig.height = FIG_HEIGHT, eval = TRUE, warning = FALSE}
+renderPlotly({
+    get_bar_line_dashboard_plot(mr()$wk$qs, mr()$mo$qsd, mr()$mo$mqsh,
+                                "qs_freq", "percent", highlight_color = RED2,
+                                month_ = current_month(), zone_group_ = signal_group(),
+                                x_bar_title = paste(input$month, "Queue Spillback Rate"),
+                                x_line1_title = "Queue Spillback Trend",
+                                x_line2_title = paste(input$month, "Queue Spillback by TOD"),
+                                plot_title = "Queue Spillback Rate")
+})
+```
+
+
+### Split Failures
+
+```{r, fig.width = FIG_WIDTH, fig.height = FIG_HEIGHT, warning = FALSE}
+renderPlotly({
+    get_bar_line_dashboard_plot(mr()$wk$sf, mr()$mo$sfd, mr()$mo$sfh,
+                                "sf_freq", "percent", highlight_color = RED2,
+                                month_ = current_month(), zone_group_ = signal_group(),
+                                x_bar_title = paste(input$month, "Split Failures Rate"),
+                                x_line1_title = "Split Failures Trend",
+                                x_line2_title = paste(input$month, "Split Failures by TOD"),
+                                plot_title = "Split Failures Rate")
+})
+```
+
+
+### Travel Time Metrics
+
+```{r, fig.width = FIG_WIDTH, fig.height = FIG_HEIGHT, eval = TRUE, warning = FALSE}
+renderPlotly({
+    get_tt_plot(cor$mo$tti, cor$mo$ttih, 
+                cor$mo$pti, cor$mo$ptih,
+                month_ = current_month(),
+                zone_group_ = signal_group(),
+                x_bar_title = paste(input$month, "TTI & PTI"),
+                x_line1_title = paste(input$month, "TTI by hr"),
+                x_line2_title = paste(input$month, "PTI by hr"))
+})
+```
+
+
+
+
+
+
+
+
+
+Volumes
+=====================================
+
+Row
+-------------------------------------
+
+### Traffic Volume [veh/day] {.value-box}
+
+```{r, warning = FALSE}
+renderValueBox({
+  valueBox(
+    value = get_valuebox(mr()$mo$vpd, "vpd", as_int,
+                           zone = signal_group(), mo = current_month(), break_ = FALSE),
+    icon = "fa-area-chart"
+  )
+})
+```
+
+### AM Peak Volume [veh/hr] {.value-box}
+
+```{r, warning = FALSE}
+renderValueBox({
+  valueBox(
+      value = get_valuebox(mr()$mo$vphp$am, "vph", as_int,
+                           zone = signal_group(), mo = current_month(), break_ = FALSE),
+      icon = "fa-area-chart"
+  )
+})
+```
+
+### PM Peak Volume [veh/hr] {.value-box}
+
+```{r, warning = FALSE}
+renderValueBox({
+  valueBox(
+      value = get_valuebox(mr()$mo$vphp$pm, "vph", as_int,
+                           zone = signal_group(), mo = current_month(), break_ = FALSE),
+      icon = "fa-area-chart"
+  )
+})
+```
+
+Row {.tabset .tabset-fade}
+-------------------------------------
+
+### Daily Volume
+
+```{r, fig.width = FIG_WIDTH, fig.height = FIG_HEIGHT, eval = TRUE, warning = FALSE}
+renderPlotly({ # Good version
+    get_bar_line_dashboard_plot(mr()$wk$vpd, mr()$mo$vpd, NULL,
+                                "vpd", "integer", highlight_color = VDOT_BLUE,
+                                month_ = current_month(), zone_group_ = signal_group(),
+                                x_bar_title = "Vehicles per Day",
+                                x_line1_title = paste(input$month, "Daily Volume (vpd)"),
+                                plot_title = "Daily Volume (veh/day) Trend")
+})
+```
+
+### Monthly Change
+
+```{r, fig.width = FIG_WIDTH, fig.height = FIG_HEIGHT, eval = TRUE, warning = FALSE}
+renderPlotly({
+    get_pct_ch_plot(mr()$mo$vpd,
+                    month_ = current_month(),
+                    zone_group = signal_group())
+})
+```
+
+### Peak Hour Volumes
+
+```{r, fig.width = FIG_WIDTH, fig.height = FIG_HEIGHT, eval = TRUE, warning = FALSE}
+renderPlotly({
+    am_vph_plot <- get_bar_line_dashboard_plot(mr()$wk$vphp$am,
+                                               mr()$mo$vphp$am, NULL,
+                                "vph", "integer", highlight_color = VDOT_BLUE,
+                                month_ = current_month(), zone_group_ = signal_group(),
+                                x_bar_title = "Vehicles per Hour",
+                                x_line1_title = paste(input$month, "Hourly Volume (vph)"),
+                                plot_title = "Peak Period Hourly Volume (veh/hr) Trend")
+    pm_vph_plot <- get_bar_line_dashboard_plot(mr()$wk$vphp$pm,
+                                               mr()$mo$vphp$pm, NULL,
+                                "vph", "integer", highlight_color = VDOT_BLUE,
+                                month_ = current_month(), zone_group_ = signal_group(),
+                                x_bar_title = "Vehicles per Hour",
+                                x_line1_title = paste(input$month, "Hourly Volume (vph)"),
+                                plot_title = "Peak Period Hourly Volume (veh/hr) Trend")
+    subplot(am_vph_plot, pm_vph_plot, nrows = 1, margin = 0.04)
+})
+```
+
+### Hourly Volumes
+
+
+```{r, fig.width = FIG_WIDTH, fig.height = FIG_HEIGHT, eval = TRUE, warning = FALSE}
+renderPlotly({
+    get_minmax_hourly_plot(mr()$mo$vph,
+                           month_ = current_month(), 
+                           zone_group_ = signal_group())
+})
+```
+
+
+
+
+
+
+
+
+
+Equipment
+=====================================
+
+Row
+-------------------------------------
+
+### Vehicle Detector Availability {.value-box}
+
+```{r, warning = FALSE}
+renderValueBox({
+  valueBox(
+      value = get_valuebox(mr()$mo$du %>% 
+                          group_by(Corridor) %>% 
+                          mutate(delta = uptime.all - lag(uptime.all)), 
+                      "uptime.all", as_pct,
+                           zone = signal_group(), mo = current_month(), break_ = FALSE),
+      icon = "fa-car"
+  )
+})
+```
+
+### CCTV Availability {.value-box}
+
+```{r, warning = FALSE}
+renderValueBox({
+  valueBox(
+    value = get_valuebox(cor$mo$cctv, "uptime", as_pct,
+                           zone = signal_group(), mo = current_month(), break_ = FALSE),
+    icon = "glyphicon-facetime-video" 
+  )
+})
+```
+
+### Pedestrian Detector Availability {.value-box}
+
+```{r, warning = FALSE}
+renderValueBox({
+  valueBox(
+      value = get_valuebox(cor$mo$ped, "uptime", as_pct,
+                           zone = signal_group(), mo = current_month(), break_ = FALSE),
+      icon = "fa-child" 
+  )
+})
+```
+
+### Communications Uptime {.value-box}
+
+```{r, warning = FALSE}
+renderValueBox({
+  valueBox(
+      value = get_valuebox(mr()$mo$cu, "uptime", as_pct,
+                           zone = signal_group(), mo = current_month(), break_ = FALSE),
+      icon = "ion-paper-airplane"
+  )
+})
+```
+
+Row {.tabset .tabset-fade}
+-------------------------------------
+
+### Detector Uptime
+
+```{r, fig.width = FIG_WIDTH, fig.height = FIG_HEIGHT, eval = TRUE, warning = FALSE}
+
+renderPlotly({
+    
+    if (corridor() == "All Corridors") {
+
+        get_cor_det_uptime_plot(mr()$dy$du, 
+                                month_name = input$month,
+                                month_ = current_month(), 
+                                zone_group_ = signal_group())
+        
+    } else {
+        
+        get_uptime_plot(sig$dy$du, 
+                                 sig$mo$du, 
+                                 var_ = "uptime.all", 
+                                 num_format = "percent", 
+                                 month_ = current_month(), 
+                                 zone_group_ = signal_group(),
+                                 x_bar_title = "Current Month Uptime",
+                                 x_line1_title = "Daily Uptime",
+                                 plot_title = "",
+                                 goal = NULL)
+    }
+})
+```
+
+### Pedestrian Detector Uptime
+
+```{r, fig.width = FIG_WIDTH, fig.height = FIG_HEIGHT, warning = FALSE}
+renderPlotly({
+    
+    weekly_ped_df <- rename(cor$mo$ped, Date = Month) %>%
+        filter(Date >= ymd("2017-07-01"))
+    monthly_ped_df <- cor$mo$ped %>%
+        filter(Month >= ymd("2017-07-01"))
+    get_bar_line_dashboard_plot(weekly_ped_df,
+                                monthly_ped_df,
+                                var_ = "uptime", num_format = "percent", highlight_color = BROWN,
+                                month_ = current_month(), zone_group_ = signal_group(),
+                                x_bar_title = paste(input$month, "Ped Det Uptime"),
+                                x_line1_title = "Pedestrian Detector Uptime Trend",
+                                plot_title = "Ped Detector Uptime")
+})
+```
+
+
+
+
+
+### Communications Uptime
+
+
+```{r, fig.width = FIG_WIDTH, fig.height = FIG_HEIGHT, eval = TRUE, warning = FALSE}
+
+renderPlotly({
+
+    if (corridor() == "All Corridors") {
+        
+        get_cor_comm_uptime_plot(mr()$dy$cu,
+                                 mr()$mo$cu,
+                                 month_name = input$month,
+                                 month_ = current_month(),
+                                 zone_group_ = signal_group())
+    } else {
+        
+        get_uptime_plot(sig$dy$cu, 
+                                 sig$mo$cu, 
+                                 var_ = "uptime", 
+                                 num_format = "percent", 
+                                 month_ = current_month(), 
+                                 zone_group_ = signal_group(),
+                                 x_bar_title = "Current Month Uptime",
+                                 x_line1_title = "Daily Uptime",
+                                 plot_title = "",
+                                 goal = NULL)
+    }
+    
+})
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Signals List
+=====================================
+
+Row {data-height = 800}
+-------------------------------------
+
+```{r}
+renderDataTable({
+    
+    datatable(filtered_corridors(),  #corr, 
+              escape = FALSE,
+              extensions = 'Scroller', 
+              options = list(
+                  deferRender = TRUE,
+                  scrollY = 800,
+                  scroller = TRUE,
+                  searching = TRUE)
+    )
+})
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Explanation of Calcs
+=====================================
+
+### PERFORMANCE
+
+#### **Throughput**
+
+Throughput is a measure of efficiency. It is meant to represent the maximum
+number of vehicles serviced through an intersection, and the corridor.
+
+Throughput is calculated as the highest 15-minute volume in a day for
+each intersection, converted to an hourly volume, averaged over the
+corridor. Volumes come from high-resolution event logs from the controller,
+which are stored in the ATSPM database.
+
+#### **Arrivals on Green**
+
+Arrivals on Green (AOG) is a measure of coordination. A percentage of 
+vehicles arriving on green would be due to good offsets
+and should be correlated with fewer stops and less delay.
+
+AOG is calculated as the total number of vehicles arriving on green
+divided by the total number of arrivals. It includes main street through phases,
+during peak periods (6am-10am, 3pm-7pm) on Tuesdays, Wednesdays and
+Thursdays.
+
+The calculation takes the ATSPM data, aggregates the counts by cycle and
+interval, and divides the counts in the green intervals by the total counts
+for the cycle, averaged over all cycles.
+
+#### **Queue Spillback Rate**
+
+Queue Spillback Rate is an experimental measure of effectiveness.
+It is a measure of unmet demand in a cycle. Based on the vehicle
+dwell times over setback detectors on the main street through phases, each cycle is
+evaluated for spillback. A spillback condition will be triggered by
+occupancy readings above what is typical for setback detectors under
+freely flowing conditions. 
+
+Specifically, under freely flowing
+conditions, the time between subsequent detector on and off events is typically
+around 0.1 seconds for setback detectors. 
+When the 95^th^ percentile detector occupancy duration increases above 3
+seconds in a cycle, it will be assumed there is standing traffic on the setback
+detector and a spillback event will be flagged for that phase in that
+cycle.
+
+The queue spillback rate is calculated as the number of spillback events
+divided by the number of cycles for main street through phases.
+
+#### **Split Failures**
+
+Split failure is another measure of unmet demand. It identifies cycles where a
+phase has unserved demand. A phase is flagged for split failure when a  detector on event occurs
+before the start of red and the subsequent detector off event occurs after the next
+start of green.
+
+Because this measure requires stop
+bar detection, it is only be calculated for side street and left
+turn phases, i.e., all phases other than main street through phases.
+
+Split Failure Percent is calculated as the number of split failures divided by the total
+number of side street and left turn phases.
+
+#### **Travel Time Index**
+
+Travel Time Index (TTI) is a measure of delay on the corridor. It is the
+ratio of travel time to free flow travel time.
+
+Hourly travel time data from HERE queried from RITIS. Free flow travel
+times are based on the "reference speed" value from HERE for each
+segment. Travel time and free flow travel time are calculated for each
+corridor by summing over all segments in the corridor for every hour in
+the month.
+
+An hourly Travel Time Index is then calculated for each corridor as the
+average travel time for that hour of the day divided by the free flow
+travel time for the corridor. The TTI for each hour is then averaged
+over the day, weighted by the average hourly volume on the main street through phases
+(from ATSPM) to get a TTI for the month (this gives more weight to peak
+periods than off-peak periods).
+
+#### **Planning Time Index**
+
+The Planning Time Index (PTI) calculation uses the same data as the
+Travel Time Index. However, instead of taking the average travel times
+for each hour of the day, it takes the 90^th^ percentile for each hour,
+over the days of the month. These 90^th^ percentile travel times are
+then averaged over the day, weighted by the average hourly volume from
+the main street through phases  (from ATSPM) to get a PTI for the month 
+(this gives more weight to peak periods than off-peak periods).
+
+
+
+### VOLUMES
+
+#### **Daily Volume**
+
+Volume is a measure of demand on a corridor. Total volume on main street 
+through phases are summed over each Tuesday, Wednesday and Thursday,
+and then averaged over all days in the month.
+
+#### **Monthly Change**
+
+Each bar in the Monthly Change plot shows the percent change in daily volume
+compared with the previous month.
+
+#### **Peak Hour Volumes**
+
+The AM and PM average peak hour volumes are the average hourly volume
+for the month over the AM and PM peak hours, respectively. 
+Peak hours are 6am-10am, 3pm-7pm.
+
+#### **Hourly Volumes**
+
+The hourly volumes chart shows the range of hourly volumes for all
+months from the beginning of the data set, superimposed with the hourly
+volumes for the current month. It is meant to show the spread of each
+hour and whether the current month is high or low compared to the
+historical range.
+
+### EQUIPMENT AND ACTIVITY
+
+#### **Detector Uptime**
+
+Detector Uptime is a measure of state-of-good-repair, which may be correlated to
+other performance measures since failed detectors may negatively affect
+performance.
+
+Based on hourly volumes by detector, each hour is flagged if any of the
+following conditions apply:
+
+-   Missing data (volume = NA)
+
+-   volume &gt; 1000
+
+-   Absolute change in volume from previous hour &gt; 500
+
+-   change in volume from previous hour = 0
+
+For each day, if more than 40% of hours are flagged the detector is considered down for that day.
+Separately, if the average absolute change from the previous hour, averaged over the day, is
+greater than 200, the detector is considered down fot that day. The
+uptime is the percentage of good days in the month. These thresholds are
+all based on observation of the data and can be adjusted as necessary.
+
+#### **Pedestrian Detector Uptime**
+
+Pedestrian Detector Uptime is the percentage of pedestrian pushbuttons operational and is
+reported by Corridor Managers from physically pressing each button in
+the field at some point during the month and observing whether it is
+working.
+
+There are two reasons why this is currently done manually. The first is that
+multiple push buttons are often physically wired into the same detector input,
+making it impossible from the controller inputs to determine whether both push
+buttons are working, or just one. The second is due to the relatively infrequent calls,
+it is difficult to tell from the data whether there is no demand or whether the 
+push button has failed.
+
+
+#### **Communications Uptime**
+
+This is calculated from gaps in the ATSPM high resolution data. Any gaps
+in subsequent events greater than 15 minutes are considered to be due to 
+communication loss. The sum of these gaps converted to a percent is the
+daily communication uptime for that controller. If comms are lost for all
+intersections, it is considered a system failure and that time is excluded
+from the uptime calculation.
+
+
