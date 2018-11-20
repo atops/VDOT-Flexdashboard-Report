@@ -59,12 +59,8 @@ Sys.setenv("AWS_ACCESS_KEY_ID" = aws_conf$AWS_ACCESS_KEY_ID,
            "AWS_SECRET_ACCESS_KEY" = aws_conf$AWS_SECRET_ACCESS_KEY,
            "AWS_DEFAULT_REGION" = aws_conf$AWS_DEFAULT_REGION)
 
-if (Sys.info()["nodename"] %in% c("GOTO3213490", "Larry")) { # The SAM or Larry # VDOT -- update if we need a proxy
-    set_config(
-        use_proxy("gdot-enterprise", port = 8080,
-                  username = Sys.getenv("GDOT_USERNAME"),
-                  password = Sys.getenv("GDOT_PASSWORD")))
-    
+if (Sys.info()["nodename"] %in% c("Larry")) { # The SAM or Larry # VDOT -- update if we need a proxy
+    pass 
 } else { # shinyapps.io
     Sys.setenv(TZ="America/New_York")
 }
