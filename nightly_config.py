@@ -10,13 +10,13 @@ import numpy as np
 from datetime import datetime
 import boto3
 
-from get_maxtime_config_asyncio_polling import get_veh_det_plans, get_unit_info
-from get_maxtime_config_reduce import reduce_det_plans, reduce_unit_info
+#from get_maxtime_config_asyncio_polling import get_veh_det_plans, get_unit_info
+#from get_maxtime_config_reduce import reduce_det_plans, reduce_unit_info
 from get_atspm_detectors import get_atspm_detectors
 
 
 # get Good/Authoritative Detector Config (det_config) and write to feather
-def get_det_config(adc, mdp, date_string):
+def get_det_config(adc, date_string):
     # -- ---------------------------------
     # -- Included detectors --
     #  SignalID/Detector pairs with vol > 0 over the past year
@@ -57,7 +57,7 @@ def get_det_config(adc, mdp, date_string):
     
     # -- --------------------------------------------------- --
     # -- Maxtime Detector Plans (from reduce function above) --
-    
+    """
     mdp = mvdp[['SignalID','Detector','CallPhase']]
     
     mdp.SignalID = mdp.SignalID.astype('int')
@@ -69,17 +69,17 @@ def get_det_config(adc, mdp, date_string):
     # Exclude those not in "included detectors"
     mdp = mdp.join(incld).rename(columns={'Unnamed: 0': 'in_cel'})
     mdp = mdp[~mdp['in_cel'].isna()]
-    
-    det_config = adc.join(other=mdp, how='outer', lsuffix='_atspm', rsuffix='_maxtime').sort_index()
+    """
+    det_config = adc.join(incld).rename(columns={'Unnamed: 0': 'in_cel'}).sort_index() #.join(other=mdp, how='outer', lsuffix='_atspm', rsuffix='_maxtime').sort_index()
     
     det_config.TimeFromStopBar = det_config.TimeFromStopBar.fillna(0).round(1)
-    det_config['CallPhase'] = np.where(det_config.CallPhase_maxtime.isna(),
-                                       det_config.CallPhase_atspm,
-                                       det_config.CallPhase_maxtime).astype('int')
+    #det_config['CallPhase'] = np.where(det_config.CallPhase_maxtime.isna(),
+    #                                   det_config.CallPhase_atspm,
+    #                                   det_config.CallPhase_maxtime).astype('int')
     
-    det_config[((~det_config.CallPhase_maxtime.isna()) & (~det_config.in_cel.isna()))]
+    #det_config[((~det_config.CallPhase_maxtime.isna()) & (~det_config.in_cel.isna()))]
     
-    det_config = det_config[((~det_config.CallPhase_atspm.isna()) & (~det_config.CallPhase_maxtime.isna())) | ((~det_config.CallPhase_maxtime.isna()) & (~det_config.in_cel.isna()))]
+    #det_config = det_config[((~det_config.CallPhase_atspm.isna()) & (~det_config.CallPhase_maxtime.isna())) | ((~det_config.CallPhase_maxtime.isna()) & (~det_config.in_cel.isna()))]
     # -- --------------------------------------------------------- --
     # -- Combine ATSPM Detector Config and MaxTime Detector Config --
     
@@ -87,27 +87,14 @@ def get_det_config(adc, mdp, date_string):
                                        'Detector',
                                        'CallPhase',
                                        'TimeFromStopBar',
-                                       'CallPhase_atspm',
-                                       'CallPhase_maxtime',
+                                       #'CallPhase_atspm',
+                                       #'CallPhase_maxtime',
                                        'in_cel']]
     return det_config
 
 s3 = boto3.client('s3')
 
 date_string = datetime.today().strftime('%Y-%m-%d')
-
-
-
-get_veh_det_plans()
-mvdp = reduce_det_plans()
-mvdp_csv_filename = 'MaxTime_Det_Plans_{}.csv'.format(date_string)
-mvdp.to_csv(mvdp_csv_filename)
-
-#upload to s3
-key = 'maxtime_det_plans/date={}/MaxTime_Det_Plans.csv'.format(date_string)
-s3.upload_file(Filename=mvdp_csv_filename, 
-               Bucket='gdot-devices', 
-               Key=key)
 
 
 
@@ -124,21 +111,10 @@ s3.upload_file(Filename=ad_csv_filename,
 
 
 
-get_unit_info()
-ui = reduce_unit_info()
-ui_csv_filename = 'MaxTime_Unit_Info_{}.csv'.format(date_string)
-ui.to_csv(ui_csv_filename)
-
-# upload to s3
-key = 'maxtime_unit_info/date={}/MaxTime_Unit_Info.csv'.format(date_string)
-s3.upload_file(Filename=ui_csv_filename, 
-               Bucket='gdot-devices', 
-               Key=key)
 
 
 
-
-det_config = get_det_config(ad, mvdp, date_string)
+det_config = get_det_config(ad, date_string)
 dc_filename = 'ATSPM_Det_Config_Good_{}.feather'.format(date_string)
 det_config.to_feather(dc_filename)
 
