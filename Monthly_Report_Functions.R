@@ -85,7 +85,8 @@ get_atspm_connection <- function() {
         dbConnect(odbc::odbc(),  
                   driver = "FreeTDS",
                   server = Sys.getenv("VDOT_ATSPM_SERVER_INSTANCE"),
-                  database = Sys.getenv("VDOT_ATSPM_DB"),
+                  #database = Sys.getenv("VDOT_ATSPM_DB"),
+                  port = 1433,
 		          uid = Sys.getenv("VDOT_ATSPM_USERNAME"),
                   pwd = Sys.getenv("VDOT_ATSPM_PASSWORD"))
     }

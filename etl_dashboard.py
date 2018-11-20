@@ -134,9 +134,10 @@ if __name__=='__main__':
 
         def connect():
             return pyodbc.connect(
-                'DRIVER=FreeTDS;' + 
+                'Driver=FreeTDS;' + 
                 'SERVER={};'.format(os.environ['VDOT_ATSPM_SERVER_INSTANCE']) +
-                'DATABASE={};'.format(os.environ['VDOT_ATSPM_DB']) +
+                #'DATABASE={};'.format(os.environ['VDOT_ATSPM_DB']) +
+                'PORT=1433;' +
                 'UID={};'.format(os.environ['VDOT_ATSPM_USERNAME']) +
                 'PWD={};'.format(os.environ['VDOT_ATSPM_PASSWORD']) +
                 'TDS_Version=8.0;')
