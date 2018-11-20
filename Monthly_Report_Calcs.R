@@ -113,6 +113,9 @@ lapply(month_abbrs, function(month_abbr) {
 
 signals_list <- corridors$SignalID[!is.na(corridors$SignalID)]
 
+print(paste("Signals List", signals_list))
+print(paste("Month Abbrs", month_abbrs))
+
 # Group into months to calculate filtered and adjusted counts
 # adjusted counts needs a full month to fill in gaps based on monthly averages
 

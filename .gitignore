@@ -8,6 +8,9 @@
 /rsconnect
 
 *.RData
+*.swp
+*.fst
+*.feather
 
 cor_s3.rds
 sig_s3.rds

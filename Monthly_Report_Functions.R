@@ -60,7 +60,7 @@ Sys.setenv("AWS_ACCESS_KEY_ID" = aws_conf$AWS_ACCESS_KEY_ID,
            "AWS_DEFAULT_REGION" = aws_conf$AWS_DEFAULT_REGION)
 
 if (Sys.info()["nodename"] %in% c("Larry")) { # The SAM or Larry # VDOT -- update if we need a proxy
-    pass 
+    print(Sys.info()["nodename"]) 
 } else { # shinyapps.io
     Sys.setenv(TZ="America/New_York")
 }
@@ -167,12 +167,16 @@ get_tmc_routes <- function(pth = "Inrix/For_Monthly_Report/2018-09/") { # VDOT -
 
 # New as of 11/8/18
 get_det_config <- function(date_) {
-    read_feather(glue('../ATSPM_Det_Config_Good_{date_}.feather')) %>%
+    fn <- glue('ATSPM_Det_Config_Good_{date_}.feather')
+    if (!file.exists(fn)) {
+	fn <- glue('ATSPM_Det_Config_Good.feather')
+    }
+    read_feather(fn) %>%
         transmute(SignalID = as.character(SignalID), 
                   Detector = as.integer(Detector), 
                   CallPhase = as.integer(CallPhase),
-                  CallPhase.atspm = as.integer(CallPhase_atspm),
-                  CallPhase.maxtime = as.integer(CallPhase_maxtime),
+                  #CallPhase.atspm = as.integer(CallPhase_atspm),
+                  #CallPhase.maxtime = as.integer(CallPhase_maxtime),
                   TimeFromStopBar = TimeFromStopBar)
 }
 
@@ -255,14 +259,15 @@ get_counts2 <- function(date_, uptime = TRUE, counts = TRUE) {
     counts_1hr_csv_fn <- glue("counts_1hr_{start_date}.csv")
     counts_15min_csv_fn <- glue("counts_15min_{start_date}.csv")
     
-    file.remove(counts_1hr_csv_fn)
-    file.remove(counts_15min_csv_fn)
-    
-    #file.remove( list.files(pattern = glue("counts_1hr_{start_date}_*.csv")) )
-    #file.remove( list.files(pattern = glue("counts_15min_{start_date}_*.csv")) )
-    
+    if (file.exists(counts_1hr_csv_fn)) {
+	file.remove(counts_1hr_csv_fn)
+    }
+    if (file.exists(counts_15min_csv_fn)) {
+	file.remove(counts_15min_csv_fn)
+    }
+        
     n <- length(signals_list)
-    i <- 20
+    i <- 10
     splits <- rep(1:ceiling(n/i), each = i, length.out = n)
     
     lapply(split(signals_list, splits), function(signals_sublist) {
@@ -384,7 +389,11 @@ get_filtered_counts <- function(counts, interval = "1 hour") { # interval (e.g.,
     all_days <- unique(date(counts$Timeperiod))
     det_config <- lapply(all_days, function(d) {
         all_timeperiods <- seq(ymd_hms(paste(d, "00:00:00")), ymd_hms(paste(d, "23:59:00")), by = "1 hour")
-        read_feather(glue("../ATSPM_Det_Config_Good_{d}.feather")) %>% 
+        fn <- glue("ATSPM_Det_Config_Good_{d}.feather")
+    	if (!file.exists(fn)) {
+	    fn <- glue("ATSPM_Det_Config_Good.feather")
+	}
+	read_feather(fn) %>% 
             transmute(SignalID = factor(SignalID), 
                       Detector = factor(Detector), 
                       CallPhase = factor(CallPhase)) %>% 
