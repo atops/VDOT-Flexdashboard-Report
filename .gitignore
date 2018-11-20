@@ -3,6 +3,7 @@
 .RData
 .Ruserdata
 
+/__pycache__
 /Monthly_Report_cache
 /rsconnect
 

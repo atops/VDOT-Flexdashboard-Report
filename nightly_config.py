@@ -104,10 +104,10 @@ ad_csv_filename = 'ATSPM_Det_Config_{}.csv'.format(date_string)
 ad.to_csv(ad_csv_filename)
 
 # upload to s3
-key = 'atspm_det_config/date={}/ATSPM_Det_Config.csv'.format(date_string)
-s3.upload_file(Filename=ad_csv_filename, 
-               Bucket='gdot-devices', 
-               Key=key)
+#key = 'atspm_det_config/date={}/ATSPM_Det_Config.csv'.format(date_string)
+#s3.upload_file(Filename=ad_csv_filename, 
+#               Bucket='gdot-devices', 
+#               Key=key)
 
 
 
@@ -119,10 +119,10 @@ dc_filename = 'ATSPM_Det_Config_Good_{}.feather'.format(date_string)
 det_config.to_feather(dc_filename)
 
 # upload to s3
-key = 'atspm_det_config_good/date={}/ATSPM_Det_Config_Good.feather'.format(date_string)
-s3.upload_file(Filename=dc_filename, 
-               Bucket='gdot-devices', 
-               Key=key)
+#key = 'atspm_det_config_good/date={}/ATSPM_Det_Config_Good.feather'.format(date_string)
+#s3.upload_file(Filename=dc_filename, 
+#               Bucket='gdot-devices', 
+#               Key=key)
 
 
 """

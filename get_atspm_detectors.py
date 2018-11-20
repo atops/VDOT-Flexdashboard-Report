@@ -22,7 +22,7 @@ def get_atspm_detectors():
                                   pool_size=20)
     
     elif os.name=='posix':
-
+        print(os.name)
         def connect():
             return pyodbc.connect(
                 'Driver=FreeTDS;' + 
