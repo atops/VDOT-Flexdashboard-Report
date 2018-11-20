@@ -3,4 +3,13 @@
 .RData
 .Ruserdata
 
+/Monthly_Report_cache
+/rsconnect
+
+*.RData
+
+cor_s3.rds
+sig_s3.rds
+teams_tables_s3.rds
 Monthly_Report_AWS.yaml
+
