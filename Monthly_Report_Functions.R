@@ -99,7 +99,7 @@ get_month_abbrs <- function(start_date, end_date) {
     day(start_date) <- 1
     end_date <- ymd(end_date)
     
-    sapply(seq(start_date, end_date, by = "1 month"), as.character)
+    sapply(seq(start_date, end_date, by = "1 month"), function(d) { format(d, "%Y-%m")} )
     
     #sapply(seq(ymd(start_date), ymd(end_date), by = "1 month"),
     #                  function(date_) { 
