@@ -17,9 +17,15 @@ import boto3
 import yaml
 from glob import glob
 
-s3 = boto3.client('s3')
-ath = boto3.client('athena')
+with open('Monthly_Report_AWS.yaml') as yaml_file:
+    cred = yaml.load(yaml_file)
 
+s3 = boto3.client('s3',
+                  aws_access_key_id=cred['AWS_ACCESS_KEY_ID'],
+                  aws_secret_access_key=cred['AWS_SECRET_ACCESS_KEY'])
+ath = boto3.client('athena',
+                  aws_access_key_id=cred['AWS_ACCESS_KEY_ID'],
+                  aws_secret_access_key=cred['AWS_SECRET_ACCESS_KEY'])
 ATHENA_DB = 'vdot_spm'
 
 '''
@@ -40,7 +46,9 @@ ATHENA_DB = 'vdot_spm'
 
 def etl2(s, date_):
     
-    dc_fn = '../ATSPM_Det_Config_Good_{}.feather'.format(date_.strftime('%Y-%m-%d'))
+    dc_fn = 'ATSPM_Det_Config_Good_{}.feather'.format(date_.strftime('%Y-%m-%d'))
+    if not os.path.exists(dc_fn):
+        dc_fn = 'ATSPM_Det_Config_Good.feather'
     det_config = (pd.read_feather(dc_fn)
                     .assign(SignalID = lambda x: x.SignalID.astype('int64'))
                     .assign(Detector = lambda x: x.Detector.astype('int64'))
@@ -48,7 +56,9 @@ def etl2(s, date_):
     
     left = det_config[det_config.SignalID==s]
     right = bad_detectors[(bad_detectors.SignalID==s) & (bad_detectors.Date==date_)]
-        
+    right = (right.assign(SignalID = lambda x: x.SignalID.astype('int64'))
+                  .assign(Detector = lambda x: x.Detector.astype('int64')))
+
     det_config_good = (pd.merge(left, right, how = 'outer', indicator = True)
                          .loc[lambda x: x._merge=='left_only']
                          .drop(['Date','_merge'], axis=1))

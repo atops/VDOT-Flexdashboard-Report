@@ -147,7 +147,8 @@ get_corridors <- function(corr_fn) {
                   Corridor = factor(Corridor),
                   Milepost = as.numeric(Milepost),
                   Agency = Agency,
-                  Name = Name,
+                  County = County,
+		  Name = Name,
                   Asof = date(Asof)) %>% 
         filter(grepl("^\\d.*", SignalID)) %>%
         filter(!is.na(Corridor)) %>%
@@ -267,7 +268,7 @@ get_counts2 <- function(date_, uptime = TRUE, counts = TRUE) {
     }
         
     n <- length(signals_list)
-    i <- 10
+    i <- 20
     splits <- rep(1:ceiling(n/i), each = i, length.out = n)
     
     lapply(split(signals_list, splits), function(signals_sublist) {
@@ -523,7 +524,7 @@ get_spm_data <- function(start_date, end_date, signals_list, table, TWR_only=TRU
 get_spm_data_aws <- function(start_date, end_date, signals_list, table, TWR_only=TRUE) {
     
     drv <- JDBC(driverClass = "com.simba.athena.jdbc.Driver",
-                classPath = "../../AthenaJDBC42_2.0.2.jar",
+                classPath = "../../AthenaJDBC42_2.0.6.jar",
                 identifier.quote = "'")
     
     if (Sys.info()["nodename"] == "GOTO3213490") { # The SAM
@@ -714,7 +715,10 @@ get_qs <- function(detection_events) {
     dates <- seq(min(qs$Date), max(qs$Date), by = "1 day")
     
     dc <- lapply(dates, function(d) {
-        fn <- glue("../ATSPM_Det_Config_Good_{d}.feather")
+        fn <- glue("ATSPM_Det_Config_Good_{d}.feather")
+	if (!file.exists(fn)) {
+            fn <- glue("ATSPM_Det_Config_Good.feather")
+	}
         read_feather(fn) %>% mutate(Date = ymd(d))
     }) %>% 
         bind_rows %>% 
@@ -785,21 +789,21 @@ weighted_mean_by_corridor_ <- function(df, per_, corridors, var_, wt_=NULL) {
     
     gdf <- left_join(df, corridors) %>%
         mutate(Corridor = factor(Corridor)) %>%
-        group_by(Zone, Corridor, Zone_Group, !!per_) 
+        group_by(Signal_Group, Corridor, !!per_) 
     
     if (is.null(wt_)) {
         gdf %>% 
             summarize(!!var_ := mean(!!var_, na.rm = TRUE)) %>%
             mutate(delta = ((!!var_) - lag(!!var_))/lag(!!var_)) %>%
             ungroup() %>%
-            select(Zone, Corridor, Zone_Group, !!per_, !!var_, delta)
+            select(Signal_Group, Corridor, !!per_, !!var_, delta)
     } else {
         gdf %>% 
             summarize(!!var_ := weighted.mean(!!var_, !!wt_, na.rm = TRUE), 
                       !!wt_ := sum(!!wt_, na.rm = TRUE)) %>%
             mutate(delta = ((!!var_) - lag(!!var_))/lag(!!var_)) %>%
             ungroup() %>%
-            select(Zone, Corridor, Zone_Group, !!per_, !!var_, !!wt_, delta)
+            select(Signal_Group, Corridor, !!per_, !!var_, !!wt_, delta)
     }
 }
 group_corridor_by_ <- function(df, per_, var_, wt_, corr_grp) {
@@ -809,8 +813,8 @@ group_corridor_by_ <- function(df, per_, var_, wt_, corr_grp) {
                   !!wt_ := sum(!!wt_, na.rm = TRUE)) %>%
         mutate(Corridor = factor(corr_grp)) %>%
         mutate(delta = ((!!var_) - lag(!!var_))/lag(!!var_)) %>%
-        mutate(Zone_Group = corr_grp) %>% 
-        select(Corridor, Zone_Group, !!per_, !!var_, !!wt_, delta) 
+        mutate(Signal_Group = corr_grp) %>% 
+        select(Corridor, Signal_Group, !!per_, !!var_, !!wt_, delta) 
 }
 group_corridor_by_sum_ <- function(df, per_, var_, wt_, corr_grp) {
     df %>%
@@ -818,8 +822,8 @@ group_corridor_by_sum_ <- function(df, per_, var_, wt_, corr_grp) {
         summarize(!!var_ := sum(!!var_, na.rm = TRUE)) %>%
         mutate(Corridor = factor(corr_grp)) %>%
         mutate(delta = ((!!var_) - lag(!!var_))/lag(!!var_)) %>%
-        mutate(Zone_Group = corr_grp) %>% 
-        select(Corridor, Zone_Group, !!per_, !!var_, delta) 
+        mutate(Signal_Group = corr_grp) %>% 
+        select(Corridor, Signal_Group, !!per_, !!var_, delta) 
 }
 
 group_corridor_by_date <- function(df, var_, wt_, corr_grp) {
@@ -836,18 +840,24 @@ group_corridors_ <- function(df, per_, var_, wt_, gr_ = group_corridor_by_) {
     
     per_ <- as.name(per_)
     
-    zgs <- lapply(c("RTOP1", "RTOP2", "D1", "D2", "D3", "D4", "D5", "D6", "Zone 7", "Cobb County"), function(zg) { # VDOT -- update
-        df %>%
-            filter(Zone_Group == zg) %>%
-            gr_(per_, var_, wt_, zg)
+    gps <- unique(df$Signal_Group)
+    sgs <- lapply(gps, function(sg) {
+	df %>%
+	    filter(Signal_Group == sg) %>% 
+	    gr_(per_, var_, wt_, sg)
     })
-    all_rtop_df_out <- df %>%
-        filter(Zone_Group %in% c("RTOP1", "RTOP2")) %>% # VDOT -- update
-        gr_(per_, var_, wt_, "All RTOP")
+    
+    #zgs <- lapply(c("RTOP1", "RTOP2", "D1", "D2", "D3", "D4", "D5", "D6", "Zone 7", "Cobb County"), function(zg) { # VDOT -- update
+    #    df %>%
+    #        filter(Signal_Group == zg) %>%
+    #        gr_(per_, var_, wt_, zg)
+    #})
+    #all_rtop_df_out <- df %>%
+    #    filter(Signal_Group %in% c("RTOP1", "RTOP2")) %>% # VDOT -- update
+    #    gr_(per_, var_, wt_, "All RTOP")
 
-    dplyr::bind_rows(select_(df, "Corridor", "Zone_Group", per_, var_, wt_, "delta"),
-                     zgs,
-                     all_rtop_df_out) %>%
+    dplyr::bind_rows(select_(df, "Corridor", "Signal_Group", per_, var_, wt_, "delta"),
+                     sgs) %>%
         mutate(Corridor = factor(Corridor))
 }
 
@@ -1187,7 +1197,7 @@ get_cor_avg_daily_detector_uptime <- function(avg_daily_detector_uptime, corrido
     full_join(select(cor_daily_sb_uptime, -c(all.sb, delta)),
               select(cor_daily_pr_uptime, -c(all.pr, delta))) %>%
         left_join(select(cor_daily_all_uptime, -c(ones, delta))) %>%
-        mutate(Zone_Group = factor(Zone_Group))
+        mutate(Signal_Group = factor(Signal_Group))
 }
 
 get_weekly_vpd <- function(vpd) {
@@ -1258,12 +1268,12 @@ get_cor_monthly_qs_by_day <- function(monthly_qs_by_day, corridors) {
 get_cor_monthly_tti <- function(cor_monthly_tti_by_hr, corridors) {
     cor_monthly_tti_by_hr %>% 
         mutate(Month = as_date(Hour)) %>%
-        filter(!Corridor %in% c("RTOP1", "RTOP2", "All RTOP", "D5", "Zone 7")) %>% # VDOT -- update
+        #filter(!Corridor %in% c("RTOP1", "RTOP2", "All RTOP", "D5", "Zone 7")) %>% # VDOT -- update
         get_cor_monthly_avg_by_day(corridors, "tti", "pct")
 }
 get_cor_monthly_pti <- function(cor_monthly_pti_by_hr, corridors) {
     cor_monthly_pti_by_hr %>% mutate(Month = as_date(Hour))  %>%
-        filter(!Corridor %in% c("RTOP1", "RTOP2", "All RTOP", "D5", "Zone 7")) %>%
+        #filter(!Corridor %in% c("RTOP1", "RTOP2", "All RTOP", "D5", "Zone 7")) %>%
         get_cor_monthly_avg_by_day(corridors, "pti", "pct")
 }
 
@@ -1296,7 +1306,7 @@ get_cor_monthly_detector_uptime <- function(avg_daily_detector_uptime, corridors
               select(cor_daily_pr_uptime, -c(all.pr, delta))) %>%
         left_join(select(cor_daily_all_uptime, -c(ones, delta))) %>%
         mutate(Corridor = factor(Corridor),
-               Zone_Group = factor(Zone_Group))
+               Signal_Group = factor(Signal_Group))
 }
 
 get_vph <- function(counts) {
@@ -1374,10 +1384,10 @@ get_cor_monthly_ti_by_hr <- function(ti, cor_monthly_vph, corridors) {
     day_dist <- cor_monthly_vph %>% 
         group_by(Corridor, month(Hour)) %>% 
         mutate(pct = vph/sum(vph, na.rm = TRUE)) %>% 
-        group_by(Corridor, Zone_Group, hr = hour(Hour)) %>% 
+        group_by(Corridor, Signal_Group, hr = hour(Hour)) %>% 
         summarize(pct = mean(pct, na.rm = TRUE))
     
-    df <- left_join(ti, corridors %>% distinct(Corridor, Zone_Group)) %>%
+    df <- left_join(ti, corridors %>% distinct(Corridor, Signal_Group)) %>%
         mutate(hr = hour(Hour)) %>%
         left_join(day_dist) %>%
         ungroup() %>%
@@ -1396,8 +1406,8 @@ get_cor_monthly_ti_by_hr <- function(ti, cor_monthly_vph, corridors) {
 # No longer used. Generalized the previous function for both tti and pti
 get_cor_monthly_pti_by_hr <- function(pti, cor_monthly_vph, corridors) {
 
-    df <- left_join(pti, corridors %>% distinct(Corridor, Zone_Group)) %>%
-        left_join(select(cor_monthly_vph, -Zone_Group)) %>%
+    df <- left_join(pti, corridors %>% distinct(Corridor, Signal_Group)) %>%
+        left_join(select(cor_monthly_vph, -Signal_Group)) %>%
         ungroup() %>%
         tidyr::replace_na(list(vph = 1))
     
@@ -1474,7 +1484,7 @@ get_cor_weekly_cctv_uptime <- function(daily_cctv_uptime) {
     df %>% 
         select(-Date) %>% 
         left_join(Tuesdays) %>% 
-        group_by(Date, Corridor, Zone_Group) %>% 
+        group_by(Date, Corridor, Signal_Group) %>% 
         summarize(up = sum(up, na.rm = TRUE),
                   num = sum(num, na.rm = TRUE),
                   uptime = sum(up, na.rm = TRUE)/sum(num, na.rm = TRUE)) %>%
@@ -1484,7 +1494,7 @@ get_cor_monthly_cctv_uptime <- function(daily_cctv_uptime) {
     
     daily_cctv_uptime %>% 
         mutate(Month = Date - days(day(Date) - 1)) %>% 
-        group_by(Month, Corridor, Zone_Group) %>% 
+        group_by(Month, Corridor, Signal_Group) %>% 
         summarize(up = sum(up, na.rm = TRUE),
                   num = sum(num, na.rm = TRUE),
                   uptime = sum(up, na.rm = TRUE)/sum(num, na.rm = TRUE)) #%>%
@@ -1656,7 +1666,7 @@ get_quarterly <- function(monthly_df, var_, wt_="ones", operation = "avg") {
     
     quarterly_df <- monthly_df %>% 
         group_by(Corridor, 
-                 Zone_Group,
+                 Signal_Group,
                  Quarter = as.character(lubridate::quarter(Month, with_year = TRUE)))
     if (operation == "avg") {
         quarterly_df <- quarterly_df %>%
@@ -1668,15 +1678,15 @@ get_quarterly <- function(monthly_df, var_, wt_="ones", operation = "avg") {
     } else if (operation == "latest") {
         quarterly_df <- monthly_df %>% 
             group_by(Corridor, 
-                     Zone_Group,
+                     Signal_Group,
                      Quarter = as.character(lubridate::quarter(Month, with_year = TRUE))) %>%
             filter(Month == max(Month)) %>%
             select(Corridor, 
-                   Zone_Group,
+                   Signal_Group,
                    Quarter,
                    !!var_,
                    !!wt_) %>%
-            group_by(Corridor, Zone_Group) %>% arrange(Zone_Group, Corridor, Quarter)
+            group_by(Corridor, Signal_Group) %>% arrange(Signal_Group, Corridor, Quarter)
     }
     
     quarterly_df %>%
