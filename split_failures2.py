@@ -58,7 +58,7 @@ def get_split_failures(start_date, end_date, signals_string):
     between_clause = "= '{}'".format(start_date.strftime('%Y-%m-%d'))
     
     cycle_query = """SELECT DISTINCT SignalID, Phase, PhaseStart 
-                     FROM gdot_spm.CycleData 
+                     FROM vdot_spm.CycleData 
                      WHERE Phase not in (2,6) 
                      AND EventCode = 9
                      AND date {}
@@ -66,7 +66,7 @@ def get_split_failures(start_date, end_date, signals_string):
                      """.format(between_clause, signals_string)
     
     detector_query = """SELECT DISTINCT SignalID, Phase, EventCode, DetTimeStamp as DetOn, DetDuration 
-                        FROM gdot_spm.DetectionEvents 
+                        FROM vdot_spm.DetectionEvents 
                         WHERE Phase not in (2,6)
                         AND date {}
                         AND SignalID in {}
@@ -74,10 +74,10 @@ def get_split_failures(start_date, end_date, signals_string):
                         
     print(between_clause)
     
-    sor = (query_athena(cycle_query, 'gdot_spm', 'gdot-spm-athena')
+    sor = (query_athena(cycle_query, 'vdot_spm', 'vdot-spm-athena')
             .assign(PhaseStart = lambda x: pd.to_datetime(x.PhaseStart)))
 
-    det = (query_athena(detector_query, 'gdot_spm', 'gdot-spm-athena')
+    det = (query_athena(detector_query, 'vdot_spm', 'vdot-spm-athena')
             .assign(DetOn = lambda x: pd.to_datetime(x.DetOn))
             .assign(DetOff = lambda x: x.DetOn + pd.to_timedelta(x.DetDuration, unit='s')))
 

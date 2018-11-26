@@ -871,13 +871,13 @@ saveRDS(sig, "sig.rds")
 
 aws.s3::put_object(file = "cor.rds", 
                    object = "cor.rds", 
-                   bucket = "gdot-devices")
+                   bucket = "vdot-spm")
 aws.s3::put_object(file = "sig.rds", 
                    object = "sig.rds", 
-                   bucket = "gdot-devices")
+                   bucket = "vdot-spm")
 aws.s3::put_object(file = "teams_tables.rds", 
                    object = "teams_tables.rds", 
-                   bucket = "gdot-devices")
+                   bucket = "vdot-spm")
 
 db_build_data_for_signal_dashboard(month_abbrs = month_abbrs[length(month_abbrs)], 
                                    corridors = corridors, 

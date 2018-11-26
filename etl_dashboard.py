@@ -98,11 +98,11 @@ def etl2(s, date_):
             d.to_parquet(de_file) 
             
             s3.upload_file(Filename=cd_file, 
-                           Bucket='gdot-spm-cycles', 
-                           Key='date={}/cd_{}_{}.parquet'.format(date_str, s, date_str))
+                           Bucket='vdot-spm', 
+                           Key='cycles/date={}/cd_{}_{}.parquet'.format(date_str, s, date_str))
             s3.upload_file(Filename=de_file, 
-                           Bucket='gdot-spm-detections', 
-                           Key='date={}/de_{}_{}.parquet'.format(date_str, s, date_str))
+                           Bucket='vdot-spm', 
+                           Key='detections/date={}/de_{}_{}.parquet'.format(date_str, s, date_str))
             
             os.remove(cd_file)
             os.remove(de_file)

@@ -529,7 +529,7 @@ get_spm_data_aws <- function(start_date, end_date, signals_list, table, TWR_only
     if (Sys.info()["nodename"] == "GOTO3213490") { # The SAM
 
         conn <- dbConnect(drv, "jdbc:awsathena://athena.us-east-1.amazonaws.com:443/",
-                          s3_staging_dir = 's3://gdot-spm-athena', # VDOT -- update
+                          s3_staging_dir = 's3://vdot-spm-athena', # VDOT -- update
                           user = Sys.getenv("AWS_ACCESS_KEY_ID"),
                           password = Sys.getenv("AWS_SECRET_ACCESS_KEY"),
                           ProxyHost = "gdot-enterprise",
@@ -539,7 +539,7 @@ get_spm_data_aws <- function(start_date, end_date, signals_list, table, TWR_only
     } else {
         
         conn <- dbConnect(drv, "jdbc:awsathena://athena.us-east-1.amazonaws.com:443/",
-                          s3_staging_dir = 's3://gdot-spm-athena', # VDOT -- update
+                          s3_staging_dir = 's3://vdot-spm-athena', # VDOT -- update
                           user = Sys.getenv("AWS_ACCESS_KEY_ID"),
                           password = Sys.getenv("AWS_SECRET_ACCESS_KEY"))
     }
@@ -552,7 +552,7 @@ get_spm_data_aws <- function(start_date, end_date, signals_list, table, TWR_only
         query_where <- ""
     }
     
-    query <- paste("SELECT * FROM", paste0("gdot_spm.", tolower(table)), query_where)
+    query <- paste("SELECT * FROM", paste0("vdot_spm.", tolower(table)), query_where)
 													  
     df <- tbl(conn, sql(query))
     
@@ -1737,7 +1737,7 @@ db_build_data_for_signal_dashboard <- function(month_abbrs, corridors, pth = '.'
     lapply(signalids, function(sid) {
         aws.s3::put_object(file = file.path(pth, glue("{sid}.db")),
                            object = glue("signal_dashboards/{sid}.db"),
-                           bucket = "gdot-devices")
+                           bucket = "vdot-spm")
     })
 }
 
