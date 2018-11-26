@@ -191,7 +191,7 @@ Row
 renderValueBox({
   valueBox(
       value = get_valuebox(mr()$mo$tp, "vph", as_int, 
-                           zone = signal_group(), mo = current_month(), break_ = TRUE),
+                           signal_group_ = signal_group(), mo = current_month(), break_ = TRUE),
       icon = "fa-bar-chart",
     color = VDOT_BLUE
   )
@@ -204,7 +204,7 @@ renderValueBox({
 renderValueBox({
   valueBox(
       value = get_valuebox(mr()$mo$aogd, "aog", as_pct, 
-                           zone = signal_group(), mo = current_month(), break_ = TRUE),
+                           signal_group_ = signal_group(), mo = current_month(), break_ = TRUE),
       icon = "fa-car",
     color = VDOT_BLUE
   )
@@ -217,7 +217,7 @@ renderValueBox({
 renderValueBox({
   valueBox(
       value = get_valuebox(mr()$mo$qsd, "qs_freq", as_pct, 
-                           zone = signal_group(), mo = current_month(), break_ = TRUE),
+                           signal_group_ = signal_group(), mo = current_month(), break_ = TRUE),
       icon = "fa-car",
     color = VDOT_BLUE
   )
@@ -230,7 +230,7 @@ renderValueBox({
 renderValueBox({
   valueBox(
       value = get_valuebox(mr()$mo$sfd, "sf_freq", as_pct, 
-                           zone = signal_group(), mo = current_month(), break_ = TRUE),
+                           signal_group_ = signal_group(), mo = current_month(), break_ = TRUE),
       icon = "fa-car",
     color = VDOT_BLUE
   )
@@ -243,7 +243,7 @@ renderValueBox({
 renderValueBox({
   valueBox(
       value = get_valuebox(cor$mo$tti, "tti", as_2dec, 
-                           zone = signal_group(), mo = current_month(), break_ = TRUE),
+                           signal_group_ = signal_group(), mo = current_month(), break_ = TRUE),
       icon = "fa-dashboard",
     color = VDOT_BLUE
   )
@@ -256,7 +256,7 @@ renderValueBox({
 renderValueBox({
   valueBox(
       value = get_valuebox(cor$mo$pti, "pti", as_2dec, 
-                           zone = signal_group(), mo = current_month(), break_ = TRUE),
+                           signal_group_ = signal_group(), mo = current_month(), break_ = TRUE),
       icon = "fa-dashboard",
     color = VDOT_BLUE
   )
@@ -281,7 +281,7 @@ Row
 renderValueBox({
   valueBox(
     value = get_valuebox(mr()$mo$vpd, "vpd", as_int, 
-                           zone = signal_group(), mo = current_month(), break_ = FALSE),
+                           signal_group_ = signal_group(), mo = current_month(), break_ = FALSE),
     icon = "fa-area-chart",
     color = VDOT_BLUE
   )
@@ -294,7 +294,7 @@ renderValueBox({
 renderValueBox({
   valueBox(
       value = get_valuebox(mr()$mo$vphp$am, "vph", as_int, 
-                           zone = signal_group(), mo = current_month(), break_ = FALSE),
+                           signal_group_ = signal_group(), mo = current_month(), break_ = FALSE),
       icon = "fa-area-chart",
     color = VDOT_BLUE
   )
@@ -307,7 +307,7 @@ renderValueBox({
 renderValueBox({
   valueBox(
       value = get_valuebox(mr()$mo$vphp$pm, "vph", as_int, 
-                           zone = signal_group(), mo = current_month(), break_ = FALSE),
+                           signal_group_ = signal_group(), mo = current_month(), break_ = FALSE),
       icon = "fa-area-chart",
     color = VDOT_BLUE
   )
@@ -341,8 +341,8 @@ Row
 ```{r}
 renderValueBox({
   valueBox(
-      value = get_valuebox(cor$mo$veh, "uptime", as_pct, 
-                           zone = signal_group(), mo = current_month(), break_ = FALSE),
+      value = get_valuebox(cor$mo$veh, "uptime.all", as_pct, 
+                           signal_group_ = signal_group(), mo = current_month(), break_ = FALSE),
       icon = "fa-car",
     color = VDOT_BLUE
   )
@@ -355,7 +355,7 @@ renderValueBox({
 renderValueBox({
   valueBox(
       value = get_valuebox(cor$mo$ped, "uptime", as_pct, 
-                           zone = signal_group(), mo = current_month(), break_ = FALSE),
+                           signal_group_ = signal_group(), mo = current_month(), break_ = FALSE),
       icon = "fa-child",
     color = VDOT_BLUE
   )
@@ -369,7 +369,7 @@ renderValueBox({
 renderValueBox({
   valueBox(
       value = get_valuebox(mr()$mo$cu, "uptime", as_pct, 
-                           zone = signal_group(), mo = current_month(), break_ = FALSE),
+                           signal_group_ = signal_group(), mo = current_month(), break_ = FALSE),
       icon = "ion-paper-airplane", #"fa-user" #
     color = VDOT_BLUE
   )
@@ -415,7 +415,7 @@ Row
 renderValueBox({
   valueBox(
       value = get_valuebox(cor$qu$tp, "vph", as_int, 
-                           zone = signal_group(), 
+                           signal_group_ = signal_group(), 
                            mo = current_month(), 
                            qu = current_quarter(), break_ = TRUE),
       icon = "fa-bar-chart",
@@ -430,7 +430,7 @@ renderValueBox({
 renderValueBox({
   valueBox(
       value = get_valuebox(cor$qu$aogd, "aog", as_pct, 
-                           zone = signal_group(), 
+                           signal_group_ = signal_group(), 
                            mo = current_month(), 
                            qu = current_quarter(), break_ = TRUE),
       icon = "fa-car",
@@ -445,7 +445,7 @@ renderValueBox({
 renderValueBox({
   valueBox(
       value = get_valuebox(cor$qu$qsd, "qs_freq", as_pct, 
-                           zone = signal_group(), 
+                           signal_group_ = signal_group(), 
                            mo = current_month(), 
                            qu = current_quarter(), break_ = TRUE),
       icon = "fa-car",
@@ -460,7 +460,7 @@ renderValueBox({
 renderValueBox({
   valueBox(
       value = get_valuebox(cor$qu$sfd, "sf_freq", as_pct, 
-                           zone = signal_group(), 
+                           signal_group_ = signal_group(), 
                            mo = current_month(), 
                            qu = current_quarter(), break_ = TRUE),
       icon = "fa-car",
@@ -475,7 +475,7 @@ renderValueBox({
 renderValueBox({
   valueBox(
       value = get_valuebox(cor$qu$tti, "tti", as_2dec, 
-                           zone = signal_group(), 
+                           signal_group_ = signal_group(), 
                            mo = current_month(), 
                            qu = current_quarter(), break_ = TRUE),
       icon = "fa-dashboard",
@@ -490,7 +490,7 @@ renderValueBox({
 renderValueBox({
   valueBox(
       value = get_valuebox(cor$qu$pti, "pti", as_2dec, 
-                           zone = signal_group(), 
+                           signal_group_ = signal_group(), 
                            mo = current_month(), 
                            qu = current_quarter(), break_ = TRUE),
       icon = "fa-dashboard",
@@ -517,7 +517,7 @@ Row
 renderValueBox({
   valueBox(
     value = get_valuebox(cor$qu$vpd, "vpd", as_int, 
-                           zone = signal_group(), 
+                           signal_group_ = signal_group(), 
                            mo = current_month(), 
                            qu = current_quarter(), break_ = FALSE),
     icon = "fa-area-chart",
@@ -532,7 +532,7 @@ renderValueBox({
 renderValueBox({
   valueBox(
       value = get_valuebox(cor$qu$vphpa, "vph", as_int, 
-                           zone = signal_group(), 
+                           signal_group_ = signal_group(), 
                            mo = current_month(),
                            qu = current_quarter(), break_ = FALSE),
       icon = "fa-area-chart",
@@ -547,7 +547,7 @@ renderValueBox({
 renderValueBox({
   valueBox(
       value = get_valuebox(cor$qu$vphpp, "vph", as_int, 
-                         zone = signal_group(), 
+                         signal_group_ = signal_group(), 
                          mo = current_month(), 
                          qu = current_quarter(), break_ = FALSE),
       icon = "fa-area-chart",
@@ -586,7 +586,7 @@ Row
 renderValueBox({
   valueBox(
       value = get_valuebox(cor$qu$veh, "uptime", as_pct, 
-                         zone = signal_group(), 
+                         signal_group_ = signal_group(), 
                          mo = current_month(), 
                          qu = current_quarter(), break_ = FALSE),
       icon = "fa-car",
@@ -602,7 +602,7 @@ renderValueBox({
 renderValueBox({
   valueBox(
     value = get_valuebox(cor$qu$ped, "uptime", as_pct, 
-                         zone = signal_group(), 
+                         signal_group_ = signal_group(), 
                          mo = current_month(), 
                          qu = current_quarter(), break_ = FALSE),
     icon = "fa-child",
@@ -619,7 +619,7 @@ renderValueBox({
 renderValueBox({
   valueBox(
       value = get_valuebox(cor$qu$cu, "uptime", as_pct, 
-                         zone = signal_group(), 
+                         signal_group_ = signal_group(), 
                          mo = current_month(), 
                          qu = current_quarter(), break_ = FALSE),
       icon = "ion-paper-airplane",
@@ -742,7 +742,7 @@ Row
 renderValueBox({
   valueBox(
       value = get_valuebox(mr()$mo$tp, "vph", as_int,
-                           zone = signal_group(), mo = current_month(), break_ = TRUE),
+                           signal_group_ = signal_group(), mo = current_month(), break_ = TRUE),
       icon = "fa-bar-chart"
   )
 })
@@ -754,7 +754,7 @@ renderValueBox({
 renderValueBox({
   valueBox(
       value = get_valuebox(mr()$mo$aogd, "aog", as_pct,
-                           zone = signal_group(), mo = current_month(), break_ = TRUE),
+                           signal_group_ = signal_group(), mo = current_month(), break_ = TRUE),
       icon = "fa-car"
   )
 })
@@ -766,7 +766,7 @@ renderValueBox({
 renderValueBox({
   valueBox(
       value = get_valuebox(mr()$mo$qsd, "qs_freq", as_pct,
-                           zone = signal_group(), mo = current_month(), break_ = TRUE),
+                           signal_group_ = signal_group(), mo = current_month(), break_ = TRUE),
       icon = "fa-car"
   )
 })
@@ -778,7 +778,7 @@ renderValueBox({
 renderValueBox({
   valueBox(
       value = get_valuebox(mr()$mo$sfd, "sf_freq", as_pct,
-                           zone = signal_group(), mo = current_month(), break_ = TRUE),
+                           signal_group_ = signal_group(), mo = current_month(), break_ = TRUE),
       icon = "fa-car"
   )
 })
@@ -790,7 +790,7 @@ renderValueBox({
 renderValueBox({
   valueBox(
       value = get_valuebox(cor$mo$tti, "tti", as_2dec,
-                           zone = signal_group(), mo = current_month(), break_ = TRUE),
+                           signal_group_ = signal_group(), mo = current_month(), break_ = TRUE),
       icon = "fa-dashboard"
   )
 })
@@ -802,7 +802,7 @@ renderValueBox({
 renderValueBox({
   valueBox(
       value = get_valuebox(cor$mo$pti, "pti", as_2dec,
-                           zone = signal_group(), mo = current_month(), break_ = TRUE),
+                           signal_group_ = signal_group(), mo = current_month(), break_ = TRUE),
       icon = "fa-dashboard"
   )
 })
@@ -819,7 +819,7 @@ Row {.tabset .tabset-fade}
 renderPlotly({
     get_bar_line_dashboard_plot(mr()$wk$tp, mr()$mo$tp, NULL,
                                 "vph", "integer", highlight_color = RED2,
-                                month_ = current_month(), zone_group_ = signal_group(),
+                                month_ = current_month(), signal_group_ = signal_group(),
                                 x_bar_title = "Vehicles per Hour",
                                 x_line1_title = paste(input$month, "Throughput (vph)"),
                                 plot_title = "Throughput (peak veh/hr) Trend")
@@ -833,7 +833,7 @@ renderPlotly({
 renderPlotly({
     get_bar_line_dashboard_plot(mr()$wk$aog, mr()$mo$aogd, mr()$mo$aogh,
                                 "aog", "percent", highlight_color = RED2,
-                                month_ = current_month(), zone_group_ = signal_group(),
+                                month_ = current_month(), signal_group_ = signal_group(),
                                 x_bar_title = paste(input$month, "AOG"),
                                 x_line1_title = "AOG Trend",
                                 x_line2_title = paste(input$month, "AOG by TOD"),
@@ -848,7 +848,7 @@ renderPlotly({
 renderPlotly({
     get_bar_line_dashboard_plot(mr()$wk$qs, mr()$mo$qsd, mr()$mo$mqsh,
                                 "qs_freq", "percent", highlight_color = RED2,
-                                month_ = current_month(), zone_group_ = signal_group(),
+                                month_ = current_month(), signal_group_ = signal_group(),
                                 x_bar_title = paste(input$month, "Queue Spillback Rate"),
                                 x_line1_title = "Queue Spillback Trend",
                                 x_line2_title = paste(input$month, "Queue Spillback by TOD"),
@@ -863,7 +863,7 @@ renderPlotly({
 renderPlotly({
     get_bar_line_dashboard_plot(mr()$wk$sf, mr()$mo$sfd, mr()$mo$sfh,
                                 "sf_freq", "percent", highlight_color = RED2,
-                                month_ = current_month(), zone_group_ = signal_group(),
+                                month_ = current_month(), signal_group_ = signal_group(),
                                 x_bar_title = paste(input$month, "Split Failures Rate"),
                                 x_line1_title = "Split Failures Trend",
                                 x_line2_title = paste(input$month, "Split Failures by TOD"),
@@ -879,7 +879,7 @@ renderPlotly({
     get_tt_plot(cor$mo$tti, cor$mo$ttih, 
                 cor$mo$pti, cor$mo$ptih,
                 month_ = current_month(),
-                zone_group_ = signal_group(),
+                signal_group_ = signal_group(),
                 x_bar_title = paste(input$month, "TTI & PTI"),
                 x_line1_title = paste(input$month, "TTI by hr"),
                 x_line2_title = paste(input$month, "PTI by hr"))
@@ -906,7 +906,7 @@ Row
 renderValueBox({
   valueBox(
     value = get_valuebox(mr()$mo$vpd, "vpd", as_int,
-                           zone = signal_group(), mo = current_month(), break_ = FALSE),
+                           signal_group_ = signal_group(), mo = current_month(), break_ = FALSE),
     icon = "fa-area-chart"
   )
 })
@@ -918,7 +918,7 @@ renderValueBox({
 renderValueBox({
   valueBox(
       value = get_valuebox(mr()$mo$vphp$am, "vph", as_int,
-                           zone = signal_group(), mo = current_month(), break_ = FALSE),
+                           signal_group_ = signal_group(), mo = current_month(), break_ = FALSE),
       icon = "fa-area-chart"
   )
 })
@@ -930,7 +930,7 @@ renderValueBox({
 renderValueBox({
   valueBox(
       value = get_valuebox(mr()$mo$vphp$pm, "vph", as_int,
-                           zone = signal_group(), mo = current_month(), break_ = FALSE),
+                           signal_group_ = signal_group(), mo = current_month(), break_ = FALSE),
       icon = "fa-area-chart"
   )
 })
@@ -945,7 +945,7 @@ Row {.tabset .tabset-fade}
 renderPlotly({ # Good version
     get_bar_line_dashboard_plot(mr()$wk$vpd, mr()$mo$vpd, NULL,
                                 "vpd", "integer", highlight_color = VDOT_BLUE,
-                                month_ = current_month(), zone_group_ = signal_group(),
+                                month_ = current_month(), signal_group_ = signal_group(),
                                 x_bar_title = "Vehicles per Day",
                                 x_line1_title = paste(input$month, "Daily Volume (vpd)"),
                                 plot_title = "Daily Volume (veh/day) Trend")
@@ -969,14 +969,14 @@ renderPlotly({
     am_vph_plot <- get_bar_line_dashboard_plot(mr()$wk$vphp$am,
                                                mr()$mo$vphp$am, NULL,
                                 "vph", "integer", highlight_color = VDOT_BLUE,
-                                month_ = current_month(), zone_group_ = signal_group(),
+                                month_ = current_month(), signal_group_ = signal_group(),
                                 x_bar_title = "Vehicles per Hour",
                                 x_line1_title = paste(input$month, "Hourly Volume (vph)"),
                                 plot_title = "Peak Period Hourly Volume (veh/hr) Trend")
     pm_vph_plot <- get_bar_line_dashboard_plot(mr()$wk$vphp$pm,
                                                mr()$mo$vphp$pm, NULL,
                                 "vph", "integer", highlight_color = VDOT_BLUE,
-                                month_ = current_month(), zone_group_ = signal_group(),
+                                month_ = current_month(), signal_group_ = signal_group(),
                                 x_bar_title = "Vehicles per Hour",
                                 x_line1_title = paste(input$month, "Hourly Volume (vph)"),
                                 plot_title = "Peak Period Hourly Volume (veh/hr) Trend")
@@ -991,7 +991,7 @@ renderPlotly({
 renderPlotly({
     get_minmax_hourly_plot(mr()$mo$vph,
                            month_ = current_month(), 
-                           zone_group_ = signal_group())
+                           signal_group_ = signal_group())
 })
 ```
 
@@ -1018,7 +1018,7 @@ renderValueBox({
                           group_by(Corridor) %>% 
                           mutate(delta = uptime.all - lag(uptime.all)), 
                       "uptime.all", as_pct,
-                           zone = signal_group(), mo = current_month(), break_ = FALSE),
+                           signal_group_ = signal_group(), mo = current_month(), break_ = FALSE),
       icon = "fa-car"
   )
 })
@@ -1030,7 +1030,7 @@ renderValueBox({
 renderValueBox({
   valueBox(
       value = get_valuebox(cor$mo$ped, "uptime", as_pct,
-                           zone = signal_group(), mo = current_month(), break_ = FALSE),
+                           signal_group_ = signal_group(), mo = current_month(), break_ = FALSE),
       icon = "fa-child" 
   )
 })
@@ -1042,7 +1042,7 @@ renderValueBox({
 renderValueBox({
   valueBox(
       value = get_valuebox(mr()$mo$cu, "uptime", as_pct,
-                           zone = signal_group(), mo = current_month(), break_ = FALSE),
+                           signal_group_ = signal_group(), mo = current_month(), break_ = FALSE),
       icon = "ion-paper-airplane"
   )
 })
@@ -1062,7 +1062,7 @@ renderPlotly({
         get_cor_det_uptime_plot(mr()$dy$du, 
                                 month_name = input$month,
                                 month_ = current_month(), 
-                                zone_group_ = signal_group())
+                                signal_group_ = signal_group())
         
     } else {
         
@@ -1071,7 +1071,7 @@ renderPlotly({
                                  var_ = "uptime.all", 
                                  num_format = "percent", 
                                  month_ = current_month(), 
-                                 zone_group_ = signal_group(),
+                                 signal_group_ = signal_group(),
                                  x_bar_title = "Current Month Uptime",
                                  x_line1_title = "Daily Uptime",
                                  plot_title = "",
@@ -1092,7 +1092,7 @@ renderPlotly({
     get_bar_line_dashboard_plot(weekly_ped_df,
                                 monthly_ped_df,
                                 var_ = "uptime", num_format = "percent", highlight_color = BROWN,
-                                month_ = current_month(), zone_group_ = signal_group(),
+                                month_ = current_month(), signal_group_ = signal_group(),
                                 x_bar_title = paste(input$month, "Ped Det Uptime"),
                                 x_line1_title = "Pedestrian Detector Uptime Trend",
                                 plot_title = "Ped Detector Uptime")
@@ -1116,7 +1116,7 @@ renderPlotly({
                                  mr()$mo$cu,
                                  month_name = input$month,
                                  month_ = current_month(),
-                                 zone_group_ = signal_group())
+                                 signal_group_ = signal_group())
     } else {
         
         get_uptime_plot(sig$dy$cu, 
@@ -1124,7 +1124,7 @@ renderPlotly({
                                  var_ = "uptime", 
                                  num_format = "percent", 
                                  month_ = current_month(), 
-                                 zone_group_ = signal_group(),
+                                 signal_group_ = signal_group(),
                                  x_bar_title = "Current Month Uptime",
                                  x_line1_title = "Daily Uptime",
                                  plot_title = "",

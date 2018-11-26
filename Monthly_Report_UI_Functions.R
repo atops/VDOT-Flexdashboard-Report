@@ -82,9 +82,9 @@ if (conf$mode == "production") {
     
 } else if (conf$mode == "beta") {
     
-    aws.s3::save_object("cor.rds", "gdot-devices", file = "cor_s3.rds")
-    aws.s3::save_object("sig.rds", "gdot-devices", file = "sig_s3.rds")
-    aws.s3::save_object("teams_tables.rds", "gdot-devices", file = "teams_tables_s3.rds")
+    aws.s3::save_object("cor.rds", "vdot-spm", file = "cor_s3.rds")
+    aws.s3::save_object("sig.rds", "vdot-spm", file = "sig_s3.rds")
+    
     
     cor <- readRDS("cor_s3.rds")
     sig <- readRDS("sig_s3.rds")
@@ -100,16 +100,16 @@ as_pct <- function(x) {sprintf(x * 100, fmt = "%.1f%%")}
 
 
 get_valuebox_ <- function(cor_monthly_df, var_, var_fmt, break_ = FALSE, 
-                          zone, mo, qu = NULL) {
+                          signal_group_, mo, qu = NULL) {
     vals <- cor_monthly_df %>% 
         replace_na(list(delta = 0))
     
     if (is.null(qu)) { # want monthly, not quarterly data
         vals <- vals %>%
-            dplyr::filter(Corridor == zone & Month == mo) %>% as.list()
+            dplyr::filter(Corridor == signal_group_ & Month == mo) %>% as.list()
     } else {
         vals <- vals %>%
-            dplyr::filter(Corridor == zone & Quarter == qu) %>% as.list()
+            dplyr::filter(Corridor == signal_group_ & Quarter == qu) %>% as.list()
     }
     val <- var_fmt(vals[[var_]])
     del <- paste0(ifelse(vals$delta > 0, " (+", " ( "), as_pct(vals$delta), ")")
@@ -225,7 +225,7 @@ get_bar_line_dashboard_plot_ <- function(cor_weekly,
                                          num_format, # percent, integer, decimal
                                          highlight_color,
                                          month_, 
-                                         zone_group_, 
+                                         signal_group_, 
                                          x_bar_title = "___",
                                          x_line1_title = "___",
                                          x_line2_title = "___",
@@ -246,27 +246,17 @@ get_bar_line_dashboard_plot_ <- function(cor_weekly,
     
     highlight_color_ <- highlight_color
     
-    if (zone_group_ == "All RTOP") {
-        mdf <- cor_monthly %>% 
-            filter(Zone_Group %in% c("RTOP1", "RTOP2", "All RTOP"), 
-                   !Corridor %in% c("RTOP1", "RTOP2"), 
-                   Month == month_)
-        wdf <- cor_weekly %>% 
-            filter(Zone_Group %in% c("RTOP1", "RTOP2", "All RTOP"), 
-                   !Corridor %in% c("RTOP1", "RTOP2"), 
-                   Date < month_ + months(1))
-    } else {
-        mdf <- cor_monthly %>% 
-            filter(Zone_Group == zone_group_, Month == month_)
-        wdf <- cor_weekly %>% 
-            filter(Zone_Group == zone_group_, Date < month_ + months(1))
-    }
+    mdf <- cor_monthly %>% 
+        filter(Signal_Group == signal_group_, Month == month_)
+    wdf <- cor_weekly %>% 
+        filter(Signal_Group == signal_group_, Date < month_ + months(1))
+        
     if (nrow(mdf) > 0 & nrow(wdf) > 0) {
         # Current Month Data
         mdf <- mdf %>%
             arrange(!!var_) %>%
             mutate(var = !!var_,
-                   col = factor(ifelse(Corridor==zone_group_, DARK_GRAY_BAR, LIGHT_GRAY_BAR)),
+                   col = factor(ifelse(Corridor==signal_group_, DARK_GRAY_BAR, LIGHT_GRAY_BAR)),
                    Corridor = factor(Corridor, levels = Corridor))
         
         sdm <- SharedData$new(mdf, ~Corridor, group = "grp")
@@ -305,7 +295,7 @@ get_bar_line_dashboard_plot_ <- function(cor_weekly,
         # Weekly Data - historical trend
         wdf <- wdf %>%
             mutate(var = !!var_,
-                   col = factor(ifelse(Corridor == zone_group_, 0, 1))) %>%
+                   col = factor(ifelse(Corridor == signal_group_, 0, 1))) %>%
             group_by(Corridor)
         
         sdw <- SharedData$new(wdf, ~Corridor, group = "grp")
@@ -333,21 +323,14 @@ get_bar_line_dashboard_plot_ <- function(cor_weekly,
         # }
         
         if (!is.null(cor_hourly)) {
-            
-            if (zone_group_ == "All RTOP") {
-                hdf <- cor_hourly %>%
-                    filter(Zone_Group %in% c("RTOP1", "RTOP2", "All RTOP"), 
-                           !Corridor %in% c("RTOP1", "RTOP2"), 
-                           date(Hour) == month_)
-            } else {
-                hdf <- cor_hourly %>%
-                    filter(Zone_Group == zone_group_, date(Hour) == month_)
-            }
-            
+
+            hdf <- cor_hourly %>%
+                filter(Signal_Group == signal_group_, date(Hour) == month_)
+
             # Hourly Data - current month
             hdf <- hdf %>%
                 mutate(var = !!var_,
-                       col = factor(ifelse(Corridor == zone_group_, 0, 1))) %>%
+                       col = factor(ifelse(Corridor == signal_group_, 0, 1))) %>%
                 group_by(Corridor)
             
             sdh <- SharedData$new(hdf, ~Corridor, group = "grp")
@@ -374,7 +357,7 @@ get_bar_line_dashboard_plot_ <- function(cor_weekly,
         subplot(bar_chart, s1, titleX = TRUE, widths = c(0.2, 0.8), margin = 0.03) %>%
             layout(margin = list(l = 100),
                    title = plot_title) %>%
-            highlight(color = highlight_color_, opacityDim = 0.9, defaultValues = c(zone_group_),
+            highlight(color = highlight_color_, opacityDim = 0.9, defaultValues = c(signal_group_),
                       selected = attrs_selected(insidetextfont = list(color = "white"), 
                                                 textposition = "auto"))
     } else(
@@ -387,7 +370,7 @@ get_tt_plot_ <- function(cor_monthly_tti, cor_monthly_tti_by_hr,
                          cor_monthly_pti, cor_monthly_pti_by_hr, 
                          highlight_color = RED2,
                          month_,
-                         zone_group_,
+                         signal_group_,
                          x_bar_title = "___",
                          x_line1_title = "___",
                          x_line2_title = "___",
@@ -397,37 +380,28 @@ get_tt_plot_ <- function(cor_monthly_tti, cor_monthly_tti_by_hr,
     tickformat <- ".2f"
     
     mott <- full_join(cor_monthly_tti, cor_monthly_pti,
-                      by = c("Corridor", "Zone_Group", "Month"),
+                      by = c("Corridor", "Signal_Group", "Month"),
                       suffix = c(".tti", ".pti"))  %>%
         filter(!is.na(Corridor)) %>%
         mutate(bti = pti - tti) %>%
         ungroup() %>%
         filter(Month < month_ + months(1)) %>%
-        select(Corridor, Zone_Group, Month, tti, pti, bti)
+        select(Corridor, Signal_Group, Month, tti, pti, bti)
     
     hrtt <- full_join(cor_monthly_tti_by_hr, cor_monthly_pti_by_hr,
-                      by = c("Corridor", "Zone_Group", "Hour"),
+                      by = c("Corridor", "Signal_Group", "Hour"),
                       suffix = c(".tti", ".pti"))  %>%
         filter(!is.na(Corridor)) %>%#,
         mutate(bti = pti - tti) %>%
         ungroup() %>%
         #filter(Month < month_ + months(1)) %>%
-        select(Corridor, Zone_Group, Hour, tti, pti, bti)
+        select(Corridor, Signal_Group, Hour, tti, pti, bti)
     
-    if (zone_group_ == "All RTOP") {
-        mott <- mott %>% 
-            filter(Zone_Group %in% c("RTOP1", "RTOP2", "All RTOP"), 
-                   !Corridor %in% c("RTOP1", "RTOP2"))
-        hrtt <- hrtt %>% 
-            filter(Zone_Group %in% c("RTOP1", "RTOP2", "All RTOP"), 
-                   !Corridor %in% c("RTOP1", "RTOP2"))
-    } else {
-        mott <- mott %>% 
-            filter(Zone_Group == zone_group_)
-        hrtt <- hrtt %>% 
-            filter(Zone_Group == zone_group_) 
-    }
-    
+    mott <- mott %>% 
+        filter(Signal_Group == signal_group_)
+    hrtt <- hrtt %>% 
+        filter(Signal_Group == signal_group_) 
+
     if (nrow(mott) > 0 & nrow(hrtt) > 0) {    
         sdb <- SharedData$new(dplyr::filter(mott, Month == month_), 
                               ~Corridor, group = "grp")
@@ -524,7 +498,7 @@ get_tt_plot_ <- function(cor_monthly_tti, cor_monthly_tti_by_hr,
             layout(margin = list(l = 120, r = 80),
                    title = "Travel Time and Planning Time Index") %>%
             highlight(color = highlight_color_, opacityDim = 0.9, 
-                      defaultValues = c(zone_group_),
+                      defaultValues = c(signal_group_),
                       selected = attrs_selected(insidetextfont = list(color = "white"), 
                                                 textposition = "auto", base = 0))
         
@@ -536,7 +510,7 @@ get_tt_plot <- memoise(get_tt_plot_)
 
 get_pct_ch_plot_ <- function(cor_monthly_vpd,
                              month_,
-                             zone_group_) {
+                             signal_group_) {
     pl <- function(df) { 
         neg <- dplyr::filter(df, delta < 0)
         pos <- dplyr::filter(df, delta > 0)
@@ -568,16 +542,10 @@ get_pct_ch_plot_ <- function(cor_monthly_vpd,
                                       y = 0.95,
                                       showarrow = FALSE))}
     
-    
-    if (zone_group_ == "All RTOP") {
-        df <- cor_monthly_vpd %>% 
-            filter(Zone_Group %in% c("RTOP1", "RTOP2", "All RTOP"), 
-                   !Corridor %in% c("RTOP1", "RTOP2"), 
-                   Month <= month_)
-    } else {
-        df <- cor_monthly_vpd %>% 
-            filter(Zone_Group == zone_group_ & Month <= month_)
-    }
+
+    df <- cor_monthly_vpd %>% 
+        filter(Signal_Group == signal_group_ & Month <= month_)
+
     if (nrow(df) > 0) {
         
         pcts <- split(df, df$Corridor)
@@ -593,16 +561,11 @@ get_pct_ch_plot_ <- function(cor_monthly_vpd,
 get_pct_ch_plot <- memoise(get_pct_ch_plot_)
 
 get_vph_peak_plot_ <- function(df, chart_title, bar_subtitle, 
-                               month_ = current_month(), zone_group_ = zone_group()) {
-    
-    if (zone_group_ == "All RTOP") {
-        df <- df %>%
-            filter(Zone_Group %in% c("RTOP1", "RTOP2", "All RTOP"), 
-                   !Corridor %in% c("RTOP1", "RTOP2"))
-    } else {
-        df <- df %>%
-            filter(Zone_Group == zone_group_)
-    }
+                               month_ = current_month(), signal_group_ = signal_group()) {
+
+    df <- df %>%
+        filter(Signal_Group == signal_group_)
+
     if (nrow(df) > 0) {
         
         sdw <- SharedData$new(dplyr::filter(df, Month <= month_), ~Corridor, group = "grp")
@@ -649,7 +612,7 @@ get_vph_peak_plot_ <- function(df, chart_title, bar_subtitle,
         
         subplot(p1, p2, titleX = TRUE, widths = c(0.2, 0.8), margin = 0.03) %>%
             layout(margin = list(l = 80, r = 40)) %>%
-            highlight(color = "#256194", opacityDim = 0.9, defaultValues = c(zone_group_),
+            highlight(color = "#256194", opacityDim = 0.9, defaultValues = c(signal_group_),
                       selected = attrs_selected(insidetextfont = list(color = "white"), textposition = "inside"))
     } else {
         no_data_plot("")
@@ -659,7 +622,7 @@ get_vph_peak_plot <- memoise(get_vph_peak_plot_)
 
 get_minmax_hourly_plot_ <- function(cor_monthly_vph, 
                                     month_ = current_month(), 
-                                    zone_group_ = zone_group()) {
+                                    signal_group_ = signal_group()) {
     
     mm_pl <- function(mm, tm) {
         
@@ -697,14 +660,9 @@ get_minmax_hourly_plot_ <- function(cor_monthly_vph,
                                       showarrow = FALSE))
     }
     
-    if (zone_group_ == "All RTOP") {
-        df <- cor_monthly_vph %>% 
-            filter(!Corridor %in% c("RTOP1", "RTOP2", "D1", "D2", "D3", "D4", "D5", "D6", "Zone 7", "Cobb County") & date(Hour) <= month_)
-    } else {
-        df <- cor_monthly_vph %>% 
-            filter(Zone_Group == zone_group_ & date(Hour) <= month_)
-    }
-    
+    df <- cor_monthly_vph %>% 
+        filter(Signal_Group == signal_group_ & date(Hour) <= month_)
+
     # Current Month Data
     this_month <- df %>% 
         filter(date(Hour) == month_) 
@@ -797,7 +755,7 @@ det_uptime_line_plot <- memoise(det_uptime_line_plot_)
 
 get_cor_det_uptime_plot_ <- function(avg_daily_uptime, 
                                      month_,
-                                     zone_group_,
+                                     signal_group_,
                                      month_name) {
     
     # Plot Detector Uptime for a Corridor. The basis of subplot.
@@ -839,10 +797,10 @@ get_cor_det_uptime_plot_ <- function(avg_daily_uptime,
         
         df <- df %>% 
             filter(Date - days(day(Date) -1) == month_) %>%
-            group_by(Corridor, Zone_Group) %>%
+            group_by(Corridor, Signal_Group) %>%
             summarize(uptime = mean(uptime.all)) %>%
             arrange(uptime) %>% ungroup() %>%
-            mutate(col = factor(ifelse(Corridor==zone_group_, DARK_GRAY_BAR, LIGHT_GRAY_BAR)),
+            mutate(col = factor(ifelse(Corridor==signal_group_, DARK_GRAY_BAR, LIGHT_GRAY_BAR)),
                    Corridor = factor(Corridor, levels = Corridor))
         
         plot_ly(data = arrange(df, uptime),
@@ -878,16 +836,9 @@ get_cor_det_uptime_plot_ <- function(avg_daily_uptime,
     }
     
     
-    if (zone_group_ == "All RTOP") {
-        avg_daily_uptime <- avg_daily_uptime %>% 
-            filter(Zone_Group %in% c("RTOP1", "RTOP2", "All RTOP"), 
-                   !Corridor %in% c("RTOP1", "RTOP2"), 
-                   Date <= month_ + months(1))
-    } else {
-        avg_daily_uptime <- avg_daily_uptime %>% 
-            filter(Zone_Group == zone_group_ & Date <= month_ + months(1))
-    }
-    
+    avg_daily_uptime <- avg_daily_uptime %>% 
+        filter(Signal_Group == signal_group_ & Date <= month_ + months(1))
+
     if (nrow(avg_daily_uptime) > 0) {
         # Create Uptime by Detector Type (Setback, Presence) by Corridor Subplots.
         cdfs <- split(avg_daily_uptime, avg_daily_uptime$Corridor)
@@ -910,7 +861,7 @@ get_cor_det_uptime_plot <- memoise(get_cor_det_uptime_plot_)
 get_cor_comm_uptime_plot_ <- function(avg_daily_uptime,
                                       avg_monthly_uptime,
                                       month_,
-                                      zone_group_,
+                                      signal_group_,
                                       month_name) {
     
     # Plot Detector Uptime for a Corridor. The basis of subplot.
@@ -946,7 +897,7 @@ get_cor_comm_uptime_plot_ <- function(avg_daily_uptime,
         
         df <- df %>% 
             arrange(uptime) %>% ungroup() %>%
-            mutate(col = factor(ifelse(Corridor==zone_group_, DARK_GRAY_BAR, LIGHT_GRAY_BAR)),
+            mutate(col = factor(ifelse(Corridor == signal_group_, DARK_GRAY_BAR, LIGHT_GRAY_BAR)),
                    Corridor = factor(Corridor, levels = Corridor))
         
         plot_ly(data = arrange(df, uptime),
@@ -982,22 +933,11 @@ get_cor_comm_uptime_plot_ <- function(avg_daily_uptime,
     }
     
     
-    if (zone_group_ == "All RTOP") {
-        avg_daily_uptime <- avg_daily_uptime %>% 
-            filter(Zone_Group %in% c("RTOP1", "RTOP2", "All RTOP"), 
-                   !Corridor %in% c("RTOP1", "RTOP2"), 
-                   Date <= month_ + months(1))
-        avg_monthly_uptime <- avg_monthly_uptime %>%
-            filter(Zone_Group %in% c("RTOP1", "RTOP2", "All RTOP"), 
-                   !Corridor %in% c("RTOP1", "RTOP2") 
-                   & Month == month_)
-    } else {
-        avg_daily_uptime <- avg_daily_uptime %>% 
-            filter(Zone_Group == zone_group_ & Date <= month_ + months(1))
-        avg_monthly_uptime <- avg_monthly_uptime %>%
-            filter(Zone_Group == zone_group_ & Month == month_)
-    }
-    
+    avg_daily_uptime <- avg_daily_uptime %>% 
+        filter(Signal_Group == signal_group_ & Date <= month_ + months(1))
+    avg_monthly_uptime <- avg_monthly_uptime %>%
+        filter(Signal_Group == signal_group_ & Month == month_)
+
     if (nrow(avg_daily_uptime) > 0) {
         # Create Uptime by Detector Type (Setback, Presence) by Corridor Subplots.
         cdfs <- split(avg_daily_uptime, avg_daily_uptime$Corridor)
@@ -1022,7 +962,7 @@ gather_outstanding_events <- function(cor_monthly_events) {
     
     cor_monthly_events %>% 
         ungroup() %>% 
-        gather(Events, Status, -c(Month, Corridor, Zone_Group))
+        gather(Events, Status, -c(Month, Corridor, Signal_Group))
 }
 
 plot_teams_tasks_ <- function(tab, var_,
@@ -1173,24 +1113,20 @@ cum_events_plot <- memoise(cum_events_plot_)
 
 plot_individual_cctvs_ <- function(daily_cctv_df, 
                                    month_ = current_month(), 
-                                   zone_group_ = zone_group(),
+                                   signal_group_ = signal_group(),
                                    corridor_ = corridor()) {
     
     df <- filter(daily_cctv_df, Date < month_ + months(1))
     
     if (corridor_ == "All Corridors") {
-        if (zone_group_ == "All RTOP") {
-            df <- filter(df, Zone_Group %in% c("RTOP1", "RTOP2"))
-        } else {
-            df <- filter(df, Zone_Group == zone_group_)
-        }
+        df <- filter(df, Signal_Group == signal_group_)
     } else {
         df <- filter(df, Corridor == corridor_)
     }
 
     
     spr <- df %>%
-        select(-num, -uptime, -Corridor, -Zone_Group) %>% 
+        select(-num, -uptime, -Corridor, -Signal_Group) %>% 
         distinct() %>% 
         spread(Date, up, fill = 0) %>%
         arrange(desc(CameraID))
@@ -1218,11 +1154,11 @@ plot_individual_cctvs <- memoise(plot_individual_cctvs_)
 uptime_heatmap <- function(df_,
                            var_,
                            month_ = current_month(), 
-                           zone_group_ = zone_group()) {
+                           signal_group_ = signal_group()) {
     
     var <- as.name(var_)
     df <- filter(df_, Date < month_ + months(1)) %>%
-        filter(Zone_Group == zone_group_) %>%
+        filter(Signal_Group == signal_group_) %>%
         select(SignalID = Corridor, Date, !!var) %>%
         distinct()
     
@@ -1262,7 +1198,7 @@ get_uptime_plot_ <- function(daily_df,
                              var_,
                              num_format, # percent, integer, decimal
                              month_, 
-                             zone_group_, 
+                             signal_group_, 
                              x_bar_title = "___",
                              x_line1_title = "___",
                              x_line2_title = "___",
@@ -1285,10 +1221,10 @@ get_uptime_plot_ <- function(daily_df,
         
         monthly_df_ <- monthly_df %>%
             filter(Month == month_,
-                   Zone_Group == zone_group_) %>%
+                   Signal_Group == signal_group_) %>%
             arrange(desc(Corridor)) %>%
             mutate(var = !!var,
-                   col = factor(ifelse(Corridor==zone_group_, DARK_GRAY_BAR, LIGHT_GRAY_BAR)),
+                   col = factor(ifelse(Corridor==signal_group_, DARK_GRAY_BAR, LIGHT_GRAY_BAR)),
                    Corridor = factor(Corridor, levels = Corridor))
         
         # Current Month Data
@@ -1324,7 +1260,7 @@ get_uptime_plot_ <- function(daily_df,
         daily_heatmap <- uptime_heatmap(daily_df, 
                                         var,
                                         month_,
-                                        zone_group_)
+                                        signal_group_)
         
         
         
@@ -1489,7 +1425,7 @@ signal_dashboard <- function(sigid, pth = "s3") {
     if (pth == "s3") {
         ky <- glue("signal_dashboards/{sigid}.db")
         fn <- glue("{sigid}.db")
-        aws.s3::save_object(ky, "gdot-devices", file = fn)
+        aws.s3::save_object(ky, "vdot-spm", file = fn)
         conn <- dbConnect(RSQLite::SQLite(), fn)
     } else {
         fn <- file.path(pth, glue("{sigid}.db"))
@@ -1659,7 +1595,7 @@ signal_dashboard_older <- function(sigid, pth = "s3") {
     
     if (pth == "s3") {
         fn <- glue("signal_dashboards/{sigid}.db") #rds")
-        aws.s3::save_object(fn, "gdot-devices", file = fn)
+        aws.s3::save_object(fn, "vdot-spm", file = fn)
         #data <- readRDS(fn)
         conn <- dbConnect(RSQLite::SQLite(), fn)
         file.remove(fn)
@@ -1787,7 +1723,7 @@ signal_dashboard_cached_plot <- function(sigid) {
     if (sigid != "") {
         fn <- glue("plot_{sigid}.rds")
         aws.s3::save_object(object = glue("signal_dashboards/plots/plot_{sigid}.rds"), 
-                            bucket = "gdot-devices", 
+                            bucket = "vdot-spm", 
                             file = fn)
         plt <- readRDS(fn)
         file.remove(fn)
@@ -1809,7 +1745,7 @@ cache_plots <- function(pth, upload_to_s3 = TRUE) {
         if (upload_to_s3 == TRUE) {
             aws.s3::put_object(file = plot_fn, 
                                object = glue("signal_dashboards/plots/plot_{s}.rds"), 
-                               bucket = "gdot-devices")
+                               bucket = "vdot-spm")
         }
     })
 }
