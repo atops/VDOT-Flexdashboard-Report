@@ -595,7 +595,7 @@ renderValueBox({
 })
 ```
 
-### Pedestrian Detector Availability [manually collected] {.value-box}
+### Pedestrian Detector Availability {.value-box}
 
 ```{r}
 
@@ -958,7 +958,7 @@ renderPlotly({ # Good version
 renderPlotly({
     get_pct_ch_plot(mr()$mo$vpd,
                     month_ = current_month(),
-                    zone_group = signal_group())
+                    signal_group_ = signal_group())
 })
 ```
 
