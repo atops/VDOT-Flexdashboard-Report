@@ -580,12 +580,12 @@ Device and Communications Uptime (% change from previous quarter)
 Row
 -------------------------------------
 
-### Vehicle Detector Availability [manually collected] {.value-box}
+### Vehicle Detector Availability {.value-box}
 
 ```{r}
 renderValueBox({
   valueBox(
-      value = get_valuebox(cor$qu$veh, "uptime", as_pct, 
+      value = get_valuebox(cor$qu$veh, "uptime.all", as_pct, 
                          signal_group_ = signal_group(), 
                          mo = current_month(), 
                          qu = current_quarter(), break_ = FALSE),
