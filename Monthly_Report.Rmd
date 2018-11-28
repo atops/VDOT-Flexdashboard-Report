@@ -1,5 +1,5 @@
 ---
-title: "VDOT ATSPM Dashboard (beta)"
+title: "ATSPM Dashboard (beta)"
 output: 
   flexdashboard::flex_dashboard:
     orientation: rows
@@ -142,7 +142,7 @@ mr <- reactive(
 filtered_corridors <- reactive({
     if (corridor() == "All Corridors") {
         corridors %>%
-            filter(signal_group %in% input$signal_group) %>%
+            filter(Signal_Group %in% input$signal_group) %>%
             select(-Description, -Asof)
     } else {
         corridors %>%
@@ -1014,10 +1014,8 @@ Row
 ```{r, warning = FALSE}
 renderValueBox({
   valueBox(
-      value = get_valuebox(mr()$mo$du %>% 
-                          group_by(Corridor) %>% 
-                          mutate(delta = uptime.all - lag(uptime.all)), 
-                      "uptime.all", as_pct,
+      value = get_valuebox(mr()$mo$du,
+                           "uptime.all", as_pct,
                            signal_group_ = signal_group(), mo = current_month(), break_ = FALSE),
       icon = "fa-car"
   )

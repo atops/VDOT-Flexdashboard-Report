@@ -1,7 +1,7 @@
 
-@import url(//fonts.googleapis.com/css?family=Open+Sans);
-@import url(//fonts.googleapis.com/css?family=Josefin+Sans); /*:700*/
-@import url(//fonts.googleapis.com/css?family=Nanum+Gothic:800); /*:700*/
+@import url('https://fonts.googleapis.com/css?family=Open+Sans');
+@import url('https://fonts.googleapis.com/css?family=Josefin+Sans'); /*:700*/
+@import url('https://fonts.googleapis.com/css?family=Nanum+Gothic:800');
 
 @font-face { 
   font-family: "Open Sans";
@@ -26,6 +26,7 @@
   color: white!important;
   font-family: 'Nanum Gothic', sans-serif;
   font-size: 24px;
+  font-weight: extra-bold;
   /*font-family: 'Josefin Sans', sans-serif;*/
   /*font-weight: bold;*/
 }
