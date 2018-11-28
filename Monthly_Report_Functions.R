@@ -1166,18 +1166,22 @@ get_daily_detector_uptime <- function(filtered_counts) {
                   all = as.double(n()))
     split(ddu, ddu$setback)
 }
-get_avg_daily_detector_uptime <- function(daily_detector_uptime) {
+get_avg_daily_detector_uptime <- function(ddu) {
     
-    sb_daily_uptime <- get_daily_avg(daily_detector_uptime$Setback, "uptime", "all", peak_only = FALSE)
-    pr_daily_uptime <- get_daily_avg(daily_detector_uptime$Presence, "uptime", "all", peak_only = FALSE)
-    
-    full_join(sb_daily_uptime, pr_daily_uptime, 
-              by = c("SignalID", "Date"), 
-              suffix = c(".sb", ".pr")) %>%
-        rowwise() %>%
-        mutate(uptime.all = weighted.mean(c(uptime.sb, uptime.pr), c(all.sb, all.pr), na.rm = TRUE)) %>%
-        select(-starts_with("delta")) %>% 
+    sb_daily_uptime <- get_daily_avg(filter(ddu, setback = "Setback"), "uptime", "all", peak_only = FALSE)
+    pr_daily_uptime <- get_daily_avg(filter(ddu, setback = "Presence"), "uptime", "all", peak_only = FALSE)
+    all_daily_uptime <- ddu %>%
+        group_by(SignalID, CallPhase, Date, Date_Hour) %>%
+        summarize(uptime = weighted.mean(uptime, all, na.rm = TRUE),
+                  all = sum(all)) %>%
         ungroup()
+    
+    sb_pr <- full_join(sb_daily_uptime, pr_daily_uptime, 
+              by = c("SignalID", "Date"), 
+              suffix = c(".sb", ".pr"))
+    full_join(all_daily_uptime, sb_pr,
+              by = c("SignalID", "Date"))%>%
+        select(-starts_with("delta\."))
 }
 get_cor_avg_daily_detector_uptime <- function(avg_daily_detector_uptime, corridors) {
     

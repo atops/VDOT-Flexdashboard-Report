@@ -124,9 +124,9 @@ print(month_abbrs)
 print("Detector Uptime")
 
 ddu <- f("ddu_", month_abbrs)
-daily_detector_uptime <- split(ddu, ddu$setback)
+#daily_detector_uptime <- split(ddu, ddu$setback)
 
-avg_daily_detector_uptime <- get_avg_daily_detector_uptime(daily_detector_uptime)
+avg_daily_detector_uptime <- get_avg_daily_detector_uptime(ddu)
 cor_avg_daily_detector_uptime <- get_cor_avg_daily_detector_uptime(avg_daily_detector_uptime, corridors)
 
 # mdu_all <- get_monthly_avg_by_day(ddu, "uptime", "all")
