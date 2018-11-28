@@ -8,6 +8,7 @@ Created on Mon Sep 24 20:42:51 2018
 
 import os
 import pandas as pd
+import feather
 import requests
 import uuid
 import polling
@@ -83,7 +84,7 @@ def get_tmc_data(start_date, end_date, tmcs, key, initial_sleep_sec=0):
         results = polling.poll(
                 lambda: requests.get(uri.format('jobs/export/results'), 
                                params = {'key': key, 'uuid': payload['uuid']}),
-                check_succsss = lambda x: x.status_code == 200,
+                check_success = lambda x: x.status_code == 200,
                 step = 5,
                 timeout = 300
                 #poll_forever = True
@@ -129,7 +130,7 @@ if __name__=='__main__':
 
 
     tmc_fn = 'tmc_routes.feather'
-    tmc_df = pd.read_feather(tmc_fn)
+    tmc_df = feather.read_dataframe(tmc_fn)
     tmc_dict = tmc_df.groupby(['Corridor'])['tmc'].apply(list).to_dict()
     
     

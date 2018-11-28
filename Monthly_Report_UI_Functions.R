@@ -78,7 +78,7 @@ if (conf$mode == "production") {
     
     cor <- readRDS("cor.rds")
     sig <- readRDS("sig.rds")
-    teams_tables <- readRDS("teams_tables.rds")
+    
     
 } else if (conf$mode == "beta") {
     
@@ -88,7 +88,7 @@ if (conf$mode == "production") {
     
     cor <- readRDS("cor_s3.rds")
     sig <- readRDS("sig_s3.rds")
-    teams_tables <- readRDS("teams_tables_s3.rds")
+    
 } else {
     stop("mode defined in configuration yaml file must be either production or beta")
 }

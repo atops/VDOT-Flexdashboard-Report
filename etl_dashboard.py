@@ -210,5 +210,5 @@ if __name__=='__main__':
                                              QueryExecutionContext={'Database': ATHENA_DB},
                                              ResultConfiguration={'OutputLocation': 's3://aws-athena-query-results-322643905670-us-east-1'})
         
-        print('\n{} signals in {} days. Done in {} minutes'.format(len(signalids), len([date_]), int((time.time()-t0)/60)))
+    print('\n{} signals in {} days. Done in {} minutes'.format(len(signalids), len([date_]), int((time.time()-t0)/60)))
 
