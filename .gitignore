@@ -11,6 +11,10 @@
 *.swp
 *.fst
 *.feather
+*.rds
+*.csv
+
+/Signal_Dashboards
 
 cor_s3.rds
 sig_s3.rds

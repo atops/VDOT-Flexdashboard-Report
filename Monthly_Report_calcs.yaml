@@ -1,10 +1,10 @@
 
 # Monthly_Report config file (yaml format)
 
-start_date: 2018-11-01 
+start_date: yesterday
 end_date: yesterday
 
-report_start_date: 2018-11-01
+report_start_date: 2017-11-01
 report_end_date: yesterday
 
 corridors_filename: corridors.feather
