@@ -84,9 +84,9 @@ fns <- list.files(path = "Inrix/For_Monthly_Report",
                   pattern = "TWTh.csv$",
                   full.names = TRUE)
 
-tt <- lapply(fns, read_csv) %>% bind_rows() %>%
-    left_join(read_feather(conf$tmc_filename) %>% select(tmc_code = tmc, Corridor, miles)) %>%
-    get_tt()
+tmc_corridors <- read_feather(conf$tmc_filename) %>% 
+    select(tmc_code = tmc, Corridor, miles)
+tt <- get_tt(fns, tmc_corridors)
 
 tti <- tt$tti 
 pti <- tt$pti 

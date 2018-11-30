@@ -771,24 +771,27 @@ get_tt_csv <- function(fns) {
     # Corridor | hour | idx | value
 }
 
-get_tt <- function(df) {
+get_tt <- function(df, tmcs) {
     
-    df_ <- df %>%
-        mutate(measurement_tstamp = mdy_hm(measurement_tstamp)) %>%
+    dfs <- lapply(fns, function(f) {data.table::fread(f) %>%
+        left_join(tmcs) %>%	
+	mutate(measurement_tstamp = as_datetime(measurement_tstamp)) %>%
         filter(wday(measurement_tstamp) %in% c(TUE,WED,THU)) %>%
         mutate(ref_sec = miles/reference_speed * 3600) %>%
         group_by(Corridor = factor(Corridor), measurement_tstamp) %>%
         summarize(travel_time_seconds = sum(travel_time_seconds, na.rm = TRUE),
                   ref_sec = sum(ref_sec, na.rm = TRUE),
                   miles = sum(miles, na.rm = TRUE)) %>%
-        ungroup() %>%
+        ungroup()
+    })
+    df <- bind_rows(dfs) %>%
         group_by(Corridor = factor(Corridor),
                  measurement_tstamp) %>%
         summarize(travel_time_seconds = sum(travel_time_seconds, na.rm = TRUE),
                   ref_sec = sum(ref_sec, na.rm = TRUE),
                   miles = sum(miles, na.rm = TRUE)) %>%
         ungroup() %>%
-        mutate(tti = travel_time_seconds/ref_sec,
+	mutate(tti = travel_time_seconds/ref_sec,
                date_hour = floor_date(measurement_tstamp, "hours"),
                hour = date_hour - days(day(date_hour) - 1)) %>%
         group_by(Corridor, hour) %>%
@@ -796,8 +799,8 @@ get_tt <- function(df) {
                   pti = quantile(travel_time_seconds, c(0.90))/mean(ref_sec, na.rm = TRUE)) %>%
         ungroup()
     
-    tti <- select(df_, Corridor, Hour = hour, tti) %>% as_tibble()
-    pti <- select(df_, Corridor, Hour = hour, pti) %>% as_tibble()
+    tti <- select(df, Corridor, Hour = hour, tti) %>% as_tibble()
+    pti <- select(df, Corridor, Hour = hour, pti) %>% as_tibble()
     
     list("tti" = tti, "pti" = pti)
     
@@ -816,7 +819,7 @@ get_Tuesdays <- function(df) {
     data.frame(Week = week(tuesdays), Date = tuesdays)
 }
 
-weighted_mean_by_corridor_ <- function(df, per_, corridors, var_, wt_=NULL) {
+weighted_mean_by_corridor_ <- function(df, per_, corridors, var_, wt_ = NULL) {
     
     per_ <- as.name(per_)
     
@@ -1302,12 +1305,12 @@ get_cor_monthly_qs_by_day <- function(monthly_qs_by_day, corridors) {
 get_cor_monthly_tti <- function(cor_monthly_tti_by_hr, corridors) {
     cor_monthly_tti_by_hr %>% 
         mutate(Month = as_date(Hour)) %>%
-        #filter(!Corridor %in% c("RTOP1", "RTOP2", "All RTOP", "D5", "Zone 7")) %>% # VDOT -- update
+        filter(Corridor %in% unique(corridors$Corridor)) %>%
         get_cor_monthly_avg_by_day(corridors, "tti", "pct")
 }
 get_cor_monthly_pti <- function(cor_monthly_pti_by_hr, corridors) {
     cor_monthly_pti_by_hr %>% mutate(Month = as_date(Hour))  %>%
-        #filter(!Corridor %in% c("RTOP1", "RTOP2", "All RTOP", "D5", "Zone 7")) %>%
+        filter(Corridor %in% unique(corridors$Corridor)) %>%
         get_cor_monthly_avg_by_day(corridors, "pti", "pct")
 }
 
