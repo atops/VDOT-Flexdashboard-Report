@@ -771,6 +771,39 @@ get_tt_csv <- function(fns) {
     # Corridor | hour | idx | value
 }
 
+get_tt <- function(df) {
+    
+    df <- df %>%
+        mutate(measurement_tstamp = ymd_hms(measurement_tstamp)) %>%
+        filter(wday(measurement_tstamp) %in% c(TUE,WED,THU)) %>%
+        mutate(ref_sec = miles/reference_speed * 3600) %>%
+        group_by(Corridor = factor(Corridor), measurement_tstamp) %>%
+        summarize(travel_time_seconds = sum(travel_time_seconds, na.rm = TRUE),
+                  ref_sec = sum(ref_sec, na.rm = TRUE),
+                  miles = sum(miles, na.rm = TRUE)) %>%
+        ungroup() %>%
+        group_by(Corridor = factor(Corridor),
+                 measurement_tstamp) %>%
+        summarize(travel_time_seconds = sum(travel_time_seconds, na.rm = TRUE),
+                  ref_sec = sum(ref_sec, na.rm = TRUE),
+                  miles = sum(miles, na.rm = TRUE)) %>%
+        ungroup() %>%
+        mutate(tti = travel_time_seconds/ref_sec,
+               date_hour = floor_date(measurement_tstamp, "hours"),
+               hour = date_hour - days(day(date_hour) - 1)) %>%
+        group_by(Corridor, hour) %>%
+        summarize(tti = mean(travel_time_seconds/ref_sec, na.rm = TRUE),
+                  pti = quantile(travel_time_seconds, c(0.90))/mean(ref_sec, na.rm = TRUE)) %>%
+        ungroup()
+    
+    tti <- select(df, Corridor, Hour = hour, tti) %>% as_tibble()
+    pti <- select(df, Corridor, Hour = hour, pti) %>% as_tibble()
+    
+    list("tti" = tti, "pti" = pti)
+    
+    # Corridor | hour | idx | value
+}
+
 
 
 # -- Generic Aggregation Functions

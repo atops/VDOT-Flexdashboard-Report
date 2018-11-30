@@ -77,19 +77,22 @@ print(month_abbrs)
 
 # # TRAVEL TIME AND BUFFER TIME INDEXES #######################################
 
-# print("Travel Times")
-# 
-# # Eventually (soon) this will be replaced to get tti and pti from summary tables
-# # calculated from RITIS API
-# fs <- list.files(path = "Inrix/For_Monthly_Report", 
-#                  pattern = "TWTh.csv$",
-#                  recursive = TRUE, 
-#                  full.names = TRUE)
-# fns <- fs[fs < "Inrix/For_Monthly_Report/2018-01"] # old format: files before 2018-01
-# tt <- get_tt_csv(fns)
-# tti <- tt$tti 
-# pti <- tt$pti 
-# 
+print("Travel Times")
+
+# Raw data from massive data downloader file
+fns <- list.files(path = "Inrix/For_Monthly_Report", 
+                  pattern = "TWTh.csv$",
+                  full.names = TRUE)
+
+tt <- lapply(fns, read_csv) %>% bind_rows() %>%
+    left_join(read_feather(conf$tmc_filename) %>% select(tmc_code = tmc, Corridor, miles)) %>%
+    get_tt()
+
+tti <- tt$tti 
+pti <- tt$pti 
+
+# Files downloaded with RITIS API
+
 # fns2 <- list.files(path = "Inrix/For_Monthly_Report",
 #                    pattern = "tt_.*_summary.csv",
 #                    recursive = FALSE,
@@ -112,12 +115,12 @@ print(month_abbrs)
 # 
 # 
 # 
-# write_fst(tti, "tti.fst")
-# write_fst(pti, "pti.fst")
-# 
-# rm(tt)
-# gc()
-# 
+write_fst(tti, "tti.fst")
+write_fst(pti, "pti.fst")
+
+rm(tt)
+gc()
+
 
 # # DETECTOR UPTIME ###########################################################
 
