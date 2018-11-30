@@ -773,8 +773,8 @@ get_tt_csv <- function(fns) {
 
 get_tt <- function(df) {
     
-    df <- df %>%
-        mutate(measurement_tstamp = ymd_hms(measurement_tstamp)) %>%
+    df_ <- df %>%
+        mutate(measurement_tstamp = mdy_hm(measurement_tstamp)) %>%
         filter(wday(measurement_tstamp) %in% c(TUE,WED,THU)) %>%
         mutate(ref_sec = miles/reference_speed * 3600) %>%
         group_by(Corridor = factor(Corridor), measurement_tstamp) %>%
@@ -796,8 +796,8 @@ get_tt <- function(df) {
                   pti = quantile(travel_time_seconds, c(0.90))/mean(ref_sec, na.rm = TRUE)) %>%
         ungroup()
     
-    tti <- select(df, Corridor, Hour = hour, tti) %>% as_tibble()
-    pti <- select(df, Corridor, Hour = hour, pti) %>% as_tibble()
+    tti <- select(df_, Corridor, Hour = hour, tti) %>% as_tibble()
+    pti <- select(df_, Corridor, Hour = hour, pti) %>% as_tibble()
     
     list("tti" = tti, "pti" = pti)
     
