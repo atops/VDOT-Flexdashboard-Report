@@ -447,28 +447,28 @@ gc()
 
 # TRAVEL TIME AND BUFFER TIME INDEXES #########################################
 
-# tti <- read_fst("tti.fst")
-# pti <- read_fst("pti.fst")
-# 
-# cor_monthly_tti_by_hr <- get_cor_monthly_ti_by_hr(tti, cor_monthly_vph, corridors)
-# cor_monthly_pti_by_hr <- get_cor_monthly_ti_by_hr(pti, cor_monthly_vph, corridors)
-# 
-# cor_monthly_tti <- get_cor_monthly_tti(cor_monthly_tti_by_hr, corridors)
-# cor_monthly_pti <- get_cor_monthly_pti(cor_monthly_pti_by_hr, corridors)
-# 
-# saveRDS(cor_monthly_tti, "cor_monthly_tti.rds")
-# saveRDS(cor_monthly_tti_by_hr, "cor_monthly_tti_by_hr.rds")
-# 
-# saveRDS(cor_monthly_pti, "cor_monthly_pti.rds")
-# saveRDS(cor_monthly_pti_by_hr, "cor_monthly_pti_by_hr.rds")
-# 
-# rm(tti)
-# rm(pti)
-# rm(cor_monthly_tti)
-# rm(cor_monthly_tti_by_hr)
-# rm(cor_monthly_pti)
-# rm(cor_monthly_pti_by_hr)
-# 
+tti <- read_fst("tti.fst")
+pti <- read_fst("pti.fst")
+
+cor_monthly_tti_by_hr <- get_cor_monthly_ti_by_hr(tti, cor_monthly_vph, corridors)
+cor_monthly_pti_by_hr <- get_cor_monthly_ti_by_hr(pti, cor_monthly_vph, corridors)
+
+cor_monthly_tti <- get_cor_monthly_tti(cor_monthly_tti_by_hr, corridors)
+cor_monthly_pti <- get_cor_monthly_pti(cor_monthly_pti_by_hr, corridors)
+
+saveRDS(cor_monthly_tti, "cor_monthly_tti.rds")
+saveRDS(cor_monthly_tti_by_hr, "cor_monthly_tti_by_hr.rds")
+
+saveRDS(cor_monthly_pti, "cor_monthly_pti.rds")
+saveRDS(cor_monthly_pti_by_hr, "cor_monthly_pti_by_hr.rds")
+
+rm(tti)
+rm(pti)
+rm(cor_monthly_tti)
+rm(cor_monthly_tti_by_hr)
+rm(cor_monthly_pti)
+rm(cor_monthly_pti_by_hr)
+
 
 
 # Package up for Flexdashboard
@@ -523,10 +523,10 @@ cor$mo <- list("vpd" = readRDS("cor_monthly_vpd.rds"),
                "qsh" = readRDS("cor_mqsh.rds"),
                "sfd" = readRDS("cor_monthly_sfd.rds"),
                "sfh" = readRDS("cor_msfh.rds"),
-               "tti" = data.frame(), #readRDS("cor_monthly_tti.rds"),
-               "ttih" = data.frame(), #readRDS("cor_monthly_tti_by_hr.rds"),
-               "pti" = data.frame(), #readRDS("cor_monthly_pti.rds"),
-               "ptih" = data.frame(), #readRDS("cor_monthly_pti_by_hr.rds"),
+               "tti" = readRDS("cor_monthly_tti.rds"),
+               "ttih" = readRDS("cor_monthly_tti_by_hr.rds"),
+               "pti" = readRDS("cor_monthly_pti.rds"),
+               "ptih" = readRDS("cor_monthly_pti_by_hr.rds"),
                "du" = readRDS("cor_monthly_detector_uptime.rds"),
                "cu" = readRDS("cor_monthly_comm_uptime.rds"),
                "veh" = readRDS("cor_monthly_detector_uptime.rds"), # -- Need to update
@@ -541,8 +541,8 @@ cor$qu <- list("vpd" = get_quarterly(cor$mo$vpd, "vpd"),
                "aogd" = get_quarterly(cor$mo$aogd, "aog", "vol"),
                "qsd" = get_quarterly(cor$mo$qsd, "qs_freq"),
                "sfd" = get_quarterly(cor$mo$sfd, "sf_freq"),
-               "tti" = data.frame(), #get_quarterly(cor$mo$tti, "tti"),
-               "pti" = data.frame(), #get_quarterly(cor$mo$pti, "pti"),
+               "tti" = get_quarterly(cor$mo$tti, "tti"),
+               "pti" = get_quarterly(cor$mo$pti, "pti"),
                "du" = get_quarterly(cor$mo$du, "uptime.all"),
                "cu" = get_quarterly(cor$mo$cu, "uptime"),
                "veh" = get_quarterly(cor$mo$veh, "uptime.all"), # -- Need to update
