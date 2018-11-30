@@ -142,7 +142,7 @@ mr <- reactive(
 filtered_corridors <- reactive({
     if (corridor() == "All Corridors") {
         corridors %>%
-            filter(Signal_Group %in% input$signal_group) %>%
+            filter(Signal_Group %in% signal_group()) %>% #input$signal_group) %>%
             select(-Description, -Asof)
     } else {
         corridors %>%
