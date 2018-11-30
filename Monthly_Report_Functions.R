@@ -880,15 +880,6 @@ group_corridors_ <- function(df, per_, var_, wt_, gr_ = group_corridor_by_) {
 	    gr_(per_, var_, wt_, sg)
     })
     
-    #zgs <- lapply(c("RTOP1", "RTOP2", "D1", "D2", "D3", "D4", "D5", "D6", "Zone 7", "Cobb County"), function(zg) { # VDOT -- update
-    #    df %>%
-    #        filter(Signal_Group == zg) %>%
-    #        gr_(per_, var_, wt_, zg)
-    #})
-    #all_rtop_df_out <- df %>%
-    #    filter(Signal_Group %in% c("RTOP1", "RTOP2")) %>% # VDOT -- update
-    #    gr_(per_, var_, wt_, "All RTOP")
-
     dplyr::bind_rows(select_(df, "Corridor", "Signal_Group", per_, var_, wt_, "delta"),
                      sgs) %>%
         mutate(Corridor = factor(Corridor))
