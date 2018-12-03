@@ -43,15 +43,14 @@ Past month reports can be viewed back to `r tail(conf$report_months, 1)`.
 ```{r sidebar, warning = FALSE, cache = FALSE}
 # shiny inputs defined here
 
-# VDOT -- update
-
-month_options <- conf$report_months
+# Last thirteen months
+month_options <- seq(today() - days(7), today() - days(7) - months(12), by = "-1 month") %>% format("%B %Y")
 
 signal_group_options <- conf$signal_groups
 
 selectInput("month", "Month:",
                        choices = month_options,
-                       selected = conf$selected_month)
+                       selected = month_options[1]) # Default to current month
 
 selectInput("signal_group", "Signal Group:",
                        choices = signal_group_options,
