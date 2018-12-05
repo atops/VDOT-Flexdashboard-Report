@@ -48,7 +48,6 @@ LIGHT_BROWN = "#FFFF99";  BROWN = "#B15928"
 
 RED2 = "#e41a1c"
 VDOT_BLUE = "#005da9"
-#GDOT_BLUE = "#256194"
 
 SUN = 1; MON = 2; TUE = 3; WED = 4; THU = 5; FRI = 6; SAT = 7
 
@@ -100,14 +99,6 @@ get_month_abbrs <- function(start_date, end_date) {
     end_date <- ymd(end_date)
     
     sapply(seq(start_date, end_date, by = "1 month"), function(d) { format(d, "%Y-%m")} )
-    
-    #sapply(seq(ymd(start_date), ymd(end_date), by = "1 month"),
-    #                  function(date_) { 
-    #                      d <- ymd(date_)
-    #                      y <- year(d)
-    #                      m <- month(d)
-    #                      s <- paste(y, sprintf("%02d", m), sep = "-")
-    #                  })
 }
 
 # Takes a list of dataframe or mulitple dataframes as list(df1, df2, df3)
@@ -142,13 +133,13 @@ write_fst_ <- function(df, fn, append = FALSE) {
 get_corridors <- function(corr_fn) {
     readxl::read_xlsx(corr_fn) %>% 
         tidyr::unite(Name, c(`Main Street Name`, `Side Street Name`), sep = ' @ ') %>%
-        transmute(SignalID = factor(SignalID), #SignalID=factor(`GDOT MaxView Device ID`), # VDOT -- update
+        transmute(SignalID = factor(SignalID), 
                   Signal_Group = factor(`Signal Group`),
                   Corridor = factor(Corridor),
                   Milepost = as.numeric(Milepost),
                   Agency = Agency,
                   County = County,
-		  Name = Name,
+                  Name = Name,
                   Asof = date(Asof)) %>% 
         filter(grepl("^\\d.*", SignalID)) %>%
         filter(!is.na(Corridor)) %>%
@@ -170,14 +161,12 @@ get_tmc_routes <- function(pth = "Inrix/For_Monthly_Report/2018-09/") { # VDOT -
 get_det_config <- function(date_) {
     fn <- glue('ATSPM_Det_Config_Good_{date_}.feather')
     if (!file.exists(fn)) {
-	fn <- glue('ATSPM_Det_Config_Good.feather')
+        fn <- glue('ATSPM_Det_Config_Good.feather')
     }
     read_feather(fn) %>%
         transmute(SignalID = as.character(SignalID), 
                   Detector = as.integer(Detector), 
                   CallPhase = as.integer(CallPhase),
-                  #CallPhase.atspm = as.integer(CallPhase_atspm),
-                  #CallPhase.maxtime = as.integer(CallPhase_maxtime),
                   TimeFromStopBar = TimeFromStopBar)
 }
 
@@ -261,10 +250,10 @@ get_counts2 <- function(date_, uptime = TRUE, counts = TRUE) {
     counts_15min_csv_fn <- glue("counts_15min_{start_date}.csv")
     
     if (file.exists(counts_1hr_csv_fn)) {
-	file.remove(counts_1hr_csv_fn)
+        file.remove(counts_1hr_csv_fn)
     }
     if (file.exists(counts_15min_csv_fn)) {
-	file.remove(counts_15min_csv_fn)
+        file.remove(counts_15min_csv_fn)
     }
         
     n <- length(signals_list)
@@ -389,10 +378,10 @@ get_filtered_counts <- function(counts, interval = "1 hour") { # interval (e.g.,
     #  This ensures all detectors are included in the bad detectors calculation.
     all_days <- unique(date(counts$Timeperiod))
     det_config <- lapply(all_days, function(d) {
-        all_timeperiods <- seq(ymd_hms(paste(d, "00:00:00")), ymd_hms(paste(d, "23:59:00")), by = "1 hour")
+        all_timeperiods <- seq(ymd_hms(paste(d, "00:00:00")), ymd_hms(paste(d, "23:59:00")), by = interval)
         fn <- glue("ATSPM_Det_Config_Good_{d}.feather")
     	if (!file.exists(fn)) {
-	    fn <- glue("ATSPM_Det_Config_Good.feather")
+            fn <- glue("ATSPM_Det_Config_Good.feather")
 	}
 	read_feather(fn) %>% 
             transmute(SignalID = factor(SignalID), 
@@ -716,9 +705,9 @@ get_qs <- function(detection_events) {
     
     dc <- lapply(dates, function(d) {
         fn <- glue("ATSPM_Det_Config_Good_{d}.feather")
-	if (!file.exists(fn)) {
+        if (!file.exists(fn)) {
             fn <- glue("ATSPM_Det_Config_Good.feather")
-	}
+        }
         read_feather(fn) %>% mutate(Date = ymd(d))
     }) %>% 
         bind_rows %>% 
@@ -878,9 +867,10 @@ group_corridors_ <- function(df, per_, var_, wt_, gr_ = group_corridor_by_) {
     
     gps <- unique(df$Signal_Group)
     sgs <- lapply(gps, function(sg) {
-	df %>%
-	    filter(Signal_Group == sg) %>% 
-	    gr_(per_, var_, wt_, sg)
+
+        df %>%
+            filter(Signal_Group == sg) %>% 
+            gr_(per_, var_, wt_, sg)
     })
     
     dplyr::bind_rows(select_(df, "Corridor", "Signal_Group", per_, var_, wt_, "delta"),
@@ -1206,7 +1196,7 @@ get_avg_daily_detector_uptime <- function(ddu) {
         summarize(uptime = weighted.mean(uptime, all, na.rm = TRUE),
                   all = sum(all)) %>%
         ungroup() %>%
-	get_daily_avg(., "uptime", "all", peak_only = FALSE)
+        get_daily_avg(., "uptime", "all", peak_only = FALSE)
     
     sb_pr <- full_join(sb_daily_uptime, pr_daily_uptime, 
               by = c("SignalID", "Date"), 
@@ -1214,7 +1204,7 @@ get_avg_daily_detector_uptime <- function(ddu) {
     full_join(all_daily_uptime, sb_pr,
               by = c("SignalID", "Date")) %>%
         select(-starts_with("delta.")) %>%
-	rename(uptime.all = uptime)
+        rename(uptime.all = uptime)
 }
 get_cor_avg_daily_detector_uptime <- function(avg_daily_detector_uptime, corridors) {
     
@@ -1316,10 +1306,6 @@ get_cor_monthly_pti <- function(cor_monthly_pti_by_hr, corridors) {
 
 get_monthly_detector_uptime <- function(avg_daily_detector_uptime) {
     avg_daily_detector_uptime %>% 
-        #ungroup() %>%
-        #rowwise() %>%
-        #mutate(num.all = sum(all.sb, all.pr, na.rm = TRUE)) %>%
-        #ungroup() %>%
         mutate(CallPhase = 0) %>%
         get_monthly_avg_by_day("uptime.all", "all") %>%
         arrange(SignalID, Month)

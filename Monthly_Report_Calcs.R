@@ -105,9 +105,6 @@ lapply(month_abbrs, function(month_abbr) {
 
 signals_list <- corridors$SignalID[!is.na(corridors$SignalID)]
 
-print(paste("Signals List", signals_list))
-print(paste("Month Abbrs", month_abbrs))
-
 # Group into months to calculate filtered and adjusted counts
 # adjusted counts needs a full month to fill in gaps based on monthly averages
 
@@ -125,7 +122,7 @@ get_counts_based_measures <- function(month_abbrs) {
         #-----------------------------------------------
         # 1-hour counts, filtered, adjusted, bad detectors
         
-        month_pattern <- paste0("counts_1hr_", yyyy_mm, "-\\d\\d?\\.fst")
+        month_pattern <- glue("filtered_counts_1hr_{yyyy_mm}-\\d+\\.fst")
         fns <- list.files(pattern = month_pattern)
         
         print(fns)
@@ -137,7 +134,7 @@ get_counts_based_measures <- function(month_abbrs) {
             clusterExport(cl, c("get_filtered_counts",
                                 "week",
                                 "signals_list"))
-            fcs <- parLapply(cl, fns, function(fn) {
+            filtered_counts_1hr <- parLapply(cl, fns, function(fn) {
                 library(fst)
                 library(dplyr)
                 library(tidyr)
@@ -146,23 +143,21 @@ get_counts_based_measures <- function(month_abbrs) {
                 library(feather)
                 
                 read_fst(fn) %>% 
-                    filter(SignalID %in% signals_list) %>%
-                    get_filtered_counts(., interval = "1 hour")
+                    filter(SignalID %in% signals_list)
                 
-            })
+            }) %>% bind_rows() %>% as_tibble()
             stopCluster(cl)
             
-            filtered_counts_1hr <- bind_rows(fcs)
-            write_fst_(filtered_counts_1hr, paste0("filtered_counts_1hr_", yyyy_mm, ".fst"))
-            rm(fcs)
+            write_fst_(filtered_counts_1hr, glue("filtered_counts_1hr_{yyyy_mm}.fst"))
+            
             
             print("adjusted counts")
             adjusted_counts_1hr <- get_adjusted_counts(filtered_counts_1hr)
-            write_fst_(adjusted_counts_1hr, paste0("adjusted_counts_1hr_", yyyy_mm, ".fst"))
-
+            write_fst_(adjusted_counts_1hr, glue("adjusted_counts_1hr_{yyyy_mm}.fst"))
+            
             print("bad detectors")
             bad_detectors <- get_bad_detectors(filtered_counts_1hr)
-
+            
             bd_fn <- glue("bad_detectors_{yyyy_mm}.fst")
             write_fst(bad_detectors, bd_fn)
             
@@ -213,29 +208,22 @@ get_counts_based_measures <- function(month_abbrs) {
                                 "signals_list",
                                 "bad_detectors"),
                           envir = environment())
-            fcs <- parLapply(cl, fns, function(fn) {
+            filtered_counts_15min <- parLapply(cl, fns, function(fn) {
                 library(fst)
                 library(dplyr)
                 library(tidyr)
                 library(lubridate)
+                library(glue)
+                library(feather)
+
                 
                 # Filter and Adjust (interpolate) 15 min Counts
-                df <- read_fst(fn) %>%
-                    as_tibble() %>%
+                df <- read_fst(fn)
                     filter(SignalID %in% signals_list) %>%
-                    mutate(Date = date(Timeperiod))
-                
-                bd <- bad_detectors %>%
-                    filter(Date %in% unique(df$Date))
-                
-                anti_join(df, bd)
-                
+                    anti_join(., filter(bad_detectors, Date %in% unique(df$Date)) %>%
+                    mutate(Month_Hour = Timeperiod - days(day(Timeperiod) - 1))
             })
             stopCluster(cl)
-            
-            filtered_counts_15min <- bind_rows(fcs) %>%
-                mutate(Month_Hour = Timeperiod - days(day(Timeperiod) - 1))
-            rm(fcs)
             
             print("adjusted counts")
             adjusted_counts_15min <- get_adjusted_counts(filtered_counts_15min) %>%
@@ -259,6 +247,7 @@ lapply(bd_fns, read_fst) %>% bind_rows() %>%
     write_feather("bad_detectors.feather")
 
 print("--- Finished counts-based measures ---")
+
 
 
 # -- Run etl_dashboard (Python): cycledata, detectionevents to S3/Athena --
@@ -334,6 +323,8 @@ get_queue_spillback_date_range <- function(start_date, end_date) {
 
         start_date <- floor_date(start_date, "months")
         end_date <- start_date + months(1) - days(1)
+        
+        print(start_date)
 
         detection_events <- get_detection_events(start_date, end_date, signals_list)
         if (nrow(collect(head(detection_events))) > 0) {
@@ -377,6 +368,17 @@ lapply(month_abbrs, function(month_abbr) {
     }
 })
 
+
+                                                                               
+
+                                                                
+                                           
+                                                             
+   
+
+                                                                               
+
+                                                   
 
 # # TRAVEL TIMES FROM RITIS API ###############################################
 
