@@ -193,7 +193,7 @@ get_counts_based_measures <- function(month_abbrs) {
         #-----------------------------------------------
         # 15-minute counts and throughput
         print("15-minute counts and throughput")
-        month_pattern <- paste0("counts_15min_TWR_", yyyy_mm, "-\\d\\d?\\.fst")
+        month_pattern <- glue("filtered_counts_15min_TWR_{yyyy_mm}-\\d+\\.fst")
         fns <- list.files(pattern = month_pattern)
         
         if (length(fns) > 0) {
@@ -203,9 +203,7 @@ get_counts_based_measures <- function(month_abbrs) {
             print("15-min filtered counts")
             
             cl <- makeCluster(4)
-            clusterExport(cl, c("get_filtered_counts",
-                                "week",
-                                "signals_list",
+            clusterExport(cl, c("signals_list",
                                 "bad_detectors"),
                           envir = environment())
             filtered_counts_15min <- parLapply(cl, fns, function(fn) {
