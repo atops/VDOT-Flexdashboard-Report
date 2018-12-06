@@ -218,11 +218,12 @@ get_counts_based_measures <- function(month_abbrs) {
 
                 
                 # Filter and Adjust (interpolate) 15 min Counts
-                df <- read_fst(fn)
-                    filter(SignalID %in% signals_list) %>%
-                    anti_join(., filter(bad_detectors, Date %in% unique(df$Date)) %>%
+                df <- read_fst(fn) %>%
+                    mutate(Date = date(Timeperiod)) %>%
+                    filter(SignalID %in% signals_list) 
+                anti_join(df, filter(bad_detectors, Date %in% unique(df$Date))) %>%
                     mutate(Month_Hour = Timeperiod - days(day(Timeperiod) - 1))
-            })
+            }) %>% bind_rows() %>% as_tibble()
             stopCluster(cl)
             
             print("adjusted counts")

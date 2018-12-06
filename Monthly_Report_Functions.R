@@ -340,26 +340,29 @@ get_counts2 <- function(date_, uptime = TRUE, counts = TRUE) {
     
     if (counts == TRUE) {
         
-        read_csv(glue("counts_1hr_{start_date}.csv"),
+        c <- read_csv(glue("counts_1hr_{start_date}.csv"),
                  col_names = c("SignalID", "Timeperiod", "Detector", "CallPhase", "vol")) %>%
             mutate(SignalID = factor(SignalID),
                    Detector = factor(Detector),
-                   CallPhase = factor(CallPhase)) %>%
-        write_fst(., glue("counts_1hr_{start_date}.fst"))
+                   CallPhase = factor(CallPhase))
+        write_fst(c, glue("counts_1hr_{start_date}.fst"))
+        get_filtered_counts(c, interval = "1 hour") %>%
+           write_fst(., glue("filtered_counts_1hr_{start_date}.fst"))
+
+        file.remove(counts_1hr_csv_fn) 
         
-        file.remove(counts_1hr_csv_fn) #glue("counts_1hr_{start_date}.csv"))
         
-        
-        if (file.exists(counts_15min_csv_fn)) { #glue("counts_15min_{start_date}.csv"))) {
+        if (file.exists(counts_15min_csv_fn)) { 
             
-            read_csv(counts_15min_csv_fn, #glue("counts_15min_{start_date}.csv"),
+            c <- read_csv(counts_15min_csv_fn, 
                      col_names = c("SignalID", "Timeperiod", "Detector", "CallPhase", "vol")) %>%
                 mutate(SignalID = factor(SignalID),
                        Detector = factor(Detector),
-                       CallPhase = factor(CallPhase)) %>%
-                write_fst(., glue("counts_15min_TWR_{start_date}.fst"))
-            
-            file.remove(counts_15min_csv_fn) #glue("counts_15min_{start_date}.csv"))
+                       CallPhase = factor(CallPhase))
+            write_fst(c, glue("counts_15min_TWR_{start_date}.fst"))
+            get_filtered_counts(c, interval = "15 min") %>% 
+               write_fst(., glue("filtered_counts_15min_TWR_{start_date}.fst")) 
+            file.remove(counts_15min_csv_fn) 
         }
         
     }
