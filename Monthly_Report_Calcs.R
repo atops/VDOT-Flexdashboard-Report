@@ -183,7 +183,6 @@ get_counts_based_measures <- function(month_abbrs) {
             daily_detector_uptime <- get_daily_detector_uptime(filtered_counts_1hr)
             ddu <- bind_rows(daily_detector_uptime)
             write_fst_(ddu, paste0("ddu_", yyyy_mm, ".fst"))
-            
         }
         
         
@@ -218,7 +217,7 @@ get_counts_based_measures <- function(month_abbrs) {
                 # Filter and Adjust (interpolate) 15 min Counts
                 df <- read_fst(fn) %>%
                     mutate(Date = date(Timeperiod)) %>%
-                    filter(SignalID %in% signals_list) 
+                    filter(SignalID %in% signals_list)
                 anti_join(df, filter(bad_detectors, Date %in% unique(df$Date))) %>%
                     mutate(Month_Hour = Timeperiod - days(day(Timeperiod) - 1))
             }) %>% bind_rows() %>% as_tibble()
@@ -236,6 +235,50 @@ get_counts_based_measures <- function(month_abbrs) {
             
             write_fst(throughput, paste0("tp_", yyyy_mm, ".fst"))
         }
+        
+        
+        
+        #-----------------------------------------------
+        # 1-hour pedestrian activation counts
+        print("1-hour pedestrian activation counts")
+        month_pattern <- glue("counts_ped_1hr_{yyyy_mm}-\\d+\\.fst")
+        fns <- list.files(pattern = month_pattern)
+        
+        if (length(fns) > 0) {
+            
+            print(fns)
+            
+            #print("1-hour pedestrian activation counts")
+            
+            cl <- makeCluster(4)
+            clusterExport(cl, c("signals_list"),
+                          envir = environment())
+            counts_ped_1hr <- parLapply(cl, fns, function(fn) {
+                library(fst)
+                library(dplyr)
+                library(tidyr)
+                library(lubridate)
+                library(glue)
+                library(feather)
+                
+                
+                # Filter and Adjust (interpolate) 15 min Counts
+                df <- read_fst(fn) %>%
+                    filter(SignalID %in% signals_list)
+            }) %>% bind_rows() %>% as_tibble()
+            stopCluster(cl)
+        }
+        
+        # PAPD - pedestrian activations per day
+        print("papd")
+        papd <- get_vpd(counts_ped_1hr, mainline_only = FALSE) # calculate over current period
+        write_fst(papd, paste0("papd_", yyyy_mm, ".fst"))
+        
+        
+        # PAPH - pedestrian activations per hour
+        print("paph")
+        paph <- get_vph(counts_ped_1hr, mainline_only = FALSE)
+        write_fst(paph, paste0("paph_", yyyy_mm, ".fst"))
     })
 }
 get_counts_based_measures(month_abbrs)
