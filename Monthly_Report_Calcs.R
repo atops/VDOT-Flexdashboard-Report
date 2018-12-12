@@ -250,9 +250,10 @@ print("--- Finished counts-based measures ---")
 
 
 # -- Run etl_dashboard (Python): cycledata, detectionevents to S3/Athena --
-import_from_path("spm_events")
-py_run_file("etl_dashboard.py") # python script
+#import_from_path("spm_events")
+#py_run_file("etl_dashboard.py") # python script
 
+system("~/miniconda3/bin/python etl_dashboard.py")
 # --- ----------------------------- -----------
 
 
