@@ -170,6 +170,17 @@ get_det_config <- function(date_) {
                   TimeFromStopBar = TimeFromStopBar)
 }
 
+get_ped_config <- function(date_) {
+    fn <- glue('../MaxTime_Ped_Plans_{date_}.csv')
+    if (!file.exists(fn)) {
+        fn <- glue('../MaxTime_Ped_Plans.csv')
+    }
+    read_csv(fn) %>%
+        transmute(SignalID = as.character(SignalID), 
+                  Detector = as.integer(Detector), 
+                  CallPhase = as.integer(CallPhase))
+}
+
 
 get_unique_timestamps <- function(df) {
     df %>% 
@@ -211,12 +222,12 @@ get_gaps <- function(df, signals_list) {
         ungroup()
 }
 
-get_counts5 <- function(df, det_config, units = "hours", date_, TWR_only = FALSE) {
+get_counts5 <- function(df, det_config, units = "hours", date_, event_code = 82, TWR_only = FALSE) {
     
     if (lubridate::wday(date_, label = TRUE) %in% c("Tue", "Wed", "Thu") || (TWR_only == FALSE)) {
         
         df %>%
-            filter(EventCode == 82) %>%
+            filter(EventCode == event_code) %>%
             mutate(Timeperiod = floor_date(Timestamp, unit = units)) %>%
             group_by(SignalID, Detector = EventParam, Timeperiod) %>%
             summarize(vol = n()) %>%
