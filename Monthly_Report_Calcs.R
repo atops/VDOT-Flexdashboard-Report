@@ -385,7 +385,8 @@ get_queue_spillback_date_range(start_date, end_date)
 # # GET SPLIT FAILURES ########################################################
 
 print("split failures")
-py_run_file("split_failures2.py") # python script
+#py_run_file("split_failures2.py") # python script
+system("~/miniconda3/bin/python split_failures2.py")
 
 lapply(month_abbrs, function(month_abbr) {
     fns <- list.files(pattern = paste0("sf_", month_abbr, "-\\d{2}.feather"))
