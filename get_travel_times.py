@@ -83,7 +83,8 @@ def get_tmc_data(start_date, end_date, tmcs, key, initial_sleep_sec=0):
         # retry at intervals of 'step' until results return (status code = 200)
         results = polling.poll(
                 lambda: requests.get(uri.format('jobs/export/results'), 
-                               params = {'key': key, 'uuid': payload['uuid']}),
+                                     timeout=5,
+                                     params = {'key': key, 'uuid': payload['uuid']}),
                 check_success = lambda x: x.status_code == 200,
                 step = 5,
                 timeout = 300
@@ -140,7 +141,7 @@ if __name__=='__main__':
     df = pd.DataFrame()
     for corridor in tmc_dict.keys():
         print('\n' + corridor)
-        tt_df = get_tmc_data(start_date, end_date, tmc_dict[corridor], cred['RITIS_KEY'], 10)
+        tt_df = get_tmc_data(start_date, end_date, tmc_dict[corridor], cred['RITIS_KEY'], 2)
     
         if len(tt_df) > 0:
             df_ = (pd.merge(tt_df, tmc_df[['tmc','miles']], left_on=['tmc_code'], right_on=['tmc'])
