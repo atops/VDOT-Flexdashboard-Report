@@ -252,21 +252,32 @@ get_counts2 <- function(date_, uptime = TRUE, counts = TRUE) {
     if (counts == TRUE) {
         det_config <- get_det_config(start_date) %>%
             select(SignalID, Detector, CallPhase)
+        ped_config <- get_ped_config(start_date) %>%
+            select(SignalID, Detector, CallPhase)
     }
 
-    uptime_sig <- data.frame()
-    gaps_all <- data.frame()
+    if (uptime == TRUE) {
+        
+        uptime_sig <- data.frame()
+        gaps_all <- data.frame()
+    }
     
     counts_1hr_csv_fn <- glue("counts_1hr_{start_date}.csv")
+    counts_ped_1hr_csv_fn <- glue("counts_ped_1hr_{start_date}.csv")
     counts_15min_csv_fn <- glue("counts_15min_{start_date}.csv")
     
     if (file.exists(counts_1hr_csv_fn)) {
         file.remove(counts_1hr_csv_fn)
     }
+    if (file.exists(counts_ped_1hr_csv_fn)) {
+        file.remove(counts_ped_1hr_csv_fn)
+    }
     if (file.exists(counts_15min_csv_fn)) {
         file.remove(counts_15min_csv_fn)
     }
-        
+
+    conn <- get_atspm_connection()
+    
     n <- length(signals_list)
     i <- 2
     splits <- rep(1:ceiling(n/i), each = i, length.out = n)
@@ -286,12 +297,8 @@ get_counts2 <- function(date_, uptime = TRUE, counts = TRUE) {
         
         
         
-        conn <- get_atspm_connection()
-        
         df <- dbGetQuery(conn, query)
         print(head(df))
-        
-        dbDisconnect(conn)
         
         if (uptime == TRUE) {
 
@@ -308,8 +315,20 @@ get_counts2 <- function(date_, uptime = TRUE, counts = TRUE) {
                                       date_ = date_,
                                       TWR_only = FALSE)
             write_csv(counts_1hr, 
-                      counts_1hr_csv_fn, #glue("counts_1hr_{start_date}.csv"), 
+                      counts_1hr_csv_fn,
                       append = TRUE)
+            
+            # get 1hr ped counts
+            counts_ped_1hr <- get_counts5(df,
+                                          ped_config,
+                                          units = "hours",
+                                          date_ = date_,
+                                          event_code = 90,
+                                          TWR_only = FALSE)
+            write_csv(counts_ped_1hr, 
+                      counts_ped_1hr_csv_fn,
+                      append = TRUE)
+
             
             # get 15min counts
             counts_15min <- get_counts5(df, 
@@ -319,11 +338,12 @@ get_counts2 <- function(date_, uptime = TRUE, counts = TRUE) {
                                         TWR_only = TRUE)
             if (nrow(counts_15min) > 0) {
                 write_csv(counts_15min, 
-                          counts_15min_csv_fn, #glue("counts_15min_{start_date}.csv"), 
+                          counts_15min_csv_fn,
                           append = TRUE)
             }
         }
     })
+    dbDisconnect(conn)
     gc()
     
     
@@ -331,7 +351,10 @@ get_counts2 <- function(date_, uptime = TRUE, counts = TRUE) {
     
     if (uptime == TRUE) {
         
-        # Second pass on distinct data. Reduce to comm uptime for signals_sublist
+        # Second pass on distinct data. 
+        
+        # Reduce to comm uptime for signals_sublist
+        print("Reducing uptime")
         uptime_all <- get_gaps(gaps_all, signals_list = c(0)) %>%
             select(-SignalID, uptime_all = uptime)
         
@@ -349,31 +372,52 @@ get_counts2 <- function(date_, uptime = TRUE, counts = TRUE) {
             write_fst(., glue("cu_{start_date}.fst"))
     }
     
+    # Get counts
     if (counts == TRUE) {
         
-        c <- read_csv(glue("counts_1hr_{start_date}.csv"),
+        # 1-hour counts
+        print("Reducing 1-hour counts")
+        c <- read_csv(counts_1hr_csv_fn,
                  col_names = c("SignalID", "Timeperiod", "Detector", "CallPhase", "vol")) %>%
             mutate(SignalID = factor(SignalID),
                    Detector = factor(Detector),
                    CallPhase = factor(CallPhase))
-        write_fst(c, glue("counts_1hr_{start_date}.fst"))
+        write_fst(c, sub(".csv", ".fst", counts_1hr_csv_fn))
+        print("...filtered counts")
         get_filtered_counts(c, interval = "1 hour") %>%
-           write_fst(., glue("filtered_counts_1hr_{start_date}.fst"))
+            write_fst(., sub("(.*?).csv", "filtered_\\1.fst", counts_1hr_csv_fn))
+        
+        file.remove(counts_1hr_csv_fn)
 
-        file.remove(counts_1hr_csv_fn) 
+                
+        # 1-hr pedestrian activations
+        print("Reducing 1-hour pedestrian activations")
+        c <- read_csv(counts_ped_1hr_csv_fn,
+                      col_names = c("SignalID", "Timeperiod", "Detector", "CallPhase", "vol")) %>%
+            mutate(SignalID = factor(SignalID),
+                   Detector = factor(Detector),
+                   CallPhase = factor(CallPhase))
+        write_fst(c, sub(".csv", ".fst", counts_ped_1hr_csv_fn))
+
+        file.remove(counts_ped_1hr_csv_fn)
+
+                
         
-        
-        if (file.exists(counts_15min_csv_fn)) { 
+        # 15-minute counts
+        print("Reducing 15-minute counts")
+        if (file.exists(counts_15min_csv_fn)) {
             
-            c <- read_csv(counts_15min_csv_fn, 
+            c <- read_csv(counts_15min_csv_fn,
                      col_names = c("SignalID", "Timeperiod", "Detector", "CallPhase", "vol")) %>%
                 mutate(SignalID = factor(SignalID),
                        Detector = factor(Detector),
                        CallPhase = factor(CallPhase))
-            write_fst(c, glue("counts_15min_TWR_{start_date}.fst"))
-            get_filtered_counts(c, interval = "15 min") %>% 
-               write_fst(., glue("filtered_counts_15min_TWR_{start_date}.fst")) 
-            file.remove(counts_15min_csv_fn) 
+            write_fst(c, sub(".csv", ".fst", counts_15min_csv_fn))
+            print("...filtered counts")
+            get_filtered_counts(c, interval = "15 min") %>%
+                write_fst(., sub("(.*?).csv", "filtered_\\1.fst", counts_15min_csv_fn))
+            
+            file.remove(counts_15min_csv_fn)
         }
         
     }
@@ -427,7 +471,6 @@ get_filtered_counts <- function(counts, interval = "1 hour") { # interval (e.g.,
                                  abs(delta_vol) == 0,
                              0, 1)) %>%
         select(-vol0)
-
     
     # bad day = any of the following:
     #    too many bad hours (60%) based on the above criteria
@@ -594,7 +637,7 @@ get_bad_detectors <- function(filtered_counts_1hr) {
 
 # Volume VPD
 get_vpd <- function(counts, mainline_only = TRUE) {
-   
+
     if (mainline_only == TRUE) {
         counts <- counts %>%
             filter(CallPhase %in% c(2,6)) # sum over Phases 2,6 # added 4/24/18
@@ -1203,11 +1246,11 @@ get_daily_detector_uptime <- function(filtered_counts) {
 get_avg_daily_detector_uptime <- function(ddu) {
     
     sb_daily_uptime <- get_daily_avg(filter(ddu, setback == "Setback"), 
-				     "uptime", "all", 
-				     peak_only = FALSE)
+                                     "uptime", "all", 
+                                     peak_only = FALSE)
     pr_daily_uptime <- get_daily_avg(filter(ddu, setback == "Presence"), 
-				     "uptime", "all", 
-				     peak_only = FALSE)
+                                     "uptime", "all", 
+                                     peak_only = FALSE)
     all_daily_uptime <- ddu %>%
         group_by(SignalID, CallPhase, Date, Date_Hour) %>%
         summarize(uptime = weighted.mean(uptime, all, na.rm = TRUE),
@@ -1216,8 +1259,8 @@ get_avg_daily_detector_uptime <- function(ddu) {
         get_daily_avg(., "uptime", "all", peak_only = FALSE)
     
     sb_pr <- full_join(sb_daily_uptime, pr_daily_uptime, 
-              by = c("SignalID", "Date"), 
-              suffix = c(".sb", ".pr"))
+                       by = c("SignalID", "Date"), 
+                       suffix = c(".sb", ".pr"))
     full_join(all_daily_uptime, sb_pr,
               by = c("SignalID", "Date")) %>%
         select(-starts_with("delta.")) %>%
@@ -1349,10 +1392,15 @@ get_cor_monthly_detector_uptime <- function(avg_daily_detector_uptime, corridors
                Signal_Group = factor(Signal_Group))
 }
 
-get_vph <- function(counts) {
-    df <- counts %>% mutate(Date_Hour = floor_date(Timeperiod, "1 hour"))
+get_vph <- function(counts, mainline_only = TRUE) {
+    
+    if (mainline_only == TRUE) {
+        counts <- counts %>%
+            filter(CallPhase %in% c(2,6)) # sum over Phases 2,6
+    }
+    df <- counts %>% 
+        mutate(Date_Hour = floor_date(Timeperiod, "1 hour"))
     get_sum_by_hr(df, "vol") %>% 
-        filter(CallPhase %in% c(2,6)) %>% # sum over Phases 2,6
         group_by(SignalID, Week, DOW, Hour) %>% 
         summarize(vph = sum(vol, na.rm = TRUE))
     
