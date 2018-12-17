@@ -171,11 +171,11 @@ get_det_config <- function(date_) {
 }
 
 get_ped_config <- function(date_) {
-    fn <- glue('../MaxTime_Ped_Plans_{date_}.csv')
+    fn <- glue('ATSPM_Ped_Config_{date_}.feather')
     if (!file.exists(fn)) {
-        fn <- glue('../MaxTime_Ped_Plans.csv')
+        fn <- glue('ATSPM_Ped_Config.feather')
     }
-    read_csv(fn) %>%
+    read_feather(fn) %>%
         transmute(SignalID = as.character(SignalID), 
                   Detector = as.integer(Detector), 
                   CallPhase = as.integer(CallPhase))

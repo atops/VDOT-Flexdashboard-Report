@@ -11,8 +11,8 @@ from datetime import datetime
 import boto3
 import feather
 
-#from get_maxtime_config_asyncio_polling import get_veh_det_plans, get_unit_info
-#from get_maxtime_config_reduce import reduce_det_plans, reduce_unit_info
+# from get_maxtime_config_asyncio_polling import get_veh_det_plans, get_unit_info
+# from get_maxtime_config_reduce import reduce_det_plans, reduce_unit_info
 from get_atspm_detectors import get_atspm_detectors, get_atspm_ped_detectors
 
 
@@ -30,13 +30,13 @@ def get_det_config(adc, date_string):
     # -- ATSPM Detector Config (from reduce function above) --
 
     adc = ad[['SignalID',
-             'Detector',
-             'ProtectedPhaseNumber',
-             'PermissivePhaseNumber',
-             'TimeFromStopBar',
-             'IPAddress']]
+              'Detector',
+              'ProtectedPhaseNumber',
+              'PermissivePhaseNumber',
+              'TimeFromStopBar',
+              'IPAddress']]
     adc = adc.rename(columns={'ProtectedPhaseNumber': 'ProtPhase',
-                            'PermissivePhaseNumber': 'PermPhase'})
+                              'PermissivePhaseNumber': 'PermPhase'})
     adc['CallPhase'] = np.where(adc.ProtPhase > 0, adc.ProtPhase, adc.PermPhase)
 
     try:
@@ -50,11 +50,11 @@ def get_det_config(adc, date_string):
     adc.Detector = adc.Detector.astype('int')
     adc.CallPhase = adc.CallPhase.astype('int')
 
-    adc = adc.set_index(['SignalID','Detector'])
+    adc = adc.set_index(['SignalID', 'Detector'])
 
     # Exclude those not in "included detectors"
-    #adc = adc.join(incld)
-    #adc = adc[~adc['Unnamed: 0'].isna()].drop(columns=['Unnamed: 0'])
+    # adc = adc.join(incld)
+    # adc = adc[~adc['Unnamed: 0'].isna()].drop(columns=['Unnamed: 0'])
 
     # -- --------------------------------------------------- --
     # -- Maxtime Detector Plans (from reduce function above) --
@@ -71,16 +71,16 @@ def get_det_config(adc, date_string):
     mdp = mdp.join(incld).rename(columns={'Unnamed: 0': 'in_cel'})
     mdp = mdp[~mdp['in_cel'].isna()]
     """
-    det_config = adc.join(incld).rename(columns={'Unnamed: 0': 'in_cel'}).sort_index() #.join(other=mdp, how='outer', lsuffix='_atspm', rsuffix='_maxtime').sort_index()
+    det_config = adc.join(incld).rename(columns={'Unnamed: 0': 'in_cel'}).sort_index()  # .join(other=mdp, how='outer', lsuffix='_atspm', rsuffix='_maxtime').sort_index()
 
     det_config.TimeFromStopBar = det_config.TimeFromStopBar.fillna(0).round(1)
-    #det_config['CallPhase'] = np.where(det_config.CallPhase_maxtime.isna(),
-    #                                   det_config.CallPhase_atspm,
-    #                                   det_config.CallPhase_maxtime).astype('int')
+    # det_config['CallPhase'] = np.where(det_config.CallPhase_maxtime.isna(),
+    #                                    det_config.CallPhase_atspm,
+    #                                    det_config.CallPhase_maxtime).astype('int')
 
-    #det_config[((~det_config.CallPhase_maxtime.isna()) & (~det_config.in_cel.isna()))]
+    # det_config[((~det_config.CallPhase_maxtime.isna()) & (~det_config.in_cel.isna()))]
 
-    #det_config = det_config[((~det_config.CallPhase_atspm.isna()) & (~det_config.CallPhase_maxtime.isna())) | ((~det_config.CallPhase_maxtime.isna()) & (~det_config.in_cel.isna()))]
+    # det_config = det_config[((~det_config.CallPhase_atspm.isna()) & (~det_config.CallPhase_maxtime.isna())) | ((~det_config.CallPhase_maxtime.isna()) & (~det_config.in_cel.isna()))]
     # -- --------------------------------------------------------- --
     # -- Combine ATSPM Detector Config and MaxTime Detector Config --
 
@@ -103,7 +103,7 @@ date_string = datetime.today().strftime('%Y-%m-%d')
 
 
 
-
+print("ATSPM Vehicle Detectors [1 of 3]")
 ad = get_atspm_detectors()
 ad_csv_filename = 'ATSPM_Det_Config_{}.csv'.format(date_string)
 ad.to_csv(ad_csv_filename)
@@ -118,7 +118,7 @@ ad.to_csv(ad_csv_filename)
 
 
 
-
+print("ATSPM Vehicle Detector Config [2 of 3]")
 det_config = get_det_config(ad, date_string)
 dc_filename = 'ATSPM_Det_Config_Good_{}.feather'.format(date_string)
 det_config.to_feather(dc_filename)
@@ -129,6 +129,7 @@ det_config.to_feather(dc_filename)
 #               Bucket='gdot-devices',
 #               Key=key)
 
+print("ATSPM Pedestrian Detectors [3 of 3]")
 ped_config = get_atspm_ped_detectors()
 pc_filename = 'ATSPM_Ped_Config_{}.feather'.format(date_string)
 feather.write_dataframe(ped_config, pc_filename)
