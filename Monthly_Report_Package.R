@@ -1,9 +1,11 @@
 
 # Monthly_Report_Package.R
 
-print(Sys.time())
-
 library(yaml)
+library(glue)
+
+print(glue("{Sys.time()} Starting Package Script"))
+
 
 if (Sys.info()["sysname"] == "Windows") {
     working_directory <- file.path(dirname(path.expand("~")), "Code", "VDOT", "VDOT-Flexdashboard-Report")
@@ -84,66 +86,14 @@ month_abbrs <- get_month_abbrs(report_start_date, report_end_date)
 print(month_abbrs)
 
 
-# # TRAVEL TIME AND BUFFER TIME INDEXES #######################################
-
-print("Travel Times")
-
-# Raw data from massive data downloader file
-fns <- list.files(path = "Inrix/For_Monthly_Report", 
-                  pattern = "TWTh.csv$",
-                  full.names = TRUE)
-
-tmc_corridors <- read_feather(conf$tmc_filename) %>% 
-    select(tmc_code = tmc, Corridor, miles)
-tt <- get_tt(fns, tmc_corridors)
-
-tti <- tt$tti 
-pti <- tt$pti 
-
-# Files downloaded with RITIS API
-
-# fns2 <- list.files(path = "Inrix/For_Monthly_Report",
-#                    pattern = "tt_.*_summary.csv",
-#                    recursive = FALSE,
-#                    full.names = TRUE)
-# 
-# tt2 <- lapply(fns2, read_csv) %>% bind_rows()
-# 
-# tti <- tt2 %>% 
-#     select(-pti) %>% 
-#     bind_rows(tti) %>% 
-#     mutate(Corridor = factor(Corridor)) %>%
-#     arrange(Corridor, Hour)
-#     
-# 
-# pti <- tt2 %>% 
-#     select(-tti) %>% 
-#     bind_rows(pti) %>% 
-#     mutate(Corridor = factor(Corridor)) %>%
-#     arrange(Corridor, Hour)
-# 
-# 
-# 
-write_fst(tti, "tti.fst")
-write_fst(pti, "pti.fst")
-
-rm(tt)
-gc()
-
-
 # # DETECTOR UPTIME ###########################################################
 
-print("Detector Uptime")
+print(glue("{Sys.time()} Detector Uptime [1 of 20]"))
 
 ddu <- f("ddu_", month_abbrs)
-#daily_detector_uptime <- split(ddu, ddu$setback)
 
 avg_daily_detector_uptime <- get_avg_daily_detector_uptime(ddu)
 cor_avg_daily_detector_uptime <- get_cor_avg_daily_detector_uptime(avg_daily_detector_uptime, corridors)
-
-# mdu_all <- get_monthly_avg_by_day(ddu, "uptime", "all")
-# mdu_sb <- get_monthly_avg_by_day(filter(ddu, setback == "Setback"), "uptime", "all")
-# mdu_pr <- get_monthly_avg_by_day(filter(ddu, setback == "Presence"), "uptime", "all")
 
 monthly_detector_uptime <- get_monthly_detector_uptime(avg_daily_detector_uptime)
 cor_monthly_detector_uptime <- get_cor_monthly_detector_uptime(avg_daily_detector_uptime, corridors)
@@ -164,7 +114,7 @@ gc()
 
 # GET COMMUNICATIONS UPTIME ###################################################
 
-print("Communication Uptime")
+print(glue("{Sys.time()} Communication Uptime [2 of 20]"))
 
 cu <- f("cu_", month_abbrs) 
 
@@ -198,7 +148,7 @@ gc()
 
 # DAILY VOLUMES ###############################################################
 
-print("Daily Volumes")
+print(glue("{Sys.time()} Daily Volumes [3 of 20]"))
 
 vpd <- f("vpd_", month_abbrs)
 weekly_vpd <- get_weekly_vpd(vpd)
@@ -227,7 +177,7 @@ gc()
 
 # HOURLY VOLUMES ##############################################################
 
-print("Hourly Volumes")
+print(glue("{Sys.time()} Hourly Volumes [4 of 20]"))
 
 vph <- f("vph_", month_abbrs)
 weekly_vph <- get_weekly_vph(mutate(vph, CallPhase = 2)) # Hack because next function needs a CallPhase
@@ -267,7 +217,7 @@ gc()
 
 # DAILY THROUGHPUT ############################################################
 
-print("Daily Throughput")
+print(glue("{Sys.time()} Daily Throughput [7 of 20]"))
 
 throughput <- f("tp_", month_abbrs)
 weekly_throughput <- get_weekly_thruput(throughput)
@@ -298,7 +248,7 @@ gc()
 
 # DAILY ARRIVALS ON GREEN #####################################################
 
-print("Daily AOG")
+print(glue("{Sys.time()} Daily AOG [8 of 20]"))
 
 aog <- f("aog_", month_abbrs, combine = TRUE)
 daily_aog <- get_daily_aog(aog)
@@ -325,7 +275,7 @@ gc()
 
 # HOURLY ARRIVALS ON GREEN ####################################################
 
-print("Hourly AOG")
+print(glue("{Sys.time()} Hourly AOG [9 of 20]"))
 
 aog_by_hr <- get_aog_by_hr(aog)
 monthly_aog_by_hr <- get_monthly_aog_by_hr(aog_by_hr)
@@ -347,7 +297,7 @@ gc()
 
 # DAILY SPLIT FAILURES #####################################################
 
-print("Daily Split Failures")
+print(glue("{Sys.time()} Daily Split Failures [10 of 20]"))
 
 sf <- f("sf_", month_abbrs)
 wsf <- get_weekly_sf_by_day(sf)
@@ -370,7 +320,7 @@ gc()
 
 # HOURLY SPLIT FAILURES #######################################################
 
-print("Hourly Split Failures")
+print(glue("{Sys.time()} Hourly Split Failures [11 of 20]"))
 
 sfh <- get_sf_by_hr(sf)
 
@@ -390,7 +340,7 @@ gc()
 
 # DAILY QUEUE SPILLBACK #######################################################
 
-print("Daily Queue Spillback")
+print(glue("{Sys.time()} Daily Queue Spillback [12 of 20]"))
 
 qs <- f("qs_", month_abbrs)
 wqs <- get_weekly_qs_by_day(qs)
@@ -407,7 +357,7 @@ saveRDS(cor_monthly_qsd, "cor_monthly_qsd.rds")
 
 # HOURLY QUEUE SPILLBACK ######################################################
 
-print("Hourly Queue Spillback")
+print(glue("{Sys.time()} Hourly Queue Spillback [13 of 20]"))
 
 qsh <- get_qs_by_hr(qs)
 mqsh <- get_monthly_qs_by_hr(qsh)
@@ -430,8 +380,24 @@ gc()
 
 # TRAVEL TIME AND BUFFER TIME INDEXES #########################################
 
-tti <- read_fst("tti.fst")
-pti <- read_fst("pti.fst")
+print(glue("{Sys.time()} Travel Time Indexes [14 of 20]"))
+
+# Raw data from massive data downloader file
+fns <- list.files(path = "Inrix/For_Monthly_Report", 
+                  pattern = "TWTh.csv$",
+                  full.names = TRUE)
+
+tmc_corridors <- read_feather(conf$tmc_filename) %>% 
+    select(tmc_code = tmc, Corridor, miles)
+tt <- get_tt(fns, tmc_corridors)
+tti <- tt$tti 
+pti <- tt$pti 
+
+
+
+
+
+
 
 cor_monthly_tti_by_hr <- get_cor_monthly_ti_by_hr(tti, cor_monthly_vph, corridors)
 cor_monthly_pti_by_hr <- get_cor_monthly_ti_by_hr(pti, cor_monthly_vph, corridors)
@@ -439,24 +405,29 @@ cor_monthly_pti_by_hr <- get_cor_monthly_ti_by_hr(pti, cor_monthly_vph, corridor
 cor_monthly_tti <- get_cor_monthly_tti(cor_monthly_tti_by_hr, corridors)
 cor_monthly_pti <- get_cor_monthly_pti(cor_monthly_pti_by_hr, corridors)
 
+write_fst(tti, "tti.fst")
+write_fst(pti, "pti.fst")
+
 saveRDS(cor_monthly_tti, "cor_monthly_tti.rds")
 saveRDS(cor_monthly_tti_by_hr, "cor_monthly_tti_by_hr.rds")
 
 saveRDS(cor_monthly_pti, "cor_monthly_pti.rds")
 saveRDS(cor_monthly_pti_by_hr, "cor_monthly_pti_by_hr.rds")
 
+rm(tt)
 rm(tti)
 rm(pti)
 rm(cor_monthly_tti)
 rm(cor_monthly_tti_by_hr)
 rm(cor_monthly_pti)
 rm(cor_monthly_pti_by_hr)
+gc()
 
 
 
 # Package up for Flexdashboard
 
-print("Package for Monthly Report")
+print(glue("{Sys.time()} Package for Monthly Report [17 of 20]"))
 
 sigify <- function(df, cor_df, corridors) {
     
@@ -512,8 +483,8 @@ cor$mo <- list("vpd" = readRDS("cor_monthly_vpd.rds"),
                "ptih" = readRDS("cor_monthly_pti_by_hr.rds"),
                "du" = readRDS("cor_monthly_detector_uptime.rds"),
                "cu" = readRDS("cor_monthly_comm_uptime.rds"),
-               "veh" = readRDS("cor_monthly_detector_uptime.rds"), # -- Need to update
-               "ped" = data.frame()) #readRDS("cor_monthly_xl_ped_uptime.rds"), # -- Need to update
+               "veh" = readRDS("cor_monthly_detector_uptime.rds"),
+               "ped" = data.frame())
                #"cctv" = readRDS("cor_monthly_cctv_uptime.rds"),
                #"events" = readRDS("cor_monthly_events.rds"))
 cor$qu <- list("vpd" = get_quarterly(cor$mo$vpd, "vpd"),
