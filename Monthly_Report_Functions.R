@@ -264,7 +264,7 @@ get_counts2 <- function(date_, uptime = TRUE, counts = TRUE) {
     
     counts_1hr_csv_fn <- glue("counts_1hr_{start_date}.csv")
     counts_ped_1hr_csv_fn <- glue("counts_ped_1hr_{start_date}.csv")
-    counts_15min_csv_fn <- glue("counts_15min_{start_date}.csv")
+    counts_15min_csv_fn <- glue("counts_15min_TWR_{start_date}.csv")
     
     if (file.exists(counts_1hr_csv_fn)) {
         file.remove(counts_1hr_csv_fn)
