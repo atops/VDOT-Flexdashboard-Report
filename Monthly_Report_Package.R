@@ -88,7 +88,7 @@ print(month_abbrs)
 
 # # DETECTOR UPTIME ###########################################################
 
-print(glue("{Sys.time()} Detector Uptime [1 of 20]"))
+print(glue("{Sys.time()} Detector Uptime [1 of 19]"))
 
 ddu <- f("ddu_", month_abbrs)
 
@@ -114,7 +114,7 @@ gc()
 
 # GET COMMUNICATIONS UPTIME ###################################################
 
-print(glue("{Sys.time()} Communication Uptime [2 of 20]"))
+print(glue("{Sys.time()} Communication Uptime [2 of 19]"))
 
 cu <- f("cu_", month_abbrs) 
 
@@ -148,7 +148,7 @@ gc()
 
 # DAILY VOLUMES ###############################################################
 
-print(glue("{Sys.time()} Daily Volumes [3 of 20]"))
+print(glue("{Sys.time()} Daily Volumes [3 of 19]"))
 
 vpd <- f("vpd_", month_abbrs)
 weekly_vpd <- get_weekly_vpd(vpd)
@@ -177,7 +177,7 @@ gc()
 
 # HOURLY VOLUMES ##############################################################
 
-print(glue("{Sys.time()} Hourly Volumes [4 of 20]"))
+print(glue("{Sys.time()} Hourly Volumes [4 of 19]"))
 
 vph <- f("vph_", month_abbrs)
 weekly_vph <- get_weekly_vph(mutate(vph, CallPhase = 2)) # Hack because next function needs a CallPhase
@@ -217,7 +217,7 @@ gc()
 
 # DAILY THROUGHPUT ############################################################
 
-print(glue("{Sys.time()} Daily Throughput [7 of 20]"))
+print(glue("{Sys.time()} Daily Throughput [7 of 19]"))
 
 throughput <- f("tp_", month_abbrs)
 weekly_throughput <- get_weekly_thruput(throughput)
@@ -234,7 +234,6 @@ cor_monthly_throughput <- get_cor_monthly_thruput(monthly_throughput, corridors)
 # Monthly % change from previous month by corridor ----------------------------
 #cor_mo_pct_throughput <- get_cor_monthly_pct_change_thruput(cor_monthly_throughput)
 
-saveRDS(weekly_throughput, "weekly_throughput.rds")
 saveRDS(monthly_throughput, "monthly_throughput.rds")
 saveRDS(cor_weekly_throughput, "cor_weekly_throughput.rds")
 saveRDS(cor_monthly_throughput, "cor_monthly_throughput.rds")
@@ -248,7 +247,7 @@ gc()
 
 # DAILY ARRIVALS ON GREEN #####################################################
 
-print(glue("{Sys.time()} Daily AOG [8 of 20]"))
+print(glue("{Sys.time()} Daily AOG [8 of 19]"))
 
 aog <- f("aog_", month_abbrs, combine = TRUE)
 daily_aog <- get_daily_aog(aog)
@@ -275,7 +274,7 @@ gc()
 
 # HOURLY ARRIVALS ON GREEN ####################################################
 
-print(glue("{Sys.time()} Hourly AOG [9 of 20]"))
+print(glue("{Sys.time()} Hourly AOG [9 of 19]"))
 
 aog_by_hr <- get_aog_by_hr(aog)
 monthly_aog_by_hr <- get_monthly_aog_by_hr(aog_by_hr)
@@ -297,7 +296,7 @@ gc()
 
 # DAILY SPLIT FAILURES #####################################################
 
-print(glue("{Sys.time()} Daily Split Failures [10 of 20]"))
+print(glue("{Sys.time()} Daily Split Failures [10 of 19]"))
 
 sf <- f("sf_", month_abbrs)
 wsf <- get_weekly_sf_by_day(sf)
@@ -320,7 +319,7 @@ gc()
 
 # HOURLY SPLIT FAILURES #######################################################
 
-print(glue("{Sys.time()} Hourly Split Failures [11 of 20]"))
+print(glue("{Sys.time()} Hourly Split Failures [11 of 19]"))
 
 sfh <- get_sf_by_hr(sf)
 
@@ -340,7 +339,7 @@ gc()
 
 # DAILY QUEUE SPILLBACK #######################################################
 
-print(glue("{Sys.time()} Daily Queue Spillback [12 of 20]"))
+print(glue("{Sys.time()} Daily Queue Spillback [12 of 19]"))
 
 qs <- f("qs_", month_abbrs)
 wqs <- get_weekly_qs_by_day(qs)
@@ -357,7 +356,7 @@ saveRDS(cor_monthly_qsd, "cor_monthly_qsd.rds")
 
 # HOURLY QUEUE SPILLBACK ######################################################
 
-print(glue("{Sys.time()} Hourly Queue Spillback [13 of 20]"))
+print(glue("{Sys.time()} Hourly Queue Spillback [13 of 19]"))
 
 qsh <- get_qs_by_hr(qs)
 mqsh <- get_monthly_qs_by_hr(qsh)
@@ -380,11 +379,11 @@ gc()
 
 # TRAVEL TIME AND BUFFER TIME INDEXES #########################################
 
-print(glue("{Sys.time()} Travel Time Indexes [14 of 20]"))
+print(glue("{Sys.time()} Travel Time Indexes [14 of 19]"))
 
 # Raw data from massive data downloader file
 fns <- list.files(path = "Inrix/For_Monthly_Report", 
-                  pattern = "TWTh.csv$",
+                  pattern = "tt_.*_summary.csv$",
                   full.names = TRUE)
 
 tmc_corridors <- read_feather(conf$tmc_filename) %>% 
@@ -427,7 +426,7 @@ gc()
 
 # Package up for Flexdashboard
 
-print(glue("{Sys.time()} Package for Monthly Report [17 of 20]"))
+print(glue("{Sys.time()} Package for Monthly Report [17 of 19]"))
 
 sigify <- function(df, cor_df, corridors) {
     
@@ -488,7 +487,7 @@ cor$mo <- list("vpd" = readRDS("cor_monthly_vpd.rds"),
                #"cctv" = readRDS("cor_monthly_cctv_uptime.rds"),
                #"events" = readRDS("cor_monthly_events.rds"))
 cor$qu <- list("vpd" = get_quarterly(cor$mo$vpd, "vpd"),
-               "vph" = data.frame(), #get_quarterly(cor$mo$vph, "vph"),
+               "vph" = data.frame(),
                "vphpa" = get_quarterly(cor$mo$vphp$am, "vph"),
                "vphpp" = get_quarterly(cor$mo$vphp$pm, "vph"),
                "tp" = get_quarterly(cor$mo$tp, "vph"),
@@ -499,7 +498,7 @@ cor$qu <- list("vpd" = get_quarterly(cor$mo$vpd, "vpd"),
                "pti" = get_quarterly(cor$mo$pti, "pti"),
                "du" = get_quarterly(cor$mo$du, "uptime.all"),
                "cu" = get_quarterly(cor$mo$cu, "uptime"),
-               "veh" = get_quarterly(cor$mo$veh, "uptime.all"), # -- Need to update
+               "veh" = get_quarterly(cor$mo$veh, "uptime.all"),
                "ped" = data.frame()) #get_quarterly(cor$mo$ped, "uptime", "num"), # -- Need to update
                #"cctv" = get_quarterly(cor$mo$cctv, "uptime", "num"),
                #"reported" = get_quarterly(cor$mo$events, "Reported"),
@@ -541,7 +540,7 @@ saveRDS(cor, "cor.rds")
 saveRDS(sig, "sig.rds")
 
 
-
+print(glue("{Sys.time()} upload to S3 [18 of 19]"))
 
 aws.s3::put_object(file = "cor.rds", 
                    object = "cor.rds", 
@@ -549,6 +548,8 @@ aws.s3::put_object(file = "cor.rds",
 aws.s3::put_object(file = "sig.rds", 
                    object = "sig.rds", 
                    bucket = "vdot-spm")
+
+print(glue("{Sys.time()} build signal_dashboards [19 of 19]"))
 
 db_build_data_for_signal_dashboard(month_abbrs = month_abbrs[length(month_abbrs)], 
                                    corridors = corridors, 
