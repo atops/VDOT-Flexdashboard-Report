@@ -448,6 +448,6 @@ lapply(month_abbrs, function(month_abbr) {
 # # TRAVEL TIMES FROM RITIS API ###############################################
 
 print(glue("{Sys.time()} travel times [10 of 10]"))
-#py_run_file("get_travel_times.py") # Run python script
+py_run_file("get_travel_times.py") # Run python script
 
 print("\n--------------------- End Monthly Report calcs -----------------------\n")
