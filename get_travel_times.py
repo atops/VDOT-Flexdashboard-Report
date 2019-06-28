@@ -99,10 +99,12 @@ def get_tmc_data(start_date, end_date, tmcs, key, initial_sleep_sec=0):
         print('results received')
 
         # Save results (binary zip file with one csv)
+                                             
         with io.BytesIO() as f:
             f.write(results.content)
             f.seek(0)
             df = pd.read_csv(f, compression='zip')
+                              
 
         # zf_filename = payload['uuid'] +'.zip'
         # with open(zf_filename, 'wb') as f:
@@ -128,9 +130,19 @@ if __name__ == '__main__':
 
     # start_date is either the given day or the first day of the month
     start_date = conf['start_date']
+           
+                              
+           
     if start_date == 'yesterday':
+                                                
         start_date = datetime.today() - timedelta(days=1)
     start_date = (start_date - timedelta(days=(start_date.day - 1))).strftime('%Y-%m-%d')
+                                                      
+           
+                            
+           
+                               
+                                                        
 
     # end date is either the given date + 1 or today.
     # end_date is not included in the query results
@@ -151,8 +163,14 @@ if __name__ == '__main__':
     end_date = '2018-04-30'
 
     # try:
+                            
 
+                       
+                                    
+            
+                                  
     tt_df = get_tmc_data(start_date, end_date, tmc_list, cred['RITIS_KEY'], 0)
+                               
 
     # except Exception as e:
     #    print('error retrieving records')
@@ -179,6 +197,10 @@ if __name__ == '__main__':
         df = (pd.merge(tmc_df[['tmc', 'miles', 'Corridor']], tt_df, left_on=['tmc'], right_on=['tmc_code'])
                 .drop(columns=['tmc'])
                 .sort_values(['Corridor', 'tmc_code', 'measurement_tstamp']))
+                                         
+                              
+                                             
+                    
 
         if len(df) > 0:
             df['reference_minutes'] = df['miles'] / df['reference_speed'] * 60
@@ -208,3 +230,4 @@ if __name__ == '__main__':
             fn_ = fn.replace('_TWTh.csv', '_summary.csv')
             summ_df.to_csv(fn_)
 
+                                                
