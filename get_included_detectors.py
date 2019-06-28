@@ -15,8 +15,8 @@ import time
 from glob import glob
 
 
-with open('Monthly_Report_calcs.yaml') as yaml_file:
-        conf = yaml.load(yaml_file)
+with open('Monthly_Report.yaml') as yaml_file:
+    conf = yaml.load(yaml_file, yaml.Loader)
 
 start_date = (datetime.today() - timedelta(days=365)).strftime('%Y-%m-%d')
 end_date = (datetime.today() - timedelta(days=1)).strftime('%Y-%m-%d')
@@ -50,28 +50,34 @@ elif os.name=='posix':
     engine = sq.create_engine('mssql://', creator=connect)
     
 
-with engine.connect() as conn:
-
+def get_included_detectors():
+    with engine.connect() as conn:
     
-    for date_ in dates:
         
-        t0 = time.time()
-        
-        sd = date_.strftime('%Y-%m-%d')
-        ed = sd #(date_ + pd.DateOffset(days=1)).strftime('%Y-%m-%d')
-        
-        print(sd, end=': ')
+        for date_ in dates:
             
-        df = pd.read_sql(sql=query.format(sd, ed), con=conn)
-        df.to_csv('included_detectors_{}.csv'.format(sd))
+            t0 = time.time()
+            
+            sd = date_.strftime('%Y-%m-%d')
+            ed = sd #(date_ + pd.DateOffset(days=1)).strftime('%Y-%m-%d')
+            
+            print(sd, end=': ')
+                
+            df = pd.read_sql(sql=query.format(sd, ed), con=conn)
+            df.to_csv('included_detectors_{}.csv'.format(sd))
+            
+            print('{} sec'.format(time.time() - t0))
         
-        print('{} sec'.format(time.time() - t0))
+        filenames = glob('included_detectors_*.csv')
+        df = pd.concat([pd.read_csv(fn)[['SignalID','Detector']] for fn in filenames]).drop_duplicates()
+        df.SignalID = df.SignalID.astype('int')
+        
+        df.to_csv('included_detectors.csv')
+        
+        for fn in filenames:
+            os.remove(fn)
+        
+        df = df.sort_values(['SignalID','Detector'])\
+               .set_index(['SignalID','Detector'])
     
-    filenames = glob('included_detectors_*.csv')
-    df = pd.concat([pd.read_csv(fn)[['SignalID','Detector']] for fn in filenames]).drop_duplicates()
-    df.SignalID = df.SignalID.astype('int')
-    
-    df.to_csv('included_detectors.csv')
-    
-    for fn in filenames:
-        os.remove(fn)
+        return df

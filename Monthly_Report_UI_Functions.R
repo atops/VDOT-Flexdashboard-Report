@@ -72,7 +72,19 @@ if (Sys.info()["nodename"] == "GOTO3213490") { # The SAM
                "AWS_DEFAULT_REGION" = aws_conf$AWS_DEFAULT_REGION)
 }
 
-corridors <- read_feather("corridors.feather")
+last_month <- floor_date(today() - days(6), unit = "months")   # Beta
+    
+
+
+
+endof_last_month <- last_month + months(1) - days(1)
+first_month <- last_month - months(12)
+report_months <- seq(last_month, first_month, by = "-1 month")
+month_options <- report_months %>% format("%B %Y")
+
+zone_group_options <- conf$zone_groups
+
+corridors <- read_feather("corridors.feather")                                                         
 
 if (conf$mode == "production") {
     
@@ -131,7 +143,7 @@ get_valuebox <- memoise(get_valuebox_)
 
 
 
-perf_plot <- function(data_, value_, name_, color_, 
+perf_plot_ <- function(data_, value_, name_, color_, 
                       format_func = function(x) {x},
                       hoverformat_ = ",.0f") {
     
@@ -182,6 +194,8 @@ perf_plot <- function(data_, value_, name_, color_,
                              r = 40)) %>% 
         plotly::config(displayModeBar = F)
 }
+perf_plot <- memoise(perf_plot_)
+
 
 no_data_plot_ <- function(name_) {
     
@@ -453,7 +467,7 @@ get_tt_plot_ <- function(cor_monthly_tti, cor_monthly_tti_by_hr,
                       alpha = 0.6) %>%
             layout(xaxis = list(title = "Travel Time Index (TTI"),
                    yaxis = list(tickformat = tickformat,
-                                range = c(1, 2.5)),
+                                range = c(0.9, 1.5)),
                    showlegend = FALSE)
         
         pttihr <- base_h %>%
@@ -461,7 +475,7 @@ get_tt_plot_ <- function(cor_monthly_tti, cor_monthly_tti_by_hr,
                       y = ~tti,
                       alpha = 0.6) %>%
             layout(xaxis = list(title = x_line1_title),
-                   yaxis = list(range = c(1, 3),
+                   yaxis = list(range = c(0.9, 2.4),
                                 tickformat = tickformat),
                    showlegend = FALSE)
         
@@ -471,7 +485,7 @@ get_tt_plot_ <- function(cor_monthly_tti, cor_monthly_tti_by_hr,
                       alpha = 0.6) %>%
             layout(xaxis = list(title = "Planning Time Index (PTI)"),
                    yaxis = list(tickformat = tickformat,
-                                range = c(1, 2.5)),
+                                range = c(0.9, 1.5)),
                    showlegend = FALSE)
         
         pptihr <- base_h %>%
@@ -479,7 +493,7 @@ get_tt_plot_ <- function(cor_monthly_tti, cor_monthly_tti_by_hr,
                       y = ~pti,
                       alpha = 0.6) %>%
             layout(xaxis = list(title = x_line2_title),
-                   yaxis = list(range = c(1, 3),
+                   yaxis = list(range = c(0.9, 2.4),
                                 tickformat = tickformat),
                    showlegend = FALSE)
         
@@ -628,7 +642,7 @@ get_minmax_hourly_plot_ <- function(cor_monthly_vph,
         
         title_ <- mm$Corridor[1]
         
-        plot_ly() %>%
+        p <- plot_ly() %>%
             add_bars(data = mm,
                      x = ~Hour,
                      y = ~min_vph,
@@ -636,11 +650,15 @@ get_minmax_hourly_plot_ <- function(cor_monthly_vph,
             add_bars(data = mm,
                      x = ~Hour,
                      y = ~(max_vph-min_vph),
-                     marker = list(color = "#a6cee3")) %>%
-            add_markers(data = tm,
-                        x = ~Hour,
-                        y = ~vph,
-                        marker = list(color = "#ca0020")) %>%
+                     marker = list(color = "#a6cee3"))
+        if (!is.null(tm)) {
+            p <- p %>% add_markers(data = tm,
+                                   x = ~Hour,
+                                   y = ~vph,
+                                   marker = list(color = "#ca0020"))
+                
+        }
+        p %>%
             layout(barmode = "stack",
                    showlegend = FALSE,
                    xaxis = list(title = "",
@@ -824,7 +842,7 @@ get_cor_det_uptime_plot_ <- function(avg_daily_uptime,
             
             layout(
                 barmode = "overlay",
-                xaxis = list(title = paste(month_name, "Detector Uptime (%)"), 
+                xaxis = list(title = paste(month_name, "Uptime (%)"), 
                              zeroline = FALSE,
                              tickformat = "%"),
                 yaxis = list(title = ""),
@@ -921,7 +939,7 @@ get_cor_comm_uptime_plot_ <- function(avg_daily_uptime,
             
             layout(
                 barmode = "overlay",
-                xaxis = list(title = paste(month_name, "Comms Uptime (%)"), 
+                xaxis = list(title = paste(month_name, "Uptime (%)"), 
                              zeroline = FALSE,
                              tickformat = "%"),
                 yaxis = list(title = ""),
