@@ -477,6 +477,4 @@ if (conf$run$split_failures == TRUE) {
     get_sf_date_range(start_date, end_date)
 }
 
-
-
 print("\n--------------------- End Monthly Report calcs -----------------------\n")

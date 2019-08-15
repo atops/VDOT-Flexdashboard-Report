@@ -137,13 +137,11 @@ mr <- reactive(
 filtered_corridors <- reactive({
     if (corridor() == "All Corridors") {
         corridors %>%
-            filter(Signal_Group %in% signal_group(),
-                   SignalID > 0) %>% 
+            filter(Signal_Group %in% signal_group()) %>% 
             select(-Description, -Asof)
     } else {
         corridors %>%
-            filter(Corridor == corridor(),
-                   SignalID > 0) %>%
+            filter(Corridor == corridor()) %>%
             select(-Description, -Asof)
     }
 })
@@ -1232,7 +1230,7 @@ Row {data-height = 800}
 ```{r}
 renderDataTable({
     
-    datatable(filtered_corridors(),  #corr, 
+    datatable(filtered_corridors() %>% filter(as.integer(as.character(SignalID)) > 0),
               escape = FALSE,
               extensions = 'Scroller', 
               options = list(
@@ -1426,5 +1424,3 @@ communication loss. The sum of these gaps converted to a percent is the
 daily communication uptime for that controller. If comms are lost for all
 intersections, it is considered a system failure and that time is excluded
 from the uptime calculation.
-
-

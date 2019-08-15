@@ -842,7 +842,7 @@ get_cor_det_uptime_plot_ <- function(avg_daily_uptime,
             
             layout(
                 barmode = "overlay",
-                xaxis = list(title = paste(month_name, "Detector Uptime (%)"), 
+                xaxis = list(title = paste(month_name, "Uptime (%)"), 
                              zeroline = FALSE,
                              tickformat = "%"),
                 yaxis = list(title = ""),
@@ -939,7 +939,7 @@ get_cor_comm_uptime_plot_ <- function(avg_daily_uptime,
             
             layout(
                 barmode = "overlay",
-                xaxis = list(title = paste(month_name, "Comms Uptime (%)"), 
+                xaxis = list(title = paste(month_name, "Uptime (%)"), 
                              zeroline = FALSE,
                              tickformat = "%"),
                 yaxis = list(title = ""),

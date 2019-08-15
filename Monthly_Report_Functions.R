@@ -688,7 +688,7 @@ get_spm_data <- function(start_date, end_date, signals_list, table, TWR_only=TRU
 get_spm_data_aws <- function(start_date, end_date, signals_list, table, TWR_only=TRUE) {
     
     drv <- JDBC(driverClass = "com.simba.athena.jdbc.Driver",
-                classPath = "../../AthenaJDBC42_2.0.7.jar",
+                classPath = "../../AthenaJDBC42_2.0.6.jar",
                 identifier.quote = "'")
     
     if (Sys.info()["nodename"] == "GOTO3213490") { # The SAM

@@ -1,4 +1,3 @@
-
 # Monthly_Report_Package.R
 
 library(yaml)
@@ -231,6 +230,10 @@ tryCatch({
     print(e)
 })
 
+<<<<<<< HEAD
+=======
+print(glue("{Sys.time()} Daily Volumes [3 of 19]"))
+>>>>>>> 7673cc95a2daa422724e9e2e4c047a9c6349a375
 
 
 # DAILY VOLUMES ###############################################################
@@ -278,6 +281,7 @@ tryCatch({
 # HOURLY VOLUMES ##############################################################
 
 print(glue("{Sys.time()} Hourly Volumes [4 of 19]"))
+<<<<<<< HEAD
 
 tryCatch({          
     vph <- f("vph_", month_abbrs)
@@ -315,6 +319,8 @@ tryCatch({
     rm(cor_weekly_vph_peak)
     rm(cor_monthly_vph_peak)
     gc()
+=======
+>>>>>>> 7673cc95a2daa422724e9e2e4c047a9c6349a375
 
     
     
@@ -433,6 +439,7 @@ tryCatch({
 # DAILY THROUGHPUT ############################################################
 
 print(glue("{Sys.time()} Daily Throughput [7 of 19]"))
+<<<<<<< HEAD
 
 tryCatch({          
     throughput <- f("tp_", month_abbrs)
@@ -440,6 +447,8 @@ tryCatch({
 
     # Group into corridors --------------------------------------------------------
     cor_weekly_throughput <- get_cor_weekly_thruput(weekly_throughput, corridors)
+=======
+>>>>>>> 7673cc95a2daa422724e9e2e4c047a9c6349a375
 
     # Monthly throughput for bar charts and % change ---------------------------------
     monthly_throughput <- get_monthly_thruput(throughput)
@@ -467,11 +476,18 @@ tryCatch({
     print(e)
 })
 
+<<<<<<< HEAD
+=======
+saveRDS(monthly_throughput, "monthly_throughput.rds")
+saveRDS(cor_weekly_throughput, "cor_weekly_throughput.rds")
+saveRDS(cor_monthly_throughput, "cor_monthly_throughput.rds")
+>>>>>>> 7673cc95a2daa422724e9e2e4c047a9c6349a375
 
 
 # DAILY ARRIVALS ON GREEN #####################################################
 
 print(glue("{Sys.time()} Daily AOG [8 of 19]"))
+<<<<<<< HEAD
 
 tryCatch({          
     aog <- f("aog_", month_abbrs, combine = TRUE)
@@ -480,6 +496,8 @@ tryCatch({
     weekly_aog_by_day <- get_weekly_aog_by_day(aog)
 
     cor_weekly_aog_by_day <- get_cor_weekly_aog_by_day(weekly_aog_by_day, corridors)
+=======
+>>>>>>> 7673cc95a2daa422724e9e2e4c047a9c6349a375
 
     monthly_aog_by_day <- get_monthly_aog_by_day(aog)
 
@@ -507,6 +525,7 @@ tryCatch({
 # HOURLY ARRIVALS ON GREEN ####################################################
 
 print(glue("{Sys.time()} Hourly AOG [9 of 19]"))
+<<<<<<< HEAD
 
 tryCatch({
     aog_by_hr <- get_aog_by_hr(aog)
@@ -568,6 +587,8 @@ tryCatch({
 })
 
 
+=======
+>>>>>>> 7673cc95a2daa422724e9e2e4c047a9c6349a375
 
 # HOURLY PROGESSION RATIO ####################################################
 
@@ -603,8 +624,12 @@ tryCatch({
 
 # DAILY SPLIT FAILURES #####################################################
 
+<<<<<<< HEAD
 tryCatch({          
     print(glue("{Sys.time()} Daily Split Failures [10 of 19]"))
+=======
+print(glue("{Sys.time()} Daily Split Failures [10 of 19]"))
+>>>>>>> 7673cc95a2daa422724e9e2e4c047a9c6349a375
 
     sf <- f("sf_", month_abbrs)
     wsf <- get_weekly_sf_by_day(sf)
@@ -633,11 +658,14 @@ tryCatch({
 # HOURLY SPLIT FAILURES #######################################################
 
 print(glue("{Sys.time()} Hourly Split Failures [11 of 19]"))
+<<<<<<< HEAD
 
 tryCatch({
     sfh <- get_sf_by_hr(sf)
 
     msfh <- get_monthly_sf_by_hr(sfh)
+=======
+>>>>>>> 7673cc95a2daa422724e9e2e4c047a9c6349a375
 
     # Hourly volumes by Corridor --------------------------------------------------
     cor_msfh <- get_cor_monthly_sf_by_hr(msfh, corridors)
@@ -661,6 +689,7 @@ tryCatch({
 # DAILY QUEUE SPILLBACK #######################################################
 
 print(glue("{Sys.time()} Daily Queue Spillback [12 of 19]"))
+<<<<<<< HEAD
 
 tryCatch({          
     qs <- f("qs_", month_abbrs)
@@ -674,6 +703,8 @@ tryCatch({
     saveRDS(monthly_qsd, "monthly_qsd.rds")
     saveRDS(cor_wqs, "cor_wqs.rds")
     saveRDS(cor_monthly_qsd, "cor_monthly_qsd.rds")
+=======
+>>>>>>> 7673cc95a2daa422724e9e2e4c047a9c6349a375
 
 }, error = function(e) {
     print('ENCOUNTERED AN ERROR:')
@@ -686,6 +717,7 @@ tryCatch({
 # HOURLY QUEUE SPILLBACK ######################################################
 
 print(glue("{Sys.time()} Hourly Queue Spillback [13 of 19]"))
+<<<<<<< HEAD
 
 tryCatch({          
     qsh <- get_qs_by_hr(qs)
@@ -696,6 +728,8 @@ tryCatch({
 
     saveRDS(mqsh, "mqsh.rds")
     saveRDS(cor_mqsh, "cor_mqsh.rds")
+=======
+>>>>>>> 7673cc95a2daa422724e9e2e4c047a9c6349a375
 
     rm(qs)
     rm(wqs)
@@ -718,15 +752,21 @@ tryCatch({
 
 print(glue("{Sys.time()} Travel Time Indexes [14 of 19]"))
 
+<<<<<<< HEAD
 tryCatch({
     fns <- list.files(path = "Inrix/For_Monthly_Report", 
                       pattern = "tt_.*_summary.csv$",
                       full.names = TRUE)
+=======
+# Raw data from massive data downloader file
+fns <- list.files(path = "Inrix/For_Monthly_Report", 
+                  pattern = "tt_.*_summary.csv$",
+                  full.names = TRUE)
+>>>>>>> 7673cc95a2daa422724e9e2e4c047a9c6349a375
 
 
     tt <- lapply(fns, read_csv) %>%
         bind_rows() %>%
-        filter(Hour >= ymd(report_start_date)) %>%
         mutate(Corridor = factor(Corridor)) %>%
         arrange(Corridor, Hour)
 
@@ -810,8 +850,8 @@ sigify <- function(df, cor_df, corridors) {
 
 cor <- list()
 cor$dy <- list("du" = readRDS("cor_avg_daily_detector_uptime.rds"),
-               "cu" = readRDS("cor_daily_comm_uptime.rds"),
-               "pau" = readRDS("cor_daily_pa_uptime.rds"))
+               "cu" = readRDS("cor_daily_comm_uptime.rds"))
+               #"pau" = readRDS("cor_daily_pa_uptime.rds"))
                #"cctv" = readRDS("cor_daily_cctv_uptime.rds"))
 cor$wk <- list("vpd" = readRDS("cor_weekly_vpd.rds"),
                "vph" = readRDS("cor_weekly_vph.rds"),
@@ -823,8 +863,8 @@ cor$wk <- list("vpd" = readRDS("cor_weekly_vpd.rds"),
                "pr" = readRDS("cor_weekly_pr_by_day.rds"),
                "qs" = readRDS("cor_wqs.rds"),
                "sf" = readRDS("cor_wsf.rds"),
-               "cu" = readRDS("cor_weekly_comm_uptime.rds"),
-               "pau" = readRDS("cor_weekly_pa_uptime.rds"))                                                               
+               "cu" = readRDS("cor_weekly_comm_uptime.rds"))
+               #"pau" = readRDS("cor_weekly_pa_uptime.rds"))                                                               
                #"cctv" =  readRDS("cor_weekly_cctv_uptime.rds"))
 cor$mo <- list("vpd" = readRDS("cor_monthly_vpd.rds"),
                "vph" = readRDS("cor_monthly_vph.rds"),
@@ -846,7 +886,7 @@ cor$mo <- list("vpd" = readRDS("cor_monthly_vpd.rds"),
                "ptih" = readRDS("cor_monthly_pti_by_hr.rds"),
                "du" = readRDS("cor_monthly_detector_uptime.rds"),
                "cu" = readRDS("cor_monthly_comm_uptime.rds"),
-               "pau" = readRDS("cor_monthly_pa_uptime.rds"),
+               #"pau" = readRDS("cor_monthly_pa_uptime.rds"),
                "veh" = readRDS("cor_monthly_detector_uptime.rds"),
                "ped" = data.frame())
                #"cctv" = readRDS("cor_monthly_cctv_uptime.rds"),
@@ -864,7 +904,10 @@ cor$qu <- list("vpd" = get_quarterly(cor$mo$vpd, "vpd"),
                "pti" = get_quarterly(cor$mo$pti, "pti"),
                "du" = get_quarterly(cor$mo$du, "uptime.all"),
                "cu" = get_quarterly(cor$mo$cu, "uptime"),
-               "pau" = get_quarterly(cor$mo$pau, "uptime"),
+<<<<<<< HEAD
+               #"pau" = get_quarterly(cor$mo$pau, "uptime"),
+=======
+>>>>>>> 7673cc95a2daa422724e9e2e4c047a9c6349a375
                "veh" = get_quarterly(cor$mo$veh, "uptime.all"),
                "ped" = data.frame()) #get_quarterly(cor$mo$ped, "uptime", "num"), # -- Need to update
                #"cctv" = get_quarterly(cor$mo$cctv, "uptime", "num"),
@@ -874,8 +917,8 @@ cor$qu <- list("vpd" = get_quarterly(cor$mo$vpd, "vpd"),
 
 sig <- list()
 sig$dy <- list("du" = sigify(readRDS("avg_daily_detector_uptime.rds"), cor$dy$du, corridors),
-               "cu" = sigify(readRDS("daily_comm_uptime.rds"), cor$dy$cu, corridors),
-               "pau" = sigify(readRDS("daily_pa_uptime.rds"), cor$dy$pau, corridors))
+               "cu" = sigify(readRDS("daily_comm_uptime.rds"), cor$dy$cu, corridors))
+               #"pau" = sigify(readRDS("daily_pa_uptime.rds"), cor$dy$pau, corridors))
                #"cctv" = readRDS("daily_cctv_uptime.rds"))
 sig$wk <- list("vpd" = sigify(readRDS("weekly_vpd.rds"), cor$wk$vpd, corridors),
                "vph" = sigify(readRDS("weekly_vph.rds"), cor$wk$vph, corridors),
@@ -888,8 +931,8 @@ sig$wk <- list("vpd" = sigify(readRDS("weekly_vpd.rds"), cor$wk$vpd, corridors),
                "pr" = sigify(readRDS("weekly_pr_by_day.rds"), cor$wk$pr, corridors),
                "qs" = sigify(readRDS("wqs.rds"), cor$wk$qs, corridors),
                "sf" = sigify(readRDS("wsf.rds"), cor$wk$sf, corridors),
-               "cu" = sigify(readRDS("weekly_comm_uptime.rds"), cor$wk$cu, corridors),
-               "pau" = sigify(readRDS("weekly_pa_uptime.rds"), cor$wk$pau, corridors))
+               "cu" = sigify(readRDS("weekly_comm_uptime.rds"), cor$wk$cu, corridors))
+               #"pau" = sigify(readRDS("weekly_pa_uptime.rds"), cor$wk$pau, corridors))
                #"cctv" = readRDS("weekly_cctv_uptime.rds"))
 sig$mo <- list("vpd" = sigify(readRDS("monthly_vpd.rds"), cor$mo$vpd, corridors),
                "vph" = sigify(readRDS("monthly_vph.rds"), cor$mo$vph, corridors),
@@ -909,8 +952,7 @@ sig$mo <- list("vpd" = sigify(readRDS("monthly_vpd.rds"), cor$mo$vpd, corridors)
                "tti" = data.frame(),
                "pti" = data.frame(),
                "du" = sigify(readRDS("monthly_detector_uptime.rds"), cor$mo$du, corridors),
-               "cu" = sigify(readRDS("monthly_comm_uptime.rds"), cor$mo$cu, corridors),
-               "pau" = sigify(readRDS("monthly_pa_uptime.rds"), cor$mo$cu, corridors))
+               "cu" = sigify(readRDS("monthly_comm_uptime.rds"), cor$mo$cu, corridors))
                #"cctv" = readRDS("monthly_cctv_uptime.rds"))
 
 saveRDS(cor, "cor.rds")
@@ -930,7 +972,9 @@ aws.s3::put_object(file = "sig.rds",
 
 # print(glue("{Sys.time()} build signal_dashboards [19 of 19]"))
 
-# db_build_data_for_signal_dashboard(month_abbrs = month_abbrs[length(month_abbrs)], 
-#                                    corridors = corridors, 
-#                                    pth = 'Signal_Dashboards', 
-#                                    upload_to_s3 = TRUE)
+print(glue("{Sys.time()} build signal_dashboards [19 of 19]"))
+
+db_build_data_for_signal_dashboard(month_abbrs = month_abbrs[length(month_abbrs)], 
+                                   corridors = corridors, 
+                                   pth = 'Signal_Dashboards', 
+                                   upload_to_s3 = TRUE)
