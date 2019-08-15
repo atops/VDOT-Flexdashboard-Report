@@ -11,7 +11,8 @@ import os
 import pyodbc
 
 
-def get_atspm_detectors():
+# Updated version that gets detector priority for counts
+def get_atspm_detectors(date=None):
 
     if os.name == 'nt':
 
@@ -38,25 +39,91 @@ def get_atspm_detectors():
 
     with engine.connect() as conn:
 
+        detectiontypedetectors = pd.read_sql_table('DetectionTypeDetector', con=conn)
+        detectiontypes = pd.read_sql_table('DetectionTypes', con=conn)
+        lanetypes = pd.read_sql_table('LaneTypes', con=conn)
+        detectionhardwares = pd.read_sql_table('DetectionHardwares', con=conn)
+        movementtypes = pd.read_sql_table('MovementTypes', con=conn)
+        directiontypes = pd.read_sql_table('DirectionTypes', con=conn)
+
         detectors = pd.read_sql_table('Detectors', con=conn)
-        approaches = pd.read_sql_query("SELECT ApproachID, SignalID, DirectionTypeID, MPH, ProtectedPhaseNumber, IsProtectedPhaseOverlap, PermissivePhaseNumber FROM Approaches", con=conn)
+        approaches = pd.read_sql_table("Approaches", con=conn)
         signals = pd.read_sql_table('Signals', con=conn)
 
+    # Combine detection types tables
+    detectiontypes2 = (detectiontypedetectors
+         .merge(detectiontypes, on=['DetectionTypeID'])
+         .drop(columns=['DetectionTypeID'])
+         .pivot_table(index=['ID'], values=['Description'], aggfunc=lambda x: list(x))
+         .rename(columns={'Description': 'DetectionTypeDesc'})
+         .reset_index())
 
-    signals = signals[signals.SignalID != 'null']
-    signals = signals[~signals.IPAddress.str.contains("^10\.10.")]
+    # Rename reused field names (Description, Abbreviation)
+    approaches = approaches.rename(columns={'Description': 'ApproachDesc'})
+    movementtypes = movementtypes.rename(columns={'Description': 'MovementTypeDesc',
+                                                  'Abbreviation': 'MovementTypeAbbr'})
+    lanetypes = lanetypes.rename(columns={'Description': 'LaneTypeDesc',
+                                          'Abbreviation': 'LaneTypeAbbr'})
+    directiontypes = directiontypes.rename(columns={'Description': 'DirectionTypeDesc',
+                                                    'Abbreviation': 'DirectionTypeAbbr'})
 
-    df = (signals.set_index(['SignalID']).join(approaches.set_index(['SignalID']), how='outer')
-            .sort_index())
+    detectionhardwares = detectionhardwares.rename(columns={'ID': 'DetectionHardwareID'})
 
-    df = (df[~df.ApproachID.isna()]
-            .assign(ApproachID = lambda x: x.ApproachID.astype('int64'))
-            .reset_index())
-    df_ = (df.set_index(['ApproachID']).join(detectors.set_index(['ApproachID']), how='outer')
-             .assign(TimeFromStopBar = lambda x: x.DistanceFromStopBar/x.MPH*3600/5280)
-             .rename(columns = {'DetChannel': 'Detector'}))
+    # Get config for a given date, if supplied
+    if date is not None:
+        detectors = detectors[(detectors.DateAdded <= date) & ((detectors.DateDisabled > date) | detectors.DateDisabled.isna())]
+        signals = signals[signals.Start <= date]
 
-    return df_.reset_index()
+    # Drop all but the latest version
+    detectors = detectors.sort_values(['DetectorID','DateAdded','ID'])\
+        .drop_duplicates(['DetectorID'], keep='last')
+
+    signals = signals.sort_values(['SignalID','VersionID'])\
+        .drop_duplicates(['SignalID'], keep='last')
+
+
+    # Big merge
+    df =(detectors.merge(movementtypes, on=['MovementTypeID'])
+              .merge(detectionhardwares, on=['DetectionHardwareID'])
+              .merge(lanetypes, on=['LaneTypeID'])
+              .merge(detectiontypes2, on=['ID'])
+              .merge(approaches, on=['ApproachID'])
+              .merge(directiontypes, on=['DirectionTypeID'])
+              .merge(signals, on=['SignalID'])
+              .drop(columns=['MovementTypeID',
+                             'LaneTypeID',
+                             'DetectionHardwareID',
+                             'ApproachID',
+                             'DirectionTypeID',
+                             'DisplayOrder_x',
+                             'DisplayOrder_y',
+                             'VersionID_x',
+                             'VersionID_y',
+                             'VersionActionId']))
+
+
+    # Calculate time from stop bar. Assumed distance and MPH are entered
+    df['TimeFromStopBar'] = df.DistanceFromStopBar/df.MPH*3600/5280
+    df = df.rename(columns = {'DetChannel': 'Detector'})
+
+    df['CallPhase'] = 0
+    df.loc[df['MovementTypeAbbr'] == 'L', 'CallPhase'] = df.loc[df['MovementTypeAbbr'] == 'L', 'ProtectedPhaseNumber']
+    df.loc[df['MovementTypeAbbr'] == 'T', 'CallPhase'] = df.loc[df['MovementTypeAbbr'] == 'T', 'ProtectedPhaseNumber']
+    #df.loc[(df['MovementTypeAbbr'] == 'TR') & (df['PermissivePhaseNumber'] > 0) & (~df['PermissivePhaseNumber'].isna()), 'CallPhase'] = df.loc[df['MovementTypeAbbr'] == 'TR', 'PermissivePhaseNumber']
+    #df.loc[(df['MovementTypeAbbr'] == 'TR') & ((df['PermissivePhaseNumber'] == 0) | df['PermissivePhaseNumber'].isna()), 'CallPhase'] = df.loc[df['MovementTypeAbbr'] == 'TR', 'ProtectedPhaseNumber']
+    df.loc[(df['MovementTypeAbbr'] == 'TR') & (df['PermissivePhaseNumber'] > 0) & (~df['PermissivePhaseNumber'].isna()), 'CallPhase'] = df.loc[(df['MovementTypeAbbr'] == 'TR') & (df['PermissivePhaseNumber'] > 0) & (~df['PermissivePhaseNumber'].isna()), 'PermissivePhaseNumber']
+    df.loc[(df['MovementTypeAbbr'] == 'TR') & ((df['PermissivePhaseNumber'] == 0) | df['PermissivePhaseNumber'].isna()), 'CallPhase'] = df.loc[(df['MovementTypeAbbr'] == 'TR') & ((df['PermissivePhaseNumber'] == 0) | df['PermissivePhaseNumber'].isna()), 'ProtectedPhaseNumber']
+    df.loc[df['MovementTypeAbbr'] == 'R', 'CallPhase'] = df.loc[df['MovementTypeAbbr'] == 'R', 'ProtectedPhaseNumber']
+    df.loc[df['MovementTypeAbbr'] == 'TL', 'CallPhase'] = df.loc[df['MovementTypeAbbr'] == 'TL', 'ProtectedPhaseNumber']
+
+    df.DetectionTypeDesc = df.DetectionTypeDesc.astype('str')
+
+    df['CountPriority'] = 3
+    df.loc[(df.LaneTypeDesc == 'Vehicle') & (df.DetectionTypeDesc.str.contains('Lane-by-lane Count')), 'CountPriority'] = 2
+    df.loc[(df.LaneTypeDesc == 'Vehicle') & (df.DetectionTypeDesc.str.contains('Advanced Count')), 'CountPriority'] = 1
+    df.loc[df.LaneTypeDesc == 'Exit', 'CountPriority'] = 0
+
+    return df
 
 
 def get_atspm_ped_detectors():

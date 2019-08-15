@@ -4,6 +4,35 @@
 #mode: production
 mode: beta
 
+
+# Sections of Monthly_Report_Calcs_ec2 to run
+run:
+    travel_times: TRUE
+    counts: TRUE
+    counts_based_measures: TRUE
+    etl: TRUE
+    arrivals_on_green: TRUE
+    queue_spillback: TRUE
+    split_failures: TRUE
+
+
+start_date: yesterday
+end_date: yesterday
+
+report_start_date: 2018-06-01
+report_end_date: yesterday
+
+corridors_filename: corridors.feather
+corridors_xlsx_filename: ../Corridors.xlsx
+
+cctv_config_filename: 
+cctv_parsed_filename: 
+
+teams_tasks_filename: 
+
+tmc_filename: tmc_routes.feather
+
+
 selected_month: November 2018
 
 report_months:
@@ -27,25 +56,3 @@ signal_groups:
     - Southwest Region
     - Eastern Region
     - Central Region
-
-
-corridors_filename: corridors.feather
-
-
-
-start_date: yesterday
-end_date: yesterday
-
-report_start_date: 2017-11-01
-report_end_date: yesterday
-
-corridors_filename: corridors.feather
-corridors_xlsx_filename: ../Corridors.xlsx
-
-cctv_config_filename: 
-cctv_parsed_filename: 
-
-teams_tasks_filename: 
-
-tmc_filename: tmc_routes.feather
-

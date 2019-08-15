@@ -83,7 +83,7 @@ def get_detector_pairs(df, det_config):
     # det_config is what comes from MaxTime Detector Plans
     dc = (det_config.rename(columns = {'Detector': 'EventParam'})
                     .fillna(value = {'TimeFromStopBar': 0})
-                    .set_index(['SignalID','EventParam']))[['Call Phase', 'TimeFromStopBar']]
+                    .set_index(['SignalID','EventParam']))[['Call Phase', 'TimeFromStopBar', 'CountDetector']]
 
     df = get_pairs(df, 82, 81).join(dc).dropna() # map detector ID to phase
     
@@ -91,18 +91,6 @@ def get_detector_pairs(df, det_config):
     df['EventCode'] = df['EventCode'].astype('int64')
 
     df.StartTimeStamp = df.StartTimeStamp + pd.to_timedelta(df.TimeFromStopBar, 's')
-    #df.EndTimeStamp = df.EndTimeStamp + pd.to_timedelta(df.TimeFromStopBar, 's')
-
-    # Add 5 seconds to account for detector setback distance.
-    # TODO: This is a hack. Need actual setback distances, as this
-    # assumes phases 2,6 are setback detectors and all others are stop bar.
-    
-    
-    #df.StartTimeStamp = (np.where(df['Call Phase'].isin([2,6]), 
-    #                              df.StartTimeStamp + pd.to_timedelta(5, 's'), 
-    #                              df.StartTimeStamp))
-    #df = (df.assign(StartTimeStamp = df.StartTimeStamp + pd.Timedelta(5, 's'),
-    #                EndTimeStamp = df.EndTimeStamp + pd.Timedelta(5, 's'))
     
     df = (df.reset_index(level=1, drop=False)
             .rename(columns={'EventParam':'Detector'})
@@ -150,10 +138,12 @@ def get_volume_by_phase(gyr, detections, aggregate=True):
     df.EventCode = df.EventCode.astype('int64')
 
     # Disaggregate. All detection events at point in cycle/phase
-    detections_by_cycle = df[['CycleStart','PhaseStart','EventCode','DetTimeStamp',
+    detections_by_cycle = df[['Detector', 'CycleStart','PhaseStart','EventCode','DetTimeStamp',
                                'DetDuration','DetTimeInCycle','DetTimeInPhase']].reset_index()
 
     # Aggregate. Group detection events to get volumes by gyr
+    df = df[df.CountDetector == True].drop('CountDetector', axis=1)
+    
     volumes = (df.set_index(['EventCode','PhaseStart'], append=True)
                  .groupby(level=[0,1,2,3])
                  .count()[['DetTimeStamp']]
@@ -215,43 +205,47 @@ def etl_main(df, det_config):
                       .set_index(['SignalID','EventParam'])
                       .sort_values('TimeStamp').sort_index())
 
-    detections = get_detector_pairs(df, det_config)
-    
-    gt = get_green_time(df)
-    yt = get_yellow_time(df)
-    rt = get_red_time(df)
-    
-    gyr = (pd.concat([assign_cycle(gt, cycles),
-                      assign_cycle(yt, cycles),
-                      assign_cycle(rt, cycles)])
-             .sort_values(['CycleStart','StartTimeStamp']).sort_index())
-    gyr.EventCode = gyr.EventCode.astype('int64')
-    
-    gyrv, detections_by_cycle = get_volume_by_phase(gyr, detections, aggregate=False)
+    if len(cycles) > 0 and len(terminations) > 0:                                             
+        detections = get_detector_pairs(df, det_config)
+        
+        gt = get_green_time(df)
+        yt = get_yellow_time(df)
+        rt = get_red_time(df)
+        
+        gyr = (pd.concat([assign_cycle(gt, cycles),
+                          assign_cycle(yt, cycles),
+                          assign_cycle(rt, cycles)])
+                 .sort_values(['CycleStart','StartTimeStamp']).sort_index())
+        gyr.EventCode = gyr.EventCode.astype('int64')
+        
+        gyrv, detections_by_cycle = get_volume_by_phase(gyr, detections, aggregate=False)
 
-    # Add termination type to green phase
-    gyrvt = (pd.merge(left=gyrv.reset_index(), 
-                      right=terminations.reset_index(), 
-                      how='outer', 
-                      left_on=['SignalID','Phase','PhaseEnd'], 
-                      right_on=['SignalID','EventParam','TimeStamp'])
-               .set_index(['SignalID','Phase'])
-               .drop(['TimeStamp','EventParam'], axis=1)
-               .rename(columns={'EventCode_x':'EventCode', 'EventCode_y':'TermType'})
-               .dropna(axis=0, how='any', subset=['EventCode'])
-               .reset_index())
-    cycles = (gyrvt.assign(TermType = gyrvt.TermType.fillna(0).astype('int64'),
-                           EventCode = gyrvt.EventCode.astype('int64'),
-                           SignalID = gyrvt.SignalID.astype('int64'),
-                           Phase = gyrvt.Phase.astype('int64'),
-                           Volume = gyrvt.Volume.astype('int64'))
-                   .filter(['SignalID','Phase',
-                            'CycleStart','PhaseStart','PhaseEnd',
-                            'EventCode','TermType','Duration','Volume']))
+        # Add termination type to green phase
+        gyrvt = (pd.merge(left=gyrv.reset_index(), 
+                          right=terminations.reset_index(), 
+                          how='outer', 
+                          left_on=['SignalID','Phase','PhaseEnd'], 
+                          right_on=['SignalID','EventParam','TimeStamp'])
+                   .set_index(['SignalID','Phase'])
+                   .drop(['TimeStamp','EventParam'], axis=1)
+                   .rename(columns={'EventCode_x':'EventCode', 'EventCode_y':'TermType'})
+                   .dropna(axis=0, how='any', subset=['EventCode'])
+                   .reset_index())
+        cycles = (gyrvt.assign(TermType = gyrvt.TermType.fillna(0).astype('int64'),
+                               EventCode = gyrvt.EventCode.astype('int64'),
+                               SignalID = gyrvt.SignalID.astype('int64'),
+                               Phase = gyrvt.Phase.astype('int64'),
+                               Volume = gyrvt.Volume.astype('int64'))
+                       .filter(['SignalID','Phase',
+                                'CycleStart','PhaseStart','PhaseEnd',
+                                'EventCode','TermType','Duration','Volume']))
 
-    return cycles, detections_by_cycle
+        return cycles, detections_by_cycle
 
+    else:
+        return pd.DataFrame(), pd.DataFrame()
 
+        
 if __name__=='__main__':
     
     print('')

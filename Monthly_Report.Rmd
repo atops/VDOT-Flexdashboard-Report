@@ -32,19 +32,15 @@ FIG_HEIGHT = 7
 
 
 
-
 Inputs {.sidebar}
 =====================================
 
 VDOT ATSPM Performance Dashboard
 
-Past month reports can be viewed back to `r tail(conf$report_months, 1)`.
+Past month reports can be viewed back to `r format(first_month, "%B %Y")`.
 
 ```{r sidebar, warning = FALSE, cache = FALSE}
 # shiny inputs defined here
-
-# Last thirteen months
-month_options <- seq(today() - days(7), today() - days(7) - months(12), by = "-1 month") %>% format("%B %Y")
 
 signal_group_options <- conf$signal_groups
 
@@ -141,11 +137,13 @@ mr <- reactive(
 filtered_corridors <- reactive({
     if (corridor() == "All Corridors") {
         corridors %>%
-            filter(Signal_Group %in% signal_group()) %>% #input$signal_group) %>%
+            filter(Signal_Group %in% signal_group(),
+                   SignalID > 0) %>% 
             select(-Description, -Asof)
     } else {
         corridors %>%
-            filter(Corridor == corridor()) %>%
+            filter(Corridor == corridor(),
+                   SignalID > 0) %>%
             select(-Description, -Asof)
     }
 })
@@ -203,6 +201,19 @@ renderValueBox({
 renderValueBox({
   valueBox(
       value = get_valuebox(mr()$mo$aogd, "aog", as_pct, 
+                           signal_group_ = signal_group(), mo = current_month(), break_ = TRUE),
+      icon = "fa-car",
+    color = VDOT_BLUE
+  )
+})
+```
+
+### Progression Ratio {.value-box}
+
+```{r}
+renderValueBox({
+  valueBox(
+      value = get_valuebox(mr()$mo$prd, "pr", as_2dec, 
                            signal_group_ = signal_group(), mo = current_month(), break_ = TRUE),
       icon = "fa-car",
     color = VDOT_BLUE
@@ -353,7 +364,7 @@ renderValueBox({
 ```{r}
 renderValueBox({
   valueBox(
-      value = get_valuebox(cor$mo$ped, "uptime", as_pct, 
+      value = get_valuebox(cor$mo$pau, "uptime", as_pct, 
                            signal_group_ = signal_group(), mo = current_month(), break_ = FALSE),
       icon = "fa-child",
     color = VDOT_BLUE
@@ -438,6 +449,21 @@ renderValueBox({
 })
 ```
 
+### Progression Ratio {.value-box}
+
+```{r}
+renderValueBox({
+  valueBox(
+      value = get_valuebox(cor$qu$prd, "pr", as_2dec, 
+                           signal_group_ = signal_group(), 
+                           mo = current_month(), 
+                           qu = current_quarter(), break_ = TRUE),
+      icon = "fa-car",
+      color = VDOT_BLUE
+  )
+})
+```
+
 ### Spillback Rate {.value-box}
 
 ```{r}
@@ -448,7 +474,7 @@ renderValueBox({
                            mo = current_month(), 
                            qu = current_quarter(), break_ = TRUE),
       icon = "fa-car",
-      color = VDOT_BLUE
+      color = VDOT_BLUE_LIGHT
   )
 })
 ```
@@ -463,7 +489,7 @@ renderValueBox({
                            mo = current_month(), 
                            qu = current_quarter(), break_ = TRUE),
       icon = "fa-car",
-      color = VDOT_BLUE_LIGHT
+      color = VDOT_BLUE
   )
 })
 ```
@@ -478,7 +504,7 @@ renderValueBox({
                            mo = current_month(), 
                            qu = current_quarter(), break_ = TRUE),
       icon = "fa-dashboard",
-      color = VDOT_BLUE
+      color = VDOT_BLUE_LIGHT
   )
 })
 ```
@@ -493,7 +519,7 @@ renderValueBox({
                            mo = current_month(), 
                            qu = current_quarter(), break_ = TRUE),
       icon = "fa-dashboard",
-      color = VDOT_BLUE_LIGHT
+      color = VDOT_BLUE
   )
 })
 ```
@@ -568,7 +594,6 @@ renderValueBox({
 })
 ```
 
-
 Row {data-height = 50}
 -------------------------------------
 
@@ -600,7 +625,7 @@ renderValueBox({
 
 renderValueBox({
   valueBox(
-    value = get_valuebox(cor$qu$ped, "uptime", as_pct, 
+    value = get_valuebox(cor$qu$pau, "uptime", as_pct, 
                          signal_group_ = signal_group(), 
                          mo = current_month(), 
                          qu = current_quarter(), break_ = FALSE),
@@ -658,6 +683,11 @@ fillCol(
         perf_plot(data.set, "aog", "Arrivals on Green\nGoal: 80%", RED2, as_pct, ".1%") 
     }),
     renderPlotly({ 
+        data.set <- filter(mr()$mo$prd, Corridor==signal_group() & Month <= current_month())
+        validate(need(nrow(data.set) > 0, "No Data"))
+        perf_plot(data.set, "pr", "Progression Ratio\nGoal: 1.20", RED2, as_2dec, ".2f") 
+    }),
+    renderPlotly({ 
         data.set <- filter(mr()$mo$qsd, Corridor==signal_group() & Month <= current_month())
         validate(need(nrow(data.set) > 0, "No Data"))
         perf_plot(data.set, "qs_freq", "Queue\nSpillback", RED2, as_pct, ".1%")
@@ -677,7 +707,7 @@ fillCol(
         validate(need(nrow(data.set) > 0, "No Data"))
         perf_plot(data.set, "pti", "Planning Time\nIndex", RED2, as_2dec, ".2f")
     }),
-    height = 700)
+    height = 800)
 ```
 
 ### Volumes and Equipment
@@ -708,8 +738,7 @@ fillCol(
         perf_plot(data.set, "uptime.all", "Detector\nUptime\nGoal: 95%", ORANGE, as_pct, ".1%")
     }),
     renderPlotly({ 
-        data.set <- filter(cor$mo$ped, 
-                          Corridor==signal_group() & Month <= current_month() & Month >= ymd("2017-07-01"))
+        data.set <- filter(cor$mo$pau, Corridor==signal_group() & Month <= current_month())
         validate(need(nrow(data.set) > 0, "No Data"))
         perf_plot(data.set, "uptime", "Ped Detector\nUptime\nGoal: 95%", ORANGE, as_pct, ".1%")
     }),
@@ -718,7 +747,8 @@ fillCol(
         validate(need(nrow(data.set) > 0, "No Data"))
         perf_plot(data.set, "uptime", "Communications\nUptime\nGoal: 95%", ORANGE, as_pct, ".1%")
     }),
-    height = 800)
+    height = 800
+)
 ```
 
 
@@ -753,6 +783,18 @@ renderValueBox({
 renderValueBox({
   valueBox(
       value = get_valuebox(mr()$mo$aogd, "aog", as_pct,
+                           signal_group_ = signal_group(), mo = current_month(), break_ = TRUE),
+      icon = "fa-car"
+  )
+})
+```
+
+### Progression Ratio {.value-box}
+
+```{r, warning = FALSE}
+renderValueBox({
+  valueBox(
+      value = get_valuebox(mr()$mo$prd, "pr", as_2dec,
                            signal_group_ = signal_group(), mo = current_month(), break_ = TRUE),
       icon = "fa-car"
   )
@@ -819,8 +861,8 @@ renderPlotly({
     get_bar_line_dashboard_plot(mr()$wk$tp, mr()$mo$tp, NULL,
                                 "vph", "integer", highlight_color = RED2,
                                 month_ = current_month(), signal_group_ = signal_group(),
-                                x_bar_title = "Vehicles per Hour",
-                                x_line1_title = paste(input$month, "Throughput (vph)"),
+                                x_bar_title = paste(input$month, "Throughput (vph)"),
+                                x_line1_title = "Vehicles per Hour Trend",
                                 plot_title = "Throughput (peak veh/hr) Trend")
 })
 ```
@@ -837,6 +879,21 @@ renderPlotly({
                                 x_line1_title = "AOG Trend",
                                 x_line2_title = paste(input$month, "AOG by TOD"),
                                 plot_title = "Percent Arrivals on Green")
+})
+```
+
+
+### Progression Ratio
+
+```{r, fig.width = FIG_WIDTH, fig.height = FIG_HEIGHT, warning = FALSE}
+renderPlotly({
+    get_bar_line_dashboard_plot(mr()$wk$pr, mr()$mo$prd, mr()$mo$prh,
+                                "pr", "decimal", highlight_color = RED2,
+                                month_ = current_month(), signal_group_ = signal_group(),
+                                x_bar_title = paste(input$month, "AOG"),
+                                x_line1_title = "Progression Ratio Trend",
+                                x_line2_title = paste(input$month, "Progression Ratio by TOD"),
+                                plot_title = "Progression Ratio")
 })
 ```
 
@@ -945,8 +1002,8 @@ renderPlotly({ # Good version
     get_bar_line_dashboard_plot(mr()$wk$vpd, mr()$mo$vpd, NULL,
                                 "vpd", "integer", highlight_color = VDOT_BLUE,
                                 month_ = current_month(), signal_group_ = signal_group(),
-                                x_bar_title = "Vehicles per Day",
-                                x_line1_title = paste(input$month, "Daily Volume (vpd)"),
+                                x_bar_title = paste(input$month, "Daily Volume (vpd)"),
+                                x_line1_title = "Vehicles per Day Trend",
                                 plot_title = "Daily Volume (veh/day) Trend")
 })
 ```
@@ -969,15 +1026,15 @@ renderPlotly({
                                                mr()$mo$vphp$am, NULL,
                                 "vph", "integer", highlight_color = VDOT_BLUE,
                                 month_ = current_month(), signal_group_ = signal_group(),
-                                x_bar_title = "Vehicles per Hour",
-                                x_line1_title = paste(input$month, "Hourly Volume (vph)"),
+                                x_bar_title = paste(input$month, "Hourly Volume (vph)"),
+                                x_line1_title = "Vehicles per Hour Trend",
                                 plot_title = "Peak Period Hourly Volume (veh/hr) Trend")
     pm_vph_plot <- get_bar_line_dashboard_plot(mr()$wk$vphp$pm,
                                                mr()$mo$vphp$pm, NULL,
                                 "vph", "integer", highlight_color = VDOT_BLUE,
                                 month_ = current_month(), signal_group_ = signal_group(),
-                                x_bar_title = "Vehicles per Hour",
-                                x_line1_title = paste(input$month, "Hourly Volume (vph)"),
+                                x_bar_title = paste(input$month, "Hourly Volume (vph)"),
+                                x_line1_title = "Vehicles per Hour Trend",
                                 plot_title = "Peak Period Hourly Volume (veh/hr) Trend")
     subplot(am_vph_plot, pm_vph_plot, nrows = 1, margin = 0.04)
 })
@@ -995,6 +1052,19 @@ renderPlotly({
 ```
 
 
+### Pedestrians
+
+```{r, fig.width = FIG_WIDTH, fig.height = FIG_HEIGHT, eval = TRUE, warning = FALSE}
+renderPlotly({ # Good version
+    get_bar_line_dashboard_plot(mr()$wk$papd, mr()$mo$papd, NULL,
+                                "papd", "integer", highlight_color = VDOT_BLUE,
+                                month_ = current_month(), signal_group_ = signal_group(),
+                                x_bar_title = paste(input$month, "Ped Activations (papd)"),
+                                x_line1_title = "Ped Activations per Day Trend",
+                                plot_title = "Pedestrian Activations per Day (pa/day) Trend")
+})
+```
+               
 
 
 
@@ -1026,7 +1096,7 @@ renderValueBox({
 ```{r, warning = FALSE}
 renderValueBox({
   valueBox(
-      value = get_valuebox(cor$mo$ped, "uptime", as_pct,
+      value = get_valuebox(cor$mo$pau, "uptime", as_pct,
                            signal_group_ = signal_group(), mo = current_month(), break_ = FALSE),
       icon = "fa-child" 
   )
@@ -1081,18 +1151,27 @@ renderPlotly({
 
 ```{r, fig.width = FIG_WIDTH, fig.height = FIG_HEIGHT, warning = FALSE}
 renderPlotly({
-    
-    weekly_ped_df <- rename(cor$mo$ped, Date = Month) %>%
-        filter(Date >= ymd("2017-07-01"))
-    monthly_ped_df <- cor$mo$ped %>%
-        filter(Month >= ymd("2017-07-01"))
-    get_bar_line_dashboard_plot(weekly_ped_df,
-                                monthly_ped_df,
-                                var_ = "uptime", num_format = "percent", highlight_color = BROWN,
-                                month_ = current_month(), signal_group_ = signal_group(),
-                                x_bar_title = paste(input$month, "Ped Det Uptime"),
-                                x_line1_title = "Pedestrian Detector Uptime Trend",
-                                plot_title = "Ped Detector Uptime")
+
+    if (corridor() == "All Corridors") {
+        
+        get_cor_comm_uptime_plot(mr()$dy$pau,
+                                 mr()$mo$pau,
+                                 month_name = input$month,
+                                 month_ = current_month(),
+                                 signal_group_ = signal_group())
+    } else {
+        
+        get_uptime_plot(sig$dy$pau, 
+                        sig$mo$pau, 
+                        var_ = "uptime", 
+                        num_format = "percent", 
+                        month_ = current_month(), 
+                        signal_group_ = signal_group(),
+                        x_bar_title = "Current Month Uptime",
+                        x_line1_title = "Daily Uptime",
+                        plot_title = "",
+                        goal = NULL)
+    }
 })
 ```
 
@@ -1117,15 +1196,15 @@ renderPlotly({
     } else {
         
         get_uptime_plot(sig$dy$cu, 
-                                 sig$mo$cu, 
-                                 var_ = "uptime", 
-                                 num_format = "percent", 
-                                 month_ = current_month(), 
-                                 signal_group_ = signal_group(),
-                                 x_bar_title = "Current Month Uptime",
-                                 x_line1_title = "Daily Uptime",
-                                 plot_title = "",
-                                 goal = NULL)
+                        sig$mo$cu, 
+                        var_ = "uptime", 
+                        num_format = "percent", 
+                        month_ = current_month(), 
+                        signal_group_ = signal_group(),
+                        x_bar_title = "Current Month Uptime",
+                        x_line1_title = "Daily Uptime",
+                        plot_title = "",
+                        goal = NULL)
     }
     
 })
