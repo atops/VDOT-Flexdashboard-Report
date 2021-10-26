@@ -136,14 +136,16 @@ def get_volume_by_phase(gyr, detections, aggregate=True):
             .rename(columns={'EventCode_y':'EventCode',
                              'Duration':'DetDuration'}))
     df.EventCode = df.EventCode.astype('int64')
+    
 
     # Disaggregate. All detection events at point in cycle/phase
     detections_by_cycle = df[['Detector', 'CycleStart','PhaseStart','EventCode','DetTimeStamp',
                                'DetDuration','DetTimeInCycle','DetTimeInPhase']].reset_index()
 
+
     # Aggregate. Group detection events to get volumes by gyr
     df = df[df.CountDetector == True].drop('CountDetector', axis=1)
-    
+
     volumes = (df.set_index(['EventCode','PhaseStart'], append=True)
                  .groupby(level=[0,1,2,3])
                  .count()[['DetTimeStamp']]
@@ -204,20 +206,20 @@ def etl_main(df, det_config):
     terminations = (df.query('EventCode in [4,5,6]')
                       .set_index(['SignalID','EventParam'])
                       .sort_values('TimeStamp').sort_index())
-
-    if len(cycles) > 0 and len(terminations) > 0:                                             
+    
+    if len(cycles) > 0 and len(terminations) > 0:
         detections = get_detector_pairs(df, det_config)
-        
+
         gt = get_green_time(df)
         yt = get_yellow_time(df)
         rt = get_red_time(df)
-        
+
         gyr = (pd.concat([assign_cycle(gt, cycles),
                           assign_cycle(yt, cycles),
                           assign_cycle(rt, cycles)])
                  .sort_values(['CycleStart','StartTimeStamp']).sort_index())
         gyr.EventCode = gyr.EventCode.astype('int64')
-        
+
         gyrv, detections_by_cycle = get_volume_by_phase(gyr, detections, aggregate=False)
 
         # Add termination type to green phase
@@ -241,11 +243,11 @@ def etl_main(df, det_config):
                                 'EventCode','TermType','Duration','Volume']))
 
         return cycles, detections_by_cycle
-
+    
     else:
         return pd.DataFrame(), pd.DataFrame()
 
-        
+
 if __name__=='__main__':
     
     print('')

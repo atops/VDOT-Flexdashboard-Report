@@ -1,41 +1,21 @@
 # -*- coding: utf-8 -*-
 """
-Created on Thu Jul 12 20:55:21 2018
+Created on Wed Nov 27 10:49:03 2019
 
-@author: V0010894
+@author: alan.toppen
 """
 
 import pandas as pd
-import sqlalchemy as sq
 import os
 import pyodbc
+import sqlalchemy as sq
+from datetime import datetime, timedelta
 
 
 # Updated version that gets detector priority for counts
-def get_atspm_detectors(date=None):
+def get_atspm_detectors(engine, date=None):
 
-    if os.name == 'nt':
-
-        uid = os.environ['VDOT_ATSPM_USERNAME']
-        pwd = os.environ['VDOT_ATSPM_PASSWORD']
-        dsn = 'sqlodbc'
-
-        engine = sq.create_engine('mssql+pyodbc://{}:{}@{}'.format(uid, pwd, dsn),
-                                  pool_size=20)
-
-    elif os.name=='posix':
-        print(os.name)
-        def connect():
-            return pyodbc.connect(
-                'Driver=FreeTDS;' +
-                'SERVER={};'.format(os.environ['VDOT_ATSPM_SERVER_INSTANCE']) +
-                #'DATABASE={};'.format(os.environ['VDOT_ATSPM_DB']) +
-                'PORT=1433;' +
-                'UID={};'.format(os.environ['VDOT_ATSPM_USERNAME']) +
-                'PWD={};'.format(os.environ['VDOT_ATSPM_PASSWORD']) +
-                'TDS_Version=8.0;')
-
-        engine = sq.create_engine('mssql://', creator=connect)
+    # engine = sq.create_engine('mssql+pyodbc://ATSPM:Trafficisgreat!@MOE64', pool_size=20)
 
     with engine.connect() as conn:
 
@@ -81,7 +61,6 @@ def get_atspm_detectors(date=None):
     signals = signals.sort_values(['SignalID','VersionID'])\
         .drop_duplicates(['SignalID'], keep='last')
 
-
     # Big merge
     df =(detectors.merge(movementtypes, on=['MovementTypeID'])
               .merge(detectionhardwares, on=['DetectionHardwareID'])
@@ -101,16 +80,13 @@ def get_atspm_detectors(date=None):
                              'VersionID_y',
                              'VersionActionId']))
 
-
     # Calculate time from stop bar. Assumed distance and MPH are entered
     df['TimeFromStopBar'] = df.DistanceFromStopBar/df.MPH*3600/5280
-    df = df.rename(columns = {'DetChannel': 'Detector'})
+    df = df.rename(columns={'DetChannel': 'Detector'})
 
     df['CallPhase'] = 0
     df.loc[df['MovementTypeAbbr'] == 'L', 'CallPhase'] = df.loc[df['MovementTypeAbbr'] == 'L', 'ProtectedPhaseNumber']
     df.loc[df['MovementTypeAbbr'] == 'T', 'CallPhase'] = df.loc[df['MovementTypeAbbr'] == 'T', 'ProtectedPhaseNumber']
-    #df.loc[(df['MovementTypeAbbr'] == 'TR') & (df['PermissivePhaseNumber'] > 0) & (~df['PermissivePhaseNumber'].isna()), 'CallPhase'] = df.loc[df['MovementTypeAbbr'] == 'TR', 'PermissivePhaseNumber']
-    #df.loc[(df['MovementTypeAbbr'] == 'TR') & ((df['PermissivePhaseNumber'] == 0) | df['PermissivePhaseNumber'].isna()), 'CallPhase'] = df.loc[df['MovementTypeAbbr'] == 'TR', 'ProtectedPhaseNumber']
     df.loc[(df['MovementTypeAbbr'] == 'TR') & (df['PermissivePhaseNumber'] > 0) & (~df['PermissivePhaseNumber'].isna()), 'CallPhase'] = df.loc[(df['MovementTypeAbbr'] == 'TR') & (df['PermissivePhaseNumber'] > 0) & (~df['PermissivePhaseNumber'].isna()), 'PermissivePhaseNumber']
     df.loc[(df['MovementTypeAbbr'] == 'TR') & ((df['PermissivePhaseNumber'] == 0) | df['PermissivePhaseNumber'].isna()), 'CallPhase'] = df.loc[(df['MovementTypeAbbr'] == 'TR') & ((df['PermissivePhaseNumber'] == 0) | df['PermissivePhaseNumber'].isna()), 'ProtectedPhaseNumber']
     df.loc[df['MovementTypeAbbr'] == 'R', 'CallPhase'] = df.loc[df['MovementTypeAbbr'] == 'R', 'ProtectedPhaseNumber']
@@ -126,38 +102,21 @@ def get_atspm_detectors(date=None):
     return df
 
 
-def get_atspm_ped_detectors():
+def get_atspm_ped_detectors(engine, date=None):
 
-    if os.name=='nt':
+    # engine = sq.create_engine('mssql+pyodbc://ATSPM:Trafficisgreat!@MOE64', pool_size=20)
 
-        uid = os.environ['VDOT_ATSPM_USERNAME']
-        pwd = os.environ['VDOT_ATSPM_PASSWORD']
-        dsn = 'sqlodbc'
-
-        engine = sq.create_engine('mssql+pyodbc://{}:{}@{}'.format(uid, pwd, dsn),
-                                  pool_size=20)
-
-    elif os.name=='posix':
-        print(os.name)
-        def connect():
-            return pyodbc.connect(
-                'Driver=FreeTDS;' +
-                'SERVER={};'.format(os.environ['VDOT_ATSPM_SERVER_INSTANCE']) +
-                #'DATABASE={};'.format(os.environ['VDOT_ATSPM_DB']) +
-                'PORT=1433;' +
-                'UID={};'.format(os.environ['VDOT_ATSPM_USERNAME']) +
-                'PWD={};'.format(os.environ['VDOT_ATSPM_PASSWORD']) +
-                'TDS_Version=8.0;')
-
-        engine = sq.create_engine('mssql://', creator=connect)
+    if date is not None:
+        start_date = (date - timedelta(days=180)).strftime('%Y-%m-%d')
+    else:
+        start_date = (datetime.today() - timedelta(days=180)).strftime('%Y-%m-%d')
 
     with engine.connect() as conn:
 
         query = """SELECT Distinct SignalID, EventParam AS Detector
-                   FROM Controller_Event_Log
-                   WHERE Timestamp > '2018-01-01'
-                   AND EventCode = 90
-                   ORDER BY SignalID, EventParam"""
+                   FROM Controller_Event_Log WHERE EventCode = 90
+                   AND Timestamp > '{}'
+                   ORDER BY SignalID, EventParam""".format(start_date)
 
         df = pd.read_sql_query(query, con=conn)
 
@@ -165,16 +124,21 @@ def get_atspm_ped_detectors():
 
     return df.reset_index()
 
-def get_atspm_detectors_setback():
 
-    df_ = get_atspm_detectors()[['SignalID','DetChannel','DistanceFromStopBar','MPH']]
-    df_ = df_[~df_.DistanceFromStopBar.isna()]
-    df_ = (df_.assign(TimeFromStopBar = lambda x: x.DistanceFromStopBar/x.MPH*3600/5280)
-              .assign(DetChannel = lambda x: x.DetChannel.astype('int64'))
-              .rename(columns = {'DetChannel': 'Detector'}))
-    return df_
+# --- Temp to backfill ---
+# import boto3
+# 
+# def get_atspm_ped_detectors(engine, date=None):
+#     s3 = boto3.client('s3', verify=False)
+#     s3.download_file(
+#         Bucket='springfield-spm', 
+#         Key='atspm_ped_config/date=2021-02-18/ATSPM_Ped_Config_Ozark.feather', 
+#         Filename='apc_2021-02-18.feather')
+#     apc = pd.read_feather('apc_2021-02-18.feather')
+#     return apc
+# --- Temp to backfill ---
 
-if __name__=='__main__':
+if __name__ == '__main__':
 
     df = get_atspm_ped_detectors()
     print(df)
