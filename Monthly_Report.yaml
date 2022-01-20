@@ -4,9 +4,24 @@
 #mode: production
 mode: beta
 
+agency: VDOT
+bucket: vdot-spm
+region: NWRO
+athena:
+    staging_dir: s3://vdot-spm-athena  # this has to be <bucket>-athena
+    jar_path: AthenaJDBC42_2.0.9.jar
+    database: vdot_spm
+    atspm_table: atspm
+atspm:
+    odbc_dsn: atspm
+    uid_env: ATSPM_USERNAME
+    pwd_env: ATSPM_PASSWORD
+    svr_env: ATSPM_SERVER_INSTANCE
+    db_env: ATSPM_DB
 
 # Sections of Monthly_Report_Calcs_ec2 to run
 run:
+    cctv: FALSE #--
     travel_times: TRUE
     counts: TRUE
     counts_based_measures: TRUE
@@ -14,45 +29,34 @@ run:
     arrivals_on_green: TRUE
     queue_spillback: TRUE
     split_failures: TRUE
+    ped_delay: TRUE
 
 
 start_date: yesterday
 end_date: yesterday
 
-report_start_date: 2018-06-01
+report_start_date: 2020-10-01
 report_end_date: yesterday
+calcs_start_date: auto
+production_report_end_date: 2021-10-01
 
-corridors_filename: corridors.feather
-corridors_xlsx_filename: ../Corridors.xlsx
+corridors_filename_s3: VDOT_Corridors_Latest.xlsx
+corridors_TMCs_filename_s3: Corridor_TMCs_Virginia.xlsx
 
 cctv_config_filename: 
 cctv_parsed_filename: 
 
 teams_tasks_filename: 
 
-tmc_filename: tmc_routes.feather
+tmc_filename: 
 
+AM_PEAK_HOURS: [6, 7, 8, 9]
+PM_PEAK_HOURS: [15, 16, 17, 18, 19]
 
-selected_month: November 2018
-
-report_months:
-    - November 2018
-    - October 2018
-    - September 2018
-    - August 2018
-    - July 2018
-    - June 2018
-    - May 2018
-    - April 2018
-    - March 2018
-    - February 2018
-    - January 2018
-    - December 2017
-    - November 2017
-
-signal_groups:
-    - Northwest Region 
+zone_groups:
+    - Northwest Region
     - Northern Region
     - Southwest Region
     - Eastern Region
     - Central Region
+    - Fredericksburg District

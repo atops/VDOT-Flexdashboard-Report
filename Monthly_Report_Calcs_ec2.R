@@ -9,7 +9,8 @@ source("Monthly_Report_Functions.R")
 
 print(glue("{Sys.time()} Starting Calcs Script"))
 
-usable_cores <- get_usable_cores()
+
+usable_cores <- get_usable_cores(4)
 doParallel::registerDoParallel(cores = usable_cores)
 
 
@@ -17,11 +18,13 @@ doParallel::registerDoParallel(cores = usable_cores)
 # aurora <- get_aurora_connection()
 
 #----- DEFINE DATE RANGE FOR CALCULATIONS ------------------------------------#
-start_date <- ifelse(conf$start_date == "yesterday",
+start_date <- ifelse(
+    conf$start_date == "yesterday",
     format(today() - days(1), "%Y-%m-%d"),
     conf$start_date
 )
-end_date <- ifelse(conf$end_date == "yesterday",
+end_date <- ifelse(
+    conf$end_date == "yesterday",
     format(today() - days(1), "%Y-%m-%d"),
     conf$end_date
 )
@@ -84,10 +87,6 @@ aws.s3::put_object(
 signals_list <- unique(corridors$SignalID)
 
 
-# -- TMC Codes for Corridors
-# tmc_routes <- get_tmc_routes()
-# write_feather(tmc_routes, "tmc_routes.feather")
-# aws.s3::put_object("tmc_routes.feather", object = "tmc_routes.feather", bucket = conf$bucket)
 
 
 print(Sys.time())
@@ -105,11 +104,6 @@ if (conf$run$cctv == TRUE) {
 # # GET RSU UPTIMES ###########################################################
 
 print(glue("{Sys.time()} parse rsu logs [2 of 10]"))
-
-if (conf$run$rsus == TRUE) {
-    # Run python script asynchronously
-    # system("c:/users/ATSPM/miniconda3/python.exe parse_rsus.py", wait = FALSE)
-}
 
 # # TRAVEL TIMES FROM RITIS API ###############################################
 
@@ -138,7 +132,7 @@ if (conf$run$counts == TRUE) {
             counts = TRUE
         )
     } else {
-        lapply(date_range, function(date_) {
+        foreach(date_ = date_range, .errorhandling = "pass") %dopar% {
             get_counts2(
                 date_,
                 bucket = conf$bucket,
@@ -146,7 +140,16 @@ if (conf$run$counts == TRUE) {
                 uptime = TRUE,
                 counts = TRUE
             )
-        })
+        }
+        # lapply(date_range, function(date_) {
+        #     get_counts2(
+        #         date_,
+        #         bucket = conf$bucket,
+        #         conf_athena = conf$athena,
+        #         uptime = TRUE,
+        #         counts = TRUE
+        #     )
+        # })
     }
 }
 

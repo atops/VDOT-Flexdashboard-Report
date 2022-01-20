@@ -3,9 +3,6 @@
 
 suppressMessages({
     library(DBI)
-    #library(rJava)
-    #library(RJDBC)
-    #library(RAthena)
     library(readxl)
     library(readr)
     library(dplyr)
@@ -29,9 +26,6 @@ suppressMessages({
     library(yaml)
     library(utils)
     library(readxl)
-    #library(plotly)
-    #library(crosstalk)
-    #library(reticulate)
     library(runner)
     library(fitdistrplus)
     library(foreach)
@@ -58,19 +52,14 @@ conf$athena$region <- aws_conf$AWS_DEFAULT_REGION
 
 if (Sys.info()["sysname"] == "Windows") {
     home_path <- dirname(path.expand("~"))
-    #python_path <- file.path(home_path, "Miniconda3", "python.exe")
 
 } else if (Sys.info()["sysname"] == "Linux") {
     home_path <- "~"
-    #python_path <- file.path(home_path, "miniconda3", "bin", "python")
 
 } else {
     stop("Unknown operating system.")
 }
 
-#use_python(python_path)
-
-#pqlib <- reticulate::import_from_path("parquet_lib", path = ".")
 
 # Colorbrewer Paired Palette Colors
 LIGHT_BLUE = "#A6CEE3";   BLUE = "#1F78B4"
@@ -95,15 +84,8 @@ SUN = 1; MON = 2; TUE = 3; WED = 4; THU = 5; FRI = 6; SAT = 7
 AM_PEAK_HOURS = conf$AM_PEAK_HOURS
 PM_PEAK_HOURS = conf$PM_PEAK_HOURS
 
-# if (Sys.info()["nodename"] %in% c("GOTO3213490", "Lenny")) { # The SAM or Lenny
-#     set_config(
-#         use_proxy("gdot-enterprise", port = 8080,
-#                   username = Sys.getenv("GDOT_USERNAME"),
-#                   password = Sys.getenv("GDOT_PASSWORD")))
-# 
-# } else { # shinyapps.io
 Sys.setenv(TZ="America/New_York")
-# }
+
 
 get_cor <- function() {
     s3read_using(qs::qread, bucket = "gdot-spm", object = "cor_ec2.qs")
@@ -127,21 +109,12 @@ get_most_recent_monday <- function(date_) {
     date_ + days(1 - lubridate::wday(date_, week_start = 1))
 }
 
-get_usable_cores <- function() {
+get_usable_cores <- function(GB=8) {
     # Usable cores is one per 8 GB of RAM.
     # Get RAM from system file and divide
 
     if (Sys.info()["sysname"] == "Windows") {
         1
-
-        # x <- suppressWarnings(shell('systeminfo | findstr Memory', intern = TRUE))
-
-        # memline <- x[grepl("Total Physical Memory", x)]
-        # mem <- stringr::str_extract(string =  memline, pattern = "\\d+,\\d+")
-        # mem <- as.numeric(gsub(",", "", mem))
-        # mem <- round(mem, -3)
-        # max(floor(mem/8e3), 1)
-
     } else if (Sys.info()["sysname"] == "Linux") {
         x <- readLines('/proc/meminfo')
 
@@ -149,7 +122,7 @@ get_usable_cores <- function() {
         mem <- stringr::str_extract(string =  memline, pattern = "\\d+")
         mem <- as.integer(mem)
         mem <- round(mem, -6)
-        max(floor(mem/8e6), 1)
+        min(max(floor(mem/(GB*1e6)), 1), parallel::detectCores() - 1)
 
     } else {
         stop("Unknown operating system.")
@@ -191,7 +164,6 @@ split_wrapper <- function(FUN) {
         # Read in each temporary file and run adjusted counts in parallel. Afterward, clean up.
         print("Running for each SignalID...")
         df <- mclapply(file_names, mc.cores = usable_cores, FUN = function(fn) {
-            #df <- lapply(file_names, function(fn) {
             cat('.')
             FUN(read_fst(fn), ...)
         }) %>% bind_rows()
@@ -463,7 +435,6 @@ s3_read_parquet_parallel <- function(table_name,
 
 
 aurora_write_parquet <- function(conn, df, date_, table_name) {
-    #conn <- get_aurora_connection()
     fieldnames <- dbListFields(conn, table_name)
 
     # clear existing data for the given table and date
@@ -478,8 +449,6 @@ aurora_write_parquet <- function(conn, df, date_, table_name) {
         table_name,
         select(df, !!!fieldnames),
         overwrite = FALSE, append = TRUE, row.names = FALSE)
-
-    #dbDisconnect(conn)
 }
 
 
@@ -931,7 +900,7 @@ multicore_decorator <- function(FUN) {
     function(x) {
         x %>%
             split(.$SignalID) %>%
-            mclapply(FUN, mc.cores = usable_cores) %>% #floor(parallel::detectCores()*3/4)) %>%
+            mclapply(FUN, mc.cores = usable_cores) %>% 
             bind_rows()
     }
 }
@@ -943,12 +912,6 @@ multicore_decorator <- function(FUN) {
 get_det_config_  <- function(bucket, folder) {
 
     function(date_) {
-        read_det_config <- function(s3object, s3bucket) {
-            aws.s3::s3read_using(read_feather, object = s3object, bucket = s3bucket)
-        }
-
-        # s3bucket <- bucket
-        # s3prefix = glue("{folder}/date={date_}")
 
         tryCatch({
             arrow::open_dataset(
@@ -961,34 +924,9 @@ get_det_config_  <- function(bucket, folder) {
                    Detector = as.integer(Detector),
                    CallPhase = as.integer(CallPhase))
         }, error = function(e) {
-            stop(glue("No detector config file for {date_}"))
+            stop(glue("Problem getting detector config file for {date_}"))
+            print(e)
         })
-
-
-        # # Are there any files for this date?
-        # s3objects <- aws.s3::get_bucket(
-        #     bucket = s3bucket,
-        #     prefix = s3prefix)
-
-        # # If the s3 object exists, read it and return the data frame
-        # if (length(s3objects) == 1) {
-        #     read_det_config(s3objects[1]$Contents$Key, s3bucket) %>%
-        #         mutate(SignalID = as.character(SignalID),
-        #                Detector = as.integer(Detector),
-        #                CallPhase = as.integer(CallPhase))
-
-        # # If the s3 object does not exist, but where there are objects for this date,
-        # # read all files and bind rows (for when multiple ATSPM databases are contributing)
-        # } else if (length(s3objects) > 0) {
-        #     lapply(s3objects, function(x) {
-        #         read_det_config(x$Key, s3bucket)})  %>%
-        #             rbindlist() %>% as_tibble() %>%
-        #                 mutate(SignalID = as.character(SignalID),
-        #                        Detector = as.integer(Detector),
-        #                        CallPhase = as.integer(CallPhase))
-        # } else {
-        #     stop(glue("No detector config file for {date_}"))
-        # }
     }
 }
 
@@ -2474,13 +2412,6 @@ get_monthly_vpd <- function(vpd) {
 
 
 get_monthly_flashevent <- function(flash) {
-    #flash <- filter(flash, DOW %in% c(TUE,WED,THU))
-
-    #ignore EventParam, FlashDuration, Endparam, FlashMode etc. for now
-    # select
-    # filter
-    # arrange
-    # mutate
     flash <- flash %>%
         select(SignalID, Date)
 
@@ -2489,8 +2420,6 @@ get_monthly_flashevent <- function(flash) {
     flash <- flash %>%
         group_by(SignalID, Date) %>%
         summarize(flash = n(), .groups = "drop")
-        # summarise (flash = n()) %>%
-        # ungroup
 
     flash$CallPhase = 0 # set the dummy, 'CallPhase' is used in get_monthly_avg_by_day() function
     get_monthly_avg_by_day(flash, "flash", peak_only = FALSE)
@@ -3369,7 +3298,7 @@ dbUpdateTable <- function(conn, table_name, df, asof = NULL) {
 
 
 
-get_corridor_summary_data <- function(cor) { #}, current_month) {
+get_corridor_summary_data <- function(cor) {
 
     #' Converts cor data set to a single data frame for the current_month
     #' for use in get_corridor_summary_table function
@@ -3379,7 +3308,6 @@ get_corridor_summary_data <- function(cor) { #}, current_month) {
     #' @return A data frame, monthly data of all metrics by Zone and Corridor
 
 
-    #    current_month <- months[order(months)][match(current_month, months.formatted)]
     data <- list(
         rename(cor$mo$du, du.delta = delta), # detector uptime - note that zone group is factor not character
         rename(cor$mo$pau, pau.delta = delta),
@@ -3389,26 +3317,23 @@ get_corridor_summary_data <- function(cor) { #}, current_month) {
         rename(cor$mo$aogd, aog.delta = delta),
         rename(cor$mo$qsd, qs.delta = delta),
         rename(cor$mo$sfd, sf.delta = delta)
-        #cor$mo$tti,
-        #cor$mo$pti,
+        cor$mo$tti,
+        cor$mo$pti,
         #cor$mo$tasks #tasks added 10/29/19
     ) %>%
         reduce(left_join, by = c("Zone_Group", "Corridor", "Month")) %>%
         filter(
             grepl("^Zone", Zone_Group),
             !grepl("^Zone", Corridor)#,
-            #Month == ymd(current_month)
         ) %>%
         select(
             -uptime.sb,
             -uptime.pr,
-            #-num,
             -starts_with("ones"),
             -starts_with("cycles"),
             -starts_with("pct"),
             -starts_with("vol"),
             -starts_with("Description")
-            #-c(All,Reported,Resolved,cum_Reported,cum_Resolved,delta.rep,delta.res) #tasks added 10/29/19
         )
     return(data)
 }
@@ -3429,7 +3354,6 @@ get_ped_delay <- function(date_, conf, signals_list, parallel = FALSE) {
                 # all 45/21/22/132 events
                 pe <- s3_read_parquet(bucket = s3bucket, object = s3object) %>%
                     filter(EventCode %in% (c(45, 21, 22, 132))) %>%
-                    select(-c(Date, DeviceID)) %>%
                     mutate(CycleLength = ifelse(EventCode == 132, EventParam, NA)) %>%
                     arrange(Timestamp) %>%
                     tidyr::fill(CycleLength) %>%
@@ -3988,8 +3912,6 @@ get_map_data <- function() {
     corridor_colors <- rtop_corridors %>% 
         mutate(
             color = rep(corridor_palette, ceiling(num_corridors/8))[1:num_corridors]) %>%
-        #color = rep(RColorBrewer::brewer.pal(7, "Dark2"),
-        #            ceiling(num_corridors/7))[1:num_corridors]) %>%
         bind_rows(data.frame(Corridor = c("None"), color = GRAY)) %>%
         mutate(Corridor = factor(Corridor))
     
@@ -4146,8 +4068,7 @@ get_adjusted_counts_split <- function(filtered_counts) {
         #hourly volumes over the month to fill in missing data for all detectors in a phase
         mo_hrly_vols <- fc_phc %>%
             group_by(SignalID, CallPhase, Detector, DOW, Month_Hour) %>% 
-            summarize(Hourly_Volume = median(vol, na.rm = TRUE), .groups = "drop") #%>%
-        #ungroup()
+            summarize(Hourly_Volume = median(vol, na.rm = TRUE), .groups = "drop") 
         # SignalID | Call.Phase | Detector | Month_Hour | Volume(median)
         
         # fill in missing detectors by hour and day of week volume in the month
@@ -4226,62 +4147,6 @@ get_flash_events <- function(conf_athena, start_date, end_date) {
 }
 
 
-# flashes['Month'] = flashes.TimeStamp.dt.strftime('%Y-%m-01')
-# 
-# fmt = (flashes.rename(columns={'TimeStamp': 'Events'})
-#        .groupby(['SignalID','Month','EventParam'])[['Events']]
-#        .count()
-#        .unstack(fill_value=0))
-# fmt['all'] = fmt.sum(axis=1)
-# fmt['MeanDuration'] = flashes.groupby(['SignalID','Month'])[['FlashDuration']].mean()
-# fmt.reset_index().to_csv('flash_averages_by_month.csv')
-# # ----
-# fmt = (flashes.rename(columns={'TimeStamp': 'Events'})
-#        .groupby(['SignalID','EventParam'])[['Events']]
-#        .count()
-#        .unstack(fill_value=0))
-# fmt['all'] = fmt.sum(axis=1)
-# fmt['MeanDuration'] = flashes.groupby(['SignalID'])[['FlashDuration']].mean()
-# fmt.reset_index().to_csv('flash_averages.csv')
-
-
-# '''
-# # R Code to finish up
-# 
-# fe <- read_csv("c:/Users/alan.toppen/Code/GDOT/flash_events.csv") %>% 
-#     select(-X1) %>% 
-#     mutate_at(vars(-c(TimeStamp, FlashDuration)), as.integer) %>% 
-#     arrange(SignalID, TimeStamp)
-# fe %>% write_csv("flash_events_2019.csv")
-# 
-# 
-# fa <- read_csv("c:/Users/alan.toppen/Code/GDOT/flash_averages.csv") %>% 
-#     rename(
-#         FaultMonitor = Events, 
-#         MMU = Events_1, 
-#         Startup = Events_2, 
-#         Preempt = Events_3) %>% 
-#     filter(X1 != "EventParam") %>% 
-#     select(-X1) %>% 
-#     mutate_at(vars(-MeanDuration), as.integer) %>% 
-#     arrange(desc(all))
-# fa %>% write_csv("flash_averages_2019.csv")
-# 
-# 
-# fam <- read_csv("c:/Users/alan.toppen/Code/GDOT/flash_averages_by_month.csv") %>% 
-#     rename(
-#         FaultMonitor = Events, 
-#         MMU = Events_1, 
-#         Startup = Events_2, 
-#         Preempt = Events_3) %>% 
-#     filter(X1 != "EventParam") %>% 
-#     select(-X1) %>% 
-#     mutate_at(vars(-c(Month, MeanDuration)), as.integer)
-# fam %>% write_csv("flash_averages_by_month_2019.csv")
-# '''
-
-
-
 fitdist_trycatch <- function(x, ...) {
     tryCatch({
         fitdist(x, ...)
@@ -4327,17 +4192,7 @@ get_latest_det_config <- function() {
             det_config <- s3read_using(arrow::read_feather, 
                                        bucket = "gdot-devices", 
                                        object = x$Contents$Key
-            )# %>% 
-                # filter(!is.na(ApproachDesc)) %>%
-                # transmute(
-                #     SignalID = factor(SignalID), 
-                #     Description = paste(trimws(PrimaryName), trimws(SecondaryName), sep = " & "), 
-                #     CallPhase, 
-                #     Detector, 
-                #     ApproachDesc, 
-                #     LaneNumber,
-                #     Type = factor(Name), 
-                #     Selector = paste0(Detector, ": ", ApproachDesc, " Lane ", LaneNumber, "/", Type))
+            )
             break
         } else {
             date_ <- date_ - days(1)

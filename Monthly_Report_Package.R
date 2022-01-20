@@ -169,6 +169,7 @@ tryCatch({
 
     if (nrow(bad_detectors)) {
         s3_upload_parquet_date_split(
+            bad_detectors,
             bucket = conf$bucket,
             prefix = "bad_ped_detectors",
             table_name = "bad_ped_detectors",

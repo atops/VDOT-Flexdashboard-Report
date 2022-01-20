@@ -2,12 +2,28 @@
 
 
 echo $(date)
-cd /home/atoppen/Code/VDOT/VDOT-Flexdashboard-Report
 
-Rscript Monthly_Report_Calcs.R
+# This is the new AWS-oriented VDOT code. For multiple regions.
+# Maps closely to GDOT.
+# Run in parallel with VDOT-Flexdashboard-Report local code, until stable.
+
+echo ---------------------------------------
+echo --- RUN R SCRIPTS - NEWER VDOT CODE --- 
+echo
+
+echo --- Pull ATSPM DATA
+# This is done on the local VDOT server and pushed to S3
+# ~/miniconda3/bin/python pull_atspm_data.py
+
+
+echo --- R Scripts
+cd /home/atoppen/Code/VDOT/scheduled_tasks
+Rscript Monthly_Report_Calcs_ec2.R
 Rscript Monthly_Report_Package.R
 
-aws s3 sync . s3://vdot-spm/dashboard --exclude "*.*" --include "ATSPM_Det*.csv"
-aws s3 sync . s3://vdot-spm/dashboard --exclude "*.*" --include "*.fst"
 
-#../flush_dns.sh 
+echo --- Watchdog
+# Ideally this would run at 7am or so to capture today's ATSPM watchdogs.
+~/miniconda3/bin/python get_watchdog_alerts.py
+Rscript get_alerts.R
+
