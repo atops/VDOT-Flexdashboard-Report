@@ -74,11 +74,6 @@ conf <- read_yaml("Monthly_Report.yaml")
 
 alerts <- get_alerts(conf)
 
-s3saveRDS(
-    alerts, 
-    bucket = conf$bucket, 
-    object = "mark/watchdog/alerts.rds",
-    opts = list(multipart = TRUE))
 s3write_using(
     alerts, 
     qs::qsave, 

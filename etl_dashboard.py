@@ -27,17 +27,13 @@ from spm_events import etl_main
 from parquet_lib import read_parquet_file
 
 
-s3 = boto3.client('s3', verify=False)
-ath = boto3.client('athena', verify=False)
-
-
 '''
     df:
         SignalID [int64]
         TimeStamp [datetime]
         EventCode [str or int64]
         EventParam [str or int64]
-    
+
     det_config:
         SignalID [int64]
         IP [str]
@@ -52,88 +48,65 @@ def etl2(s, date_, det_config, conf):
     date_str = date_.strftime('%Y-%m-%d')
 
     det_config_good = det_config[det_config.SignalID==s]
-    
+
     start_date = date_
     end_date = date_ + pd.DateOffset(days=1) - pd.DateOffset(seconds=0.1)
-    
-    
+
+
     t0 = time.time()
     
-    print('{} | {} Starting...'.format(s, date_str))
-
     try:
-        #print('|{} reading from database...'.format(s)) 
-        key = 'atspm/date={d}/atspm_{s}_{d}.parquet'.format(s = s, d = date_str)
+        key = f'atspm/date={date_str}/atspm_{s}_{date_str}.parquet'
         df = read_parquet_file(conf['bucket'], key)
         
     
         if len(df)==0:
-            print('|{} no event data for this signal on {}.'.format(s, date_str))
-    
+            print(f'{date_str} | {s} | No event data for this signal')
+
+
         if len(det_config_good)==0:
-            print('|{} no detector configuration data for this signal on {}.'.format(s, date_str))
-            
+            print(f'{date_str} | {s} | No detector configuration data for this signal')
+
         if len(df) > 0 and len(det_config_good) > 0:
-    
-            #print('|{} creating cycles and detection events...'.format(s))
+
             c, d = etl_main(df, det_config_good)
 
             if len(c) > 0 and len(d) > 0:
-    
-                # c.to_parquet(f's3://{conf["bucket"]}/cycles/date={date_str}/cd_{s}_{date_str}.parquet', 
-                #              allow_truncated_timestamps=True)
-    
-                # d.to_parquet(f's3://{conf["bucket"]}/detections/date={date_str}/de_{s}_{date_str}.parquet', 
-                #              allow_truncated_timestamps=True)
 
-                with io.BytesIO() as data: 
-                    c.to_parquet(data, allow_truncated_timestamps=True, use_deprecated_int96_timestamps=True)
-                    data.seek(0)
-                    s3.upload_fileobj(
-                        Fileobj=data,
-                        Bucket=conf["bucket"],
-                        Key=f'cycles/date={date_str}/cd_{s}_{date_str}.parquet')
+                c.to_parquet(f's3://{conf["bucket"]}/cycles/date={date_str}/cd_{s}_{date_str}.parquet',
+                             allow_truncated_timestamps=True)
 
-                with io.BytesIO() as data: 
-                    d.to_parquet(data, allow_truncated_timestamps=True, use_deprecated_int96_timestamps=True)
-                    data.seek(0)
-                    s3.upload_fileobj(
-                        Fileobj=data,
-                        Bucket=conf["bucket"],
-                        Key=f'detections/date={date_str}/de_{s}_{date_str}.parquet')
-    
-                print('{}: {} seconds'.format(s, round(time.time()-t0, 1)))
+                d.to_parquet(f's3://{conf["bucket"]}/detections/date={date_str}/de_{s}_{date_str}.parquet',
+                             allow_truncated_timestamps=True)
+
             else:
-                print('{}: {} seconds -- no cycles'.format(s, round(time.time()-t0, 1)))
-        
-    
+                print(f'{date_str} | {s} | No cycles')
+
+
     except Exception as e:
         print(s, e)
 
 
-        
-        
-    
 
 
 def main(start_date, end_date):
-  
-    
+
+
     with open('Monthly_Report.yaml') as yaml_file:
         conf = yaml.load(yaml_file, Loader=yaml.Loader)
-    
+
     #-----------------------------------------------------------------------------------------
     # Placeholder for manual override of start/end dates
     # start_date = '2021-05-04'
     # end_date = '2021-05-04'
     #-----------------------------------------------------------------------------------------
-    
+
     dates = pd.date_range(start_date, end_date, freq='1D')
 
     corridors_filename = re.sub('\..*', '.feather', conf['corridors_filename_s3'])
     corridors = pd.read_feather(corridors_filename)
     corridors = corridors[~corridors.SignalID.isna()]
-    
+
     signalids = list(corridors.SignalID.astype('int').values)
     # signalids = list(corridors.SignalID.values)
     
@@ -163,7 +136,6 @@ def main(start_date, end_date):
                 s3.download_fileobj(
                     Bucket=bucket, 
                     Key=key, Fileobj=data)  
-                     # f'atspm_det_config_good/date={date_str}/ATSPM_Det_Config_Good_Ozark.feather', Fileobj=data)
 
                 det_config_raw = (pd.read_feather(data)
                     .assign(SignalID = lambda x: x.SignalID.astype('int64'))
@@ -209,16 +181,16 @@ def main(start_date, end_date):
             ncores = 1  # os.cpu_count()
 
             #-----------------------------------------------------------------------------------------
-            with Pool(processes=ncores * 4) as pool: #24
+            with Pool(processes=ncores * 24) as pool: #24
                 pool.starmap_async(
                     etl2, list(itertools.product(signalids, [date_], [det_config], [conf])), chunksize=ncores*4-1)
                 pool.close()
                 pool.join()
             #-----------------------------------------------------------------------------------------
         else:
-            print('No good detectors. Skip this day.') 
-        
-    print('\n{} signals in {} days. Done in {} minutes'.format(len(signalids), len(dates), int((time.time()-t0)/60)))
+            print('No good detectors. Skip this day.')
+
+    print(f'{len(signalids)} signals in {len(dates)} days. Done in {int((time.time()-t0)/60)} minutes')
 
 
     # Add a partition for each day
@@ -228,22 +200,22 @@ def main(start_date, end_date):
 
         response_repair_cycledata = ath.start_query_execution(
             QueryString=f"ALTER TABLE cycledata ADD PARTITION (date = '{date_str}');",
-            QueryExecutionContext={'Database': 'gdot_spm'},
-            ResultConfiguration={'OutputLocation': 's3://gdot-spm-athena'})
+            QueryExecutionContext={'Database': conf['athena']['database']},
+            ResultConfiguration={'OutputLocation': conf['athena']['staging_dir']})
 
         response_repair_detection_events = ath.start_query_execution(
             QueryString=f"ALTER TABLE detectionevents ADD PARTITION (date = '{date_str}');",
-            QueryExecutionContext={'Database': 'gdot_spm'},
-            ResultConfiguration={'OutputLocation': 's3://gdot-spm-athena'})
+            QueryExecutionContext={'Database': conf['athena']['database']},
+            ResultConfiguration={'OutputLocation': conf['athena']['staging_dir']})
 
 
     # Check if the partitions for the last day were successfully added before moving on
     while True:
         response1 = s3.list_objects(
-            Bucket='gdot-spm-athena',
+            Bucket=os.path.basename(conf['athena']['staging_dir']),
             Prefix=response_repair_cycledata['QueryExecutionId'])
         response2 = s3.list_objects(
-            Bucket='gdot-spm-athena',
+            Bucket=os.path.basename(conf['athena']['staging_dir']),
             Prefix=response_repair_detection_events['QueryExecutionId'])
 
         if 'Contents' in response1 and 'Contents' in response2:
@@ -254,11 +226,14 @@ def main(start_date, end_date):
             print('.', end='')
 
 
-
 if __name__=='__main__':
-    
+
     with open('Monthly_Report.yaml') as yaml_file:
         conf = yaml.load(yaml_file, Loader=yaml.Loader)
+
+
+	s3 = boto3.client('s3', verify=conf['ssl_cert'])
+	ath = boto3.client('athena', verify=conf['ssl_cert'])
 
 
     if len(sys.argv) > 1:
@@ -267,10 +242,10 @@ if __name__=='__main__':
     else:
         start_date = conf['start_date']
         end_date = conf['end_date']
-    
-    if start_date == 'yesterday': 
+
+    if start_date == 'yesterday':
         start_date = (datetime.today() - timedelta(days=1)).strftime('%Y-%m-%d')
-    if end_date == 'yesterday': 
+    if end_date == 'yesterday':
         end_date = (datetime.today() - timedelta(days=1)).strftime('%Y-%m-%d')
 
     main(start_date, end_date)

@@ -22,8 +22,6 @@ import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
-ath = boto3.client('athena', verify=False)
-s3 = boto3.client('s3', verify=False)
 pp = pprint.PrettyPrinter()
 
 
@@ -249,6 +247,10 @@ if __name__=='__main__':
     
     with open('Monthly_Report.yaml') as yaml_file:
         conf = yaml.load(yaml_file, Loader=yaml.Loader)
+
+
+	ath = boto3.client('athena', verify=conf['ssl_cert'])
+	s3 = boto3.client('s3', verify=conf['ssl_cert'])
 
 
     if len(sys.argv) > 1:

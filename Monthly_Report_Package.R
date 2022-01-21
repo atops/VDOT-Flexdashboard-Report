@@ -264,6 +264,7 @@ tryCatch({
     print(e)
 })
 
+
 # # WATCHDOG ###########################################################
 
 print(glue("{Sys.time()} watchdog alerts [3 of 23]"))
@@ -654,9 +655,8 @@ tryCatch({
     # Group into corridors --------------------------------------------------------
     cor_weekly_vpd <- get_cor_weekly_vpd(weekly_vpd, corridors)
     # Subcorridors
-    sub_weekly_vpd <-
-        (get_cor_weekly_vpd(weekly_vpd, subcorridors) %>%
-             filter(!is.na(Corridor)))
+    sub_weekly_vpd <- get_cor_weekly_vpd(weekly_vpd, subcorridors) %>%
+             filter(!is.na(Corridor))
 
     # Monthly volumes for bar charts and % change ---------------------------------
     monthly_vpd <- get_monthly_vpd(vpd)
@@ -664,9 +664,8 @@ tryCatch({
     # Group into corridors
     cor_monthly_vpd <- get_cor_monthly_vpd(monthly_vpd, corridors)
     # Subcorridors
-    sub_monthly_vpd <-
-        (get_cor_monthly_vpd(monthly_vpd, subcorridors) %>%
-             filter(!is.na(Corridor)))
+    sub_monthly_vpd <- get_cor_monthly_vpd(monthly_vpd, subcorridors) %>%
+             filter(!is.na(Corridor))
 
     # Monthly % change from previous month by corridor ----------------------------
     addtoRDS(weekly_vpd, "weekly_vpd.rds", "vpd", report_start_date, wk_calcs_start_date)
@@ -1587,7 +1586,7 @@ tryCatch({
             readRDS("monthly_vph_peak.rds"), cor$mo$vphp,
             function(x, y) {
                 sigify(x, y, corridors) %>%
-                    select(-c(Name, ones))  #, Zone))
+                    select(-c(Name, ones))
             }
         ),
         "papd" = sigify(readRDS("monthly_papd.rds"), cor$mo$papd, corridors) %>%

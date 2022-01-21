@@ -127,9 +127,8 @@ def get_corridor_travel_times(df, corr_grouping, bucket, table_name):
     def uf(df):
         date_string = df.date.values[0]
         filename = 'travel_times_{}.parquet'.format(date_string)
-        df.drop(columns=['date'])\
-            .to_parquet('s3://{b}/mark/{t}/date={d}/{f}'.format(
-                    b=bucket, t=table_name, d=date_string, f=filename))
+        df = df.drop(columns=['date'])
+        df.to_parquet(f's3://{bucket}/mark/{table_name}/date={date_string}/{filename}')
          
     # Write to parquet files and upload to S3
     df.groupby(['date']).apply(uf)
@@ -155,9 +154,8 @@ def get_corridor_travel_time_metrics(df, corr_grouping, bucket, table_name):
     def uf(df): # upload parquet file
         date_string = df.date.values[0]
         filename = 'travel_time_metrics_{}.parquet'.format(date_string)
-        df.drop(columns=['date'])\
-            .to_parquet('s3://{b}/mark/{t}/date={d}/{f}'.format(
-                    b=bucket, t=table_name, d=date_string, f=filename))
+        df = df.drop(columns=['date'])
+        df.to_parquet(f's3://{bucket}/mark/{table_name}/date={date_string}/{filename}')
             
     # Write to parquet files and upload to S3
     summ_df.reset_index().assign(date = lambda x: x.Hour.dt.date).groupby(['date']).apply(uf)
@@ -242,11 +240,8 @@ if __name__=='__main__':
         get_corridor_travel_times(
             df, ['Corridor', 'Subcorridor'], conf['bucket'], sub_table)
             
-       
-        # months = list(set([pd.Timestamp(d).strftime('%Y-%m') for d in (start_date, end_date)]))
-        month_start_dates = pd.date_range(start_date, end_date, freq='MS')
-        months = sorted(list(set([pd.Timestamp(d).strftime('%Y-%m') for d in month_start_dates])))
-
+        months = list(set([pd.Timestamp(d).strftime('%Y-%m') for d in pd.date_range(start_date, end_date, freq='D')]))
+ 
         for yyyy_mm in months:
             try:
                 df = dd.read_parquet(f"s3://{conf['bucket']}/mark/{cor_table}/date={yyyy_mm}-*/*").compute()

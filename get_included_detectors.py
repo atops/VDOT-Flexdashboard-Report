@@ -28,13 +28,15 @@ def get_incld(conn, query, date_):
     print('{} sec'.format(time.time() - t0))
     return df
 
-def get_included_detectors(engine):
+def get_included_detectors(engine, date_string):
 
     #with open('Monthly_Report.yaml') as yaml_file:
     #    conf = yaml.load(yaml_file, yaml.Loader)
 
-    start_date = (datetime.today() - timedelta(days=365)).strftime('%Y-%m-%d')
-    end_date = (datetime.today() - timedelta(days=1)).strftime('%Y-%m-%d')
+    end_date = datetime.strptime(date_string, '%Y-%m-%d')
+    start_date = (end_date - timedelta(days=365)).strftime('%Y-%m-%d')
+    end_date = end_date.strftime('%Y-%m-%d')
+
     dates = pd.date_range(start_date, end_date, freq='3D')
 
     query = """SELECT DISTINCT SignalID, EventParam as Detector

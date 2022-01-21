@@ -24,7 +24,7 @@ def get_det_config(ad, engine, date_string):
     #  SignalID/Detector pairs with vol > 0 over the past year
     #  over a sample of dates between 8am-9am
 
-    incld = get_included_detectors(engine).assign(index = 1)
+    incld = get_included_detectors(engine, date_string).assign(index = 1)
     incld.reset_index().to_feather('included_detectors.feather')
     #incld = pd.read_feather('included_detectors.feather').set_index(['SignalID','Detector'])
 
@@ -68,9 +68,7 @@ def get_det_config(ad, engine, date_string):
     return det_config
 
 
-def nightly_config(engine, date_):
-    s3 = boto3.client('s3', verify=False)
-
+def nightly_config(engine, date_, BUCKET, REGION):
     date_string = date_.strftime('%Y-%m-%d')
 
     print("ATSPM Vehicle Detectors [1 of 3]")
@@ -115,21 +113,27 @@ if __name__=='__main__':
     BUCKET = conf['bucket']
     REGION = conf['region']
 
+    s3 = boto3.client('s3', verify=conf['ssl_cert'])
         
     
-    # engine = sq.create_engine(f'mssql+pyodbc://{uid}:{pwd}@{dsn}')
-    engine = get_atspm_engine(cred['ATSPM_UID'], cred['ATSPM_PWD'], dsn = cred['ATSPM_DSN'])
-
+    engine = get_atspm_engine(
+        username=cred['ATSPM_UID'], 
+        password=cred['ATSPM_PWD'], 
+        hostname=cred['ATSPM_HOST'], 
+        database=cred['ATSPM_DB'],
+        dsn=cred['ATSPM_DSN'])
+        
+    #"""
     date_ = datetime.today()
-    nightly_config(engine, date_)
+    nightly_config(engine, date_, BUCKET, REGION)
 
 
     # Code to go back and calculate past days
     """
-    dates = pd.date_range('2020-10-14', '2021-09-08', freq='1D')
+    dates = pd.date_range('2021-12-15', '2022-01-18', freq='1D')
 
     for date_ in dates:
         print(date_)
-        nightly_config(engine, date_)
+        nightly_config(engine, date_, BUCKET, REGION)
     """
-    
+    #"""

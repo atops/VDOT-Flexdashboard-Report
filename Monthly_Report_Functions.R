@@ -12,7 +12,7 @@ suppressMessages({
     library(lubridate)
     library(glue)
     library(data.table)
-    #library(formattable)
+    library(formattable)
     library(forcats)
     library(fst)
     library(parallel)
@@ -32,7 +32,6 @@ suppressMessages({
     library(arrow)
     # https://arrow.apache.org/install/
     library(qs)
-    library(DBI)
 })
 
 
@@ -687,7 +686,6 @@ get_uptime <- function(df, start_date, end_time) {
 
 
 get_counts <- function(df, det_config, units = "hours", date_, event_code = 82, TWR_only = FALSE) {
-
 
     if (lubridate::wday(date_, label = TRUE) %in% c("Tue", "Wed", "Thu") || (TWR_only == FALSE)) {
 
@@ -3316,10 +3314,9 @@ get_corridor_summary_data <- function(cor) {
         rename(cor$mo$tp, tp.delta = delta), # no longer pulling from vpd (volume) table - this is throughput
         rename(cor$mo$aogd, aog.delta = delta),
         rename(cor$mo$qsd, qs.delta = delta),
-        rename(cor$mo$sfd, sf.delta = delta)
+        rename(cor$mo$sfd, sf.delta = delta),
         cor$mo$tti,
-        cor$mo$pti,
-        #cor$mo$tasks #tasks added 10/29/19
+        cor$mo$pti
     ) %>%
         reduce(left_join, by = c("Zone_Group", "Corridor", "Month")) %>%
         filter(

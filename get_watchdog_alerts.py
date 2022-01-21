@@ -21,10 +21,6 @@ import io
 
 from pull_atspm_data import get_atspm_engine
 
-s3 = boto3.client('s3', verify=False)
-ath = boto3.client('athena', verify=False)
-s3r = boto3.resource('s3', verify=False)
-
 
 # Not used. Kept because I don't want to have to rewrite it.
 def query_athena(query, database, output_bucket):
@@ -73,12 +69,12 @@ def get_corridors(bucket, key):
 
 
 # Upload watchdog alerts to predetermined location in S3
-def s3_upload_watchdog_alerts(df, bucket):
+def s3_upload_watchdog_alerts(df, bucket, region):
 
-    feather_filename = 'SPMWatchDogErrorEvents.feather'
+    feather_filename = f'SPMWatchDogErrorEvents_{region}.feather'
     zipfile_filename = feather_filename + '.zip'
 
-    df.to_feather(feather_filename)
+    df.reset_index(drop=True).to_feather(feather_filename)
 
     # Compress file
     zf = zipfile.ZipFile(zipfile_filename, 'w', zipfile.ZIP_DEFLATED)
@@ -147,11 +143,24 @@ def main():
 
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
+    with open('Monthly_Report_AWS.yaml') as yaml_file:
+        cred = yaml.load(yaml_file, Loader=yaml.Loader)
+    
     with open('Monthly_Report.yaml') as yaml_file:
         conf = yaml.load(yaml_file, Loader=yaml.Loader)
 
+	s3 = boto3.client('s3', verify=conf['ssl_cert'])
+	ath = boto3.client('athena', verify=conf['ssl_cert'])
+	s3r = boto3.resource('s3', verify=conf['ssl_cert'])
+
     try:
-        engine = get_atspm_engine()
+        engine = get_atspm_engine(
+            username=cred['ATSPM_UID'], 
+            password=cred['ATSPM_PWD'], 
+            hostname=cred['ATSPM_HOST'], 
+            database=cred['ATSPM_DB'],
+            dsn=cred['ATSPM_DSN'])
+
         corridors = get_corridors(
                 conf['bucket'],
                 conf['corridors_filename_s3'].replace('.xlsx','.feather'))
@@ -161,7 +170,7 @@ def main():
 
         try:
             # Write to Feather file - WatchDog
-            s3_upload_watchdog_alerts(wd, conf['bucket'])
+            s3_upload_watchdog_alerts(wd, conf['bucket'], conf['region'])
             print('{now} - successfully uploaded to s3'.format(now=now))
         except Exception as e:
             print('{now} - ERROR: Could not upload to s3 - {err}'.format(now=now, err=e))

@@ -15,8 +15,6 @@ from datetime import datetime, timedelta
 # Updated version that gets detector priority for counts
 def get_atspm_detectors(engine, date=None):
 
-    # engine = sq.create_engine('mssql+pyodbc://ATSPM:Trafficisgreat!@MOE64', pool_size=20)
-
     with engine.connect() as conn:
 
         detectiontypedetectors = pd.read_sql_table('DetectionTypeDetector', con=conn)
@@ -104,8 +102,6 @@ def get_atspm_detectors(engine, date=None):
 
 def get_atspm_ped_detectors(engine, date=None):
 
-    # engine = sq.create_engine('mssql+pyodbc://ATSPM:Trafficisgreat!@MOE64', pool_size=20)
-
     if date is not None:
         start_date = (date - timedelta(days=180)).strftime('%Y-%m-%d')
     else:
@@ -125,18 +121,7 @@ def get_atspm_ped_detectors(engine, date=None):
     return df.reset_index()
 
 
-# --- Temp to backfill ---
-# import boto3
-# 
-# def get_atspm_ped_detectors(engine, date=None):
-#     s3 = boto3.client('s3', verify=False)
-#     s3.download_file(
-#         Bucket='springfield-spm', 
-#         Key='atspm_ped_config/date=2021-02-18/ATSPM_Ped_Config_Ozark.feather', 
-#         Filename='apc_2021-02-18.feather')
-#     apc = pd.read_feather('apc_2021-02-18.feather')
-#     return apc
-# --- Temp to backfill ---
+
 
 if __name__ == '__main__':
 

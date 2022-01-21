@@ -22,6 +22,7 @@ import itertools
 import boto3
 import yaml
 import pprint
+import urllib.parse
 
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -47,8 +48,13 @@ pp = pprint.PrettyPrinter()
 '''
 
 
-def get_atspm_engine(uid, pwd, dsn):
-    engine = sq.create_engine(f'mssql+pyodbc://{uid}:{pwd}@{dsn}', pool_size=20)
+def get_atspm_engine(username, password, hostname = None, database = None, dsn = None):
+    password = urllib.parse.quote_plus(password)
+    if dsn is None:
+        engine = sq.create_engine(rf'mssql+pymssql://{username}:{password}@{hostname}/{database}')
+    else:
+        # Should probably add some error handling here
+        engine = sq.create_engine(rf'mssql+pyodbc://{username}:{password}@{dsn}')
     return engine
 
 
@@ -103,8 +109,6 @@ def pull_raw_atspm_data(s, date_, engine):
         print('{} | {} Starting...'.format(s, date_str))
 
         try:
-            # engine = get_atspm_engine()
-
             with engine.connect() as conn:
                 df = pd.read_sql(
                     sql=query.format(
@@ -145,83 +149,89 @@ def pull_raw_atspm_data(s, date_, engine):
 
 
 if __name__ == '__main__':
+    try:
+        with open('Monthly_Report_AWS.yaml') as yaml_file:
+            cred = yaml.load(yaml_file, Loader=yaml.Loader)
 
-    with open('Monthly_Report_AWS.yaml') as yaml_file:
-        cred = yaml.load(yaml_file, Loader=yaml.Loader)
+        engine = get_atspm_engine(
+            username=cred['ATSPM_UID'], 
+            password=cred['ATSPM_PWD'], 
+            hostname=cred['ATSPM_HOST'], 
+            database=cred['ATSPM_DB'],
+            dsn=cred['ATSPM_DSN'])
 
-    engine = get_atspm_engine(uid=cred['ATSPM_UID'], pwd=cred['ATSPM_PWD'], dsn=cred['ATSPM_DSN'])
+        with engine.connect() as conn:
+            Signals = pd.read_sql_table('Signals', conn)
 
-    with engine.connect() as conn:
-        Signals = pd.read_sql_table('Signals', conn)
+        with open('Monthly_Report.yaml') as yaml_file:
+            conf = yaml.load(yaml_file, Loader=yaml.FullLoader)
 
-    with open('Monthly_Report.yaml') as yaml_file:
-        conf = yaml.load(yaml_file, Loader=yaml.FullLoader)
-
-    BUCKET=conf['bucket']
-    DATABASE=conf['athena']['database']
-    ATHENA_OUTPUT_BUCKET=conf['athena']['staging_dir']
-
-
-    s3 = boto3.client('s3', region_name=cred['AWS_DEFAULT_REGION'], verify=False)
-    ath = boto3.client('athena', region_name=cred['AWS_DEFAULT_REGION'], verify=False)
-
-
-    if len(sys.argv) == 3:
-        start_date = sys.argv[1]
-        end_date = sys.argv[2]
-
-    elif len(sys.argv) == 2:
-        start_date = sys.argv[1]
-        end_date = sys.argv[1]
-
-    elif len(sys.argv) == 1:
-        start_date = 'yesterday'  # conf['start_date']
-        if start_date == 'yesterday':
-            start_date = datetime.today().date() - timedelta(days=1)
-            while True:
-                response = s3.list_objects_v2(Bucket=BUCKET,
-                                              Prefix="atspm/date={}".format(start_date.strftime('%Y-%m-%d')))
-                if response['KeyCount'] > 0:
-                    start_date = (start_date + timedelta(days=1))
-                    break
-                else:
-                    start_date = start_date - timedelta(days=1)
-            start_date = min(start_date, datetime.today().date() - timedelta(days=1))
-        end_date = 'yesterday'  # conf['end_date']
-        if end_date == 'yesterday':
-            end_date = (datetime.today().date() - timedelta(days=1))
-
-    else:
-        sys.exit("Too many command line arguments")
-    
-    # Placeholder for manual override of start/end dates
-    #start_date = '2020-01-01'
-    #end_date = '2020-05-11'
-
-    dates = pd.date_range(start_date, end_date, freq='1D')
+        BUCKET=conf['bucket']
+        DATABASE=conf['athena']['database']
+        ATHENA_OUTPUT_BUCKET=conf['athena']['staging_dir']
 
 
-    #signalids = list(Signals[Signals.SignalID != 'null'].SignalID.astype('int').values)
-    signalids = [s.lstrip('0') for s in Signals.SignalID.values]
-    #signalids = list(Signals.SignalID.values)
+        s3 = boto3.client('s3', verify=conf['ssl_cert'])
+        ath = boto3.client('athena', verify=conf['ssl_cert'])
 
-    t0 = time.time()
-    for date_ in dates:
-        procs = 2 # min(os.cpu_count()*2, 16)
-        with Pool(processes=procs) as pool: #18
-            pool.starmap_async(pull_raw_atspm_data, list(itertools.product(signalids, [date_], [engine])))
-            pool.close()
-            pool.join()
 
-        partition_query = '''ALTER TABLE atspm ADD PARTITION (date="{d}")
-                             location "s3://{b}/atspm/date={d}/"'''.format(b=BUCKET, d=date_.date())
+        if len(sys.argv) == 3:
+            start_date = sys.argv[1]
+            end_date = sys.argv[2]
 
-        print('Update Athena partitions:')
-        response = ath.start_query_execution(
-                QueryString = partition_query,
-                QueryExecutionContext={'Database': DATABASE},
-                ResultConfiguration={'OutputLocation': ATHENA_OUTPUT_BUCKET})
-        pp.pprint(response)
+        elif len(sys.argv) == 2:
+            start_date = sys.argv[1]
+            end_date = sys.argv[1]
 
-    print('\n{} signals in {} days. Done in {} minutes'.format(len(signalids), len(dates), int((time.time()-t0)/60)))
+        elif len(sys.argv) == 1:
+            start_date = conf['start_date']
+            if start_date == 'yesterday':
+                start_date = datetime.today().date() - timedelta(days=1)
+                while True:
+                    response = s3.list_objects_v2(Bucket=BUCKET,
+                                                  Prefix="atspm/date={}".format(start_date.strftime('%Y-%m-%d')))
+                    if response['KeyCount'] > 0:
+                        start_date = (start_date + timedelta(days=1))
+                        break
+                    else:
+                        start_date = start_date - timedelta(days=1)
+                start_date = min(start_date, datetime.today().date() - timedelta(days=1))
+            end_date = conf['end_date']
+            if end_date == 'yesterday':
+                end_date = (datetime.today().date() - timedelta(days=1))
 
+        else:
+            sys.exit("Too many command line arguments")
+        
+        # Placeholder for manual override of start/end dates
+        #start_date = '2020-01-01'
+        #end_date = '2020-05-11'
+
+        dates = pd.date_range(start_date, end_date, freq='1D')
+
+
+        #signalids = list(Signals[Signals.SignalID != 'null'].SignalID.astype('int').values)
+        signalids = [s.lstrip('0') for s in Signals.SignalID.values]
+        #signalids = list(Signals.SignalID.values)
+
+        t0 = time.time()
+        for date_ in dates:
+            procs = 2 # min(os.cpu_count()*2, 16)
+            with Pool(processes=procs) as pool: #18
+                pool.starmap_async(pull_raw_atspm_data, list(itertools.product(signalids, [date_], [engine])))
+                pool.close()
+                pool.join()
+
+            partition_query = '''ALTER TABLE atspm ADD PARTITION (date="{d}")
+                                 location "s3://{b}/atspm/date={d}/"'''.format(b=BUCKET, d=date_.date())
+
+            print('Update Athena partitions:')
+            response = ath.start_query_execution(
+                    QueryString = partition_query,
+                    QueryExecutionContext={'Database': DATABASE},
+                    ResultConfiguration={'OutputLocation': ATHENA_OUTPUT_BUCKET})
+            pp.pprint(response)
+
+        print('\n{} signals in {} days. Done in {} minutes'.format(len(signalids), len(dates), int((time.time()-t0)/60)))
+    except Exception as e:
+        print(str(e))
