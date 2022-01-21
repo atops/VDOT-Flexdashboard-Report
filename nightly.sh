@@ -24,6 +24,7 @@ Rscript Monthly_Report_Package.R
 
 echo --- Watchdog
 # Ideally this would run at 7am or so to capture today's ATSPM watchdogs.
-~/miniconda3/bin/python get_watchdog_alerts.py
+# This is run on local VDOT server and pushed to S3
+#~/miniconda3/bin/python get_watchdog_alerts.py
 Rscript get_alerts.R
 

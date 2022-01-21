@@ -6,10 +6,9 @@ mode: beta
 
 agency: VDOT
 bucket: vdot-spm
-region: NWRO
+region: 
 athena:
     staging_dir: s3://vdot-spm-athena  # this has to be <bucket>-athena
-    jar_path: AthenaJDBC42_2.0.9.jar
     database: vdot_spm
     atspm_table: atspm
 atspm:
@@ -18,6 +17,8 @@ atspm:
     pwd_env: ATSPM_PASSWORD
     svr_env: ATSPM_SERVER_INSTANCE
     db_env: ATSPM_DB
+
+ssl_cert: True # True/False or *.pem file name
 
 # Sections of Monthly_Report_Calcs_ec2 to run
 run:
@@ -45,10 +46,6 @@ corridors_TMCs_filename_s3: Corridor_TMCs_Virginia.xlsx
 
 cctv_config_filename: 
 cctv_parsed_filename: 
-
-teams_tasks_filename: 
-
-tmc_filename: 
 
 AM_PEAK_HOURS: [6, 7, 8, 9]
 PM_PEAK_HOURS: [15, 16, 17, 18, 19]
