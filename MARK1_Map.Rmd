@@ -1,12 +1,13 @@
 ---
-title: "VDOT TMC Segments Map"
-author: "Alan Toppen"
-date: "09/27/2021"
+title: "VDOT ATSPM Dashboard TMC Segments Map"
+author: "Kimley-Horn"
+date: "Last Updated: January 2022"
 # output: html_document
 output:
   flexdashboard::flex_dashboard:
     orientation: columns
     vertical_layout: fill
+    css: MARK1_Map.css
 
 ---
 
@@ -33,11 +34,34 @@ suppressMessages({
     library(tictoc)
 })
 
+future::plan(future::multicore)
+
+
 BLACK <- "#000000"
 WHITE <- "#FFFFFF"
 GRAY <- "#D0D0D0"
 DARK_GRAY <- "#7A7A7A"
 DARK_DARK_GRAY <- "#494949"
+
+RED <- "#e41a1c"
+BLUE <- "#005DAA" # VDOT Blue (previously: "#377eb8")
+GREEN <- "#115740"  # W&M Official Orange  (previously: "#4daf4a")
+PURPLE <- "#984ea3"
+ORANGE <- "#E57200"  # UVA Official Orange  (previously: #ff7f00")
+MAROON <- "#861F41"  # Va Tech Official Maroon
+YELLOW <- "#ffff33"
+BROWN <- "#a65628"
+PINK <- "#f781bf"
+
+LIGHT_RED <- "#f7babb"
+LIGHT_BLUE <- "#b3dcff"  # "#c4dbed"
+LIGHT_GREEN <- "#3fd9a7"  # "#cae8c9"
+LIGHT_PURPLE <- "#e3cbe6"
+LIGHT_ORANGE <- "#ffd9b3"
+LIGHT_MAROON <- "#f1c1d1"
+LIGHT_YELLOW <- "#ffffb3"
+LIGHT_BROWN <- "#f0d2c1"
+LIGHT_PINK <- "#fab7da"
 
 conf <- read_yaml("Monthly_Report.yaml")
 
@@ -119,41 +143,41 @@ get_geom_coords <- function(coords_string) {
 
 # --- Corridors Listing ---
 
-corridor_palette <- c("#e41a1c", "#377eb8", "#4daf4a", "#984ea3", 
-                      "#ff7f00", "#ffff33", "#a65628", "#f781bf")
+
+# corridor_palette <- c()
 
 corridors <- s3read_using(
     read_excel,
     bucket = BUCKET,
     object = conf$corridors_filename_s3)
-# corridors <- read_excel("VDOT_Corridors_Latest.xlsx")
+
 
 num_corridors <- nrow(distinct(corridors))
 zones <- distinct(corridors, Zone)
 
-zone_colors <- zones %>% 
-    mutate(color = rep(corridor_palette, ceiling(nrow(zones)/8))[1:(nrow(zones))],)
+zone_colors <- zones %>%
+    mutate(
+        color = case_when(
+            Zone == "Central Region" ~ RED, 
+            Zone == "Eastern Region" ~ GREEN,
+            Zone == "Fredericksburg District" ~ PINK,
+            Zone == "Northern Region" ~ BLUE,
+            Zone == "Southwest Region" ~ MAROON,
+            Zone == "Northwest Region" ~ ORANGE,
+            TRUE ~ DARK_GRAY),
+        accent_color = case_when(
+            Zone == "Central Region" ~ LIGHT_RED, 
+            Zone == "Eastern Region" ~ LIGHT_GREEN,
+            Zone == "Fredericksburg District" ~ LIGHT_PINK,
+            Zone == "Northern Region" ~ LIGHT_BLUE,
+            Zone == "Southwest Region" ~ LIGHT_MAROON,
+            Zone == "Northwest Region" ~ LIGHT_ORANGE,
+            TRUE ~ DARK_GRAY)
+    )
 
 corridor_colors <- corridors %>%
     select(Zone, Corridor) %>%
     left_join(zone_colors, by = "Zone")
-
-#corr_levels <- levels(corridor_colors$Corridor)
-#ordered_levels <- fct_relevel(corridor_colors$Corridor, c("None", corr_levels[corr_levels != "None"]))
-#corridor_colors <- corridor_colors %>% 
-#    mutate(Corridor = factor(Corridor, levels = corr_levels))
-
-
-# zone_colors <- data.frame(
-#     zone = glue("Zone {seq_len(8)}"), 
-#     color = corridor_palette) %>%
-#     mutate(color = if_else(color=="#ffff33", "#f7f733", as.character(color)))
-
-#zone_colors <- bind_rows(
-#    zone_colors,
-#    zone_colors %>% filter(zone == "Zone 7") %>% mutate(zone = "Zone 7m"),
-#    zone_colors %>% filter(zone == "Zone 7") %>% mutate(zone = "Zone 7d")
-#)
 ```
 
 
@@ -170,20 +194,17 @@ signals_sp <- ints %>%
     left_join(zone_colors, by = c("Zone")
     ) %>%
     mutate(
-        Description = paste0(SignalID, ": ", `Main Street Name`, " at ", `Side Street Name`),
-        fill_color = color,
-        stroke_color = GRAY
+        Description = paste0(SignalID, ": ", `Main Street Name`, " at ", `Side Street Name`)) %>%
+    rename(
+        fill_color = accent_color,
+        stroke_color = color
     )
 
-    # mutate(
-    #     # If part of a Zone (RTOP), fill is black, otherwise white
-    #     fill_color = ifelse(grepl("^Z", Zone), BLACK, WHITE),
-    #     # If not part of a corridor, gray outer color, otherwise black
-    #     stroke_color = ifelse(Corridor == "None", GRAY, BLACK),
-    #     # If part of a Zone (RTOP), override black outer to corridor color
-    #     stroke_color = ifelse(grepl("^Z", Zone), color, stroke_color))
-
 Encoding(signals_sp$Description) <- "utf-8"
+
+
+statewide_signals_sp <- read_excel("VDOT_TrafficSignals_Export_2022-01-20.xlsx", skip = 4) %>%
+    select(REG_SIGNAL, KITS_ID, MAJ_NAME, MINOR_NAME, DISTRICT, ATSPM, Latitude, Longitude)
 ```
 
 
@@ -193,7 +214,6 @@ tmcs <- s3read_using(
     read_excel,
     bucket = BUCKET,
     object = conf$corridors_TMCs_filename_s3) %>%
-# tmcs <- read_excel("Corridor_TMCs_Virginia.xlsx") %>%
     left_join(corridor_colors, by = c("Corridor")) %>%
     replace_na(list(color = GRAY)) %>%
     mutate(Zone = factor(Zone))
@@ -205,9 +225,10 @@ tmcs <- s3read_using(
 tic()
 # -- This takes a little while
 z <- tmcs %>% 
+    filter(!is.na(Corridor)) %>% 
     mutate(
-        tmc_coords = purrr::map(coordinates, get_tmc_coords),
-        sp_data = purrr::map(
+        tmc_coords = furrr::future_map(coordinates, get_tmc_coords),  # purrr::map
+        sp_data = furrr::future_map(
             tmc_coords, function(y) {
                 points_to_line(data = y, long = "longitude", lat = "latitude")
             })
@@ -216,15 +237,8 @@ z <- tmcs %>%
 corridors_sp <- do.call(rbind, z$sp_data) %>%
     SpatialLinesDataFrame(z, match.ID = FALSE)
 
-sz <- tmcs %>% 
-    filter(!is.na(Subcorridor)) %>% 
-    mutate(
-        tmc_coords = purrr::map(coordinates, get_tmc_coords),
-        sp_data = purrr::map(
-            tmc_coords, function(y) {
-                points_to_line(data = y, long = "longitude", lat = "latitude")
-            })
-        )
+
+sz <- filter(z, !is.na(Subcorridor))
 
 subcorridors_sp <- do.call(rbind, sz$sp_data) %>%
     SpatialLinesDataFrame(sz, match.ID = FALSE)
@@ -233,7 +247,8 @@ subcorridors_sp <- do.call(rbind, sz$sp_data) %>%
 map_data <- list(
     corridors_sp = corridors_sp, 
     subcorridors_sp = subcorridors_sp, 
-    signals_sp = signals_sp)
+    signals_sp = signals_sp,
+    statewide_signals_sp = statewide_signals_sp)
 toc()
 ```
 
@@ -281,6 +296,14 @@ point_popups <- function(description, zone, corridor, subcorridor) {
           glue("<b>Subcorridor:</b> {subcorridor}"))
 }
 
+statewide_signals_popups <- function(sigid, kitsid, major_name, minor_name, district) {
+    paste(sep = "<br/>", 
+          glue("<b>Signal:</b> {sigid}"),
+          glue("<b>KITS ID:</b> {kitsid}"),
+          glue("<b>Location: {major_name} @ {minor_name}</b>"), 
+          glue("<b>District:</b> {district}"))
+}
+
 line_labels <- function(zone, corridor, subcorridor, tmc) {
     paste(sep = " | ", 
           glue("Region: {zone}"),
@@ -289,7 +312,7 @@ line_labels <- function(zone, corridor, subcorridor, tmc) {
           glue("TMC Code: {tmc}"))
 }
 
-leaflet(width = "100%", height = 1000) %>% 
+map <- leaflet(width = "100%", height = 1000) %>% 
     setView(
         lat = 37.5247764, 
         lng = -77.5633012, 
@@ -297,29 +320,57 @@ leaflet(width = "100%", height = 1000) %>%
     
     addProviderTiles(
         providers$CartoDB.Positron) %>% 
+        addProviderTiles(providers$Esri.WorldImagery, group = "Satellite") %>%
+        addProviderTiles(providers$Esri.WorldTopoMap, group = "Topo") %>%
+        addProviderTiles(providers$CartoDB.Positron, group = "Light") %>%
+        addProviderTiles(providers$CartoDB.DarkMatter, group = "Dark") %>%
     
-    addPolylines(
-        data = subset(map_data$corridors_sp, is.na(Zone)),
-        color = ~color,
-        popup = ~line_popups(roadNumber, roadName, Corridor, Subcorridor, tmc),
-        label = ~htmltools::htmlEscape(line_labels(Zone, Corridor, Subcorridor, tmc)),
-        highlightOptions = highlightOptions(stroke = TRUE, color = BLACK, opacity = 1)) %>%
+        addLayersControl(
+            baseGroups = c("Light", "Dark","Satellite", "Topo"),
+            overlayGroups = c("Statewide Signals"),
+            options = layersControlOptions(collapsed = FALSE)
+        ) %>%
     
+    # TMC Segments with no Corridor assigned highlight as black on hover
+    # addPolylines(
+    #     data = subset(map_data$corridors_sp, is.na(Zone)),
+    #     color = ~color,
+    #     popup = ~line_popups(roadNumber, roadName, Corridor, Subcorridor, tmc),
+    #     label = ~htmltools::htmlEscape(line_labels(Zone, Corridor, Subcorridor, tmc)),
+    #     highlightOptions = highlightOptions(stroke = TRUE, color = BLACK, opacity = 1)) %>%
+
+    # TMC Segments with Subcorridor assigned are thick and gray
     addPolylines(
         data = map_data$subcorridors_sp,
-        color = DARK_GRAY,
+        color = GRAY, opacity = 1,
         popup = ~line_popups(roadNumber, roadName, Corridor, Subcorridor, tmc),
         label = ~line_labels(Zone, Corridor, Subcorridor, tmc),
         highlightOptions = highlightOptions(stroke = TRUE, color = BLACK, opacity = 1),
         weight = 20) %>%
 
+    # TMC Segments with a Corridor assigned are colored by Zone
     addPolylines(
         data = subset(map_data$corridors_sp, !is.na(Zone)),
-        color = ~color,
+        color = ~color, opacity = 1,
         popup = ~line_popups(roadNumber, roadName, Corridor, Subcorridor, tmc),
         label = ~line_labels(Zone, Corridor, Subcorridor, tmc),
         highlightOptions = highlightOptions(stroke = TRUE, color = BLACK, opacity = 1)) %>%
     
+    # Statewide Signals -- those not configured in the Dashboard corridors file
+    addCircleMarkers(
+        group = "Statewide Signals",
+        data = map_data$statewide_signals_sp,
+        lng = ~Longitude,
+        lat = ~Latitude,
+        popup = ~statewide_signals_popups(REG_SIGNAL, KITS_ID, MAJ_NAME, MINOR_NAME, DISTRICT),
+        radius = 5,
+        fillColor = WHITE,
+        color = DARK_GRAY,
+        fillOpacity = 1,
+        opacity = 1,
+        weight = 2) %>%
+
+    # Signals configured in the Dashboard corridors file are colored by Zone
     addCircleMarkers(
         data = map_data$signals_sp,
         lng = ~Longitude,
@@ -327,14 +378,16 @@ leaflet(width = "100%", height = 1000) %>%
         popup = ~point_popups(Description, Zone, Corridor, Subcorridor),
         label = ~Description,  # point_labels(Description, Zone, Corridor),
         radius = 5,
-        fillColor = ~fill_color,
-        color = ~stroke_color,
+        fillColor = ~fill_color,  # ~fill_color,
+        color = ~stroke_color,  # ~stroke_color,
         stroke = TRUE,
         fillOpacity = 1,
         opacity = 1,
         weight = 3)
 
-#s3saveRDS(map, bucket = BUCKET, object = "mark1_leaflet_map.rds")
+s3write_using(map, qs::qsave, bucket = BUCKET, object = "VDOT_Corridors_Map.qs")
+
+map
 ```
 
 
