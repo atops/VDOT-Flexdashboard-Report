@@ -3307,22 +3307,18 @@ get_corridor_summary_data <- function(cor) {
 
 
     data <- list(
-        rename(cor$mo$du, du.delta = delta), # detector uptime - note that zone group is factor not character
-        rename(cor$mo$pau, pau.delta = delta),
-        #cor$mo$cctv,
-        rename(cor$mo$cu, cu.delta = delta),
+        rename(cor$mo$du, du = uptime, du.delta = delta), # detector uptime - note that zone group is factor not character
+        rename(cor$mo$pau, pau = uptime, pau.delta = delta),
+        rename(cor$mo$cu, cu = uptime, cu.delta = delta),
         rename(cor$mo$tp, tp.delta = delta), # no longer pulling from vpd (volume) table - this is throughput
         rename(cor$mo$aogd, aog.delta = delta),
-        rename(cor$mo$qsd, qs.delta = delta),
-        rename(cor$mo$sfd, sf.delta = delta),
-        cor$mo$tti,
-        cor$mo$pti
+        rename(cor$mo$prd, pr.delta = delta),
+        rename(cor$mo$qsd, qs = qs_freq, qs.delta = delta),
+        rename(cor$mo$sfd, sf = sf_freq, sf.delta = delta),
+        rename(cor$mo$tti, tti.delta = delta),
+        rename(cor$mo$pti, pti.delta = delta)
     ) %>%
         reduce(left_join, by = c("Zone_Group", "Corridor", "Month")) %>%
-        filter(
-            grepl("^Zone", Zone_Group),
-            !grepl("^Zone", Corridor)#,
-        ) %>%
         select(
             -uptime.sb,
             -uptime.pr,
