@@ -948,6 +948,120 @@ get_tt_plot_ <- function(cor_monthly_tti, cor_monthly_tti_by_hr,
         no_data_plot("")
     }
 }
+#get_tt_plot <- memoise(get_tt_plot_)
+get_tt_plot <- cmpfun(get_tt_plot_)
+
+get_pct_ch_plot_ <- function(cor_monthly_vpd,
+                             month_,
+                             zone_group_) {
+    pl <- function(df) { 
+        neg <- dplyr::filter(df, delta < 0)
+        pos <- dplyr::filter(df, delta > 0)
+        
+        title_ <- df$Corridor[1]
+        
+        plot_ly() %>% 
+            add_bars(data = neg,
+                     x = ~Month, 
+                     y = ~delta, 
+                     marker = list(color = "#e31a1c")) %>%
+            add_bars(data = pos,
+                     x = ~Month, 
+                     y = ~delta, 
+                     marker = list(color = "#33a02c")) %>%
+            layout(xaxis = list(title = "",
+                                nticks = nrow(df)),
+                   yaxis = list(title = "",
+                                tickformat = "%"),
+                   showlegend = FALSE,
+                   annotations = list(text = title_,
+                                      font = list(size = 12),
+                                      xref = "paper",
+                                      yref = "paper",
+                                      yanchor = "bottom",
+                                      xanchor = "center",
+                                      align = "center",
+                                      x = 0.5,
+                                      y = 0.95,
+                                      showarrow = FALSE))
+    }
+    
+    df <- filter_mr_data(cor_monthly_vpd, zone_group_)
+    
+    df <- filter(df, Month <= month_)
+    
+    if (nrow(df) > 0) {
+        
+        pcts <- split(df, df$Corridor)
+        plts <- lapply(pcts[lapply(pcts, nrow)>0], pl)
+        subplot(plts,
+                margin = 0.03, nrows = min(length(plts), 4), shareX = TRUE, shareY = TRUE) %>%
+            layout(title = "Percent Change from Previous Month (vehicles/day)",
+                   margin = list(t = 60))
+    } else {
+        no_data_plot("")
+    }
+}
+get_pct_ch_plot <- memoise(get_pct_ch_plot_)
+
+get_vph_peak_plot_ <- function(df, chart_title, bar_subtitle, 
+                               month_ = current_month(), zone_group_ = zone_group()) {
+    
+    df <- filter_mr_data(df, zone_group_)
+
+    if (nrow(df) > 0) {
+        
+        sdw <- SharedData$new(dplyr::filter(df, Month <= month_), ~Corridor, group = "grp")
+        sdm <- SharedData$new(dplyr::filter(df, Month == month_), ~Corridor, group = "grp")
+        
+        base <- plot_ly(sdw, color = I("gray")) %>%
+            group_by(Corridor)
+        base_m <- plot_ly(sdm, color = I("gray")) %>%
+            group_by(Corridor)
+        
+        p1 <- base_m %>%
+            summarise(vph = mean(vph)) %>% # This has to be just the current month's vph
+            arrange(vph) %>%
+            add_bars(x = ~vph, 
+                     y = ~factor(Corridor, levels = Corridor),
+                     text = ~scales::comma_format()(as.integer(vph)),
+                     textposition = "inside",
+                     textfont = list(color = "black"),
+                     hoverinfo = "none") %>%
+            layout(
+                barmode = "overlay",
+                xaxis = list(title = bar_subtitle, zeroline = FALSE),
+                yaxis = list(title = ""),
+                showlegend = FALSE,
+                font = list(size = 11),
+                margin = list(pad = 4)
+            )
+        p2 <- base %>%
+            add_lines(x = ~Month, y = ~vph, alpha = 0.6) %>%
+            layout(xaxis = list(title = "Date"),
+                   showlegend = FALSE,
+                   annotations = list(text = chart_title,
+                                      font = list(size = 12),
+                                      xref = "paper",
+                                      yref = "paper",
+                                      yanchor = "bottom",
+                                      xanchor = "center",
+                                      align = "center",
+                                      x = 0.5,
+                                      y = 1,
+                                      showarrow = FALSE)
+            )
+        
+        
+        subplot(p1, p2, titleX = TRUE, widths = c(0.2, 0.8), margin = 0.03) %>%
+            layout(margin = list(l = 80, r = 40)) %>%
+            highlight(color = "#256194", opacityDim = 0.9, defaultValues = c(zone_group_),
+                      selected = attrs_selected(insidetextfont = list(color = "white"), textposition = "inside"))
+    } else {
+        no_data_plot("")
+    }
+}
+get_vph_peak_plot <- memoise(get_vph_peak_plot_)
 
 
 
