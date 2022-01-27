@@ -13,8 +13,7 @@ import boto3
 import pandas as pd
 import io
 import re
-#from multiprocessing.dummy import Pool
-from multiprocessing import Pool
+from multiprocessing import get_context
 import itertools
 import pprint
 
@@ -90,7 +89,7 @@ def get_det_config(date_, conf):
     return df
 
 
-def get_aog(signalid, date_, det_config, conf):
+def get_aog(signalid, date_, det_config, conf, per='H'):
     '''
     date_ [Timestamp]
     '''
@@ -120,7 +119,7 @@ def get_aog(signalid, date_, det_config, conf):
             print('#', end='')
             return pd.DataFrame()
         else:
-            df_aog = (df.assign(Hour=lambda x: x.DetTimeStamp.dt.floor('H'))
+            df_aog = (df.assign(Hour=lambda x: x.DetTimeStamp.dt.floor(per))
                       .rename(columns={'Detector': 'Arrivals',
                                        'EventCode': 'Interval'})
                       .groupby(['Hour', 'SignalID', 'Phase', 'Interval'])
@@ -151,11 +150,11 @@ def get_aog(signalid, date_, det_config, conf):
             df_gc = (pd.concat([df_gc, x])
                      .sort_index()
                      .ffill() # fill forward missing Intervals for on the hour rows
-                     .reset_index(level=['IntervalStart'])
-                     .assign(IntervalEnd=lambda x: x.IntervalStart.shift(-1))
-                     .assign(IntervalDuration=lambda x: (x.IntervalEnd - x.IntervalStart).dt.total_seconds())
-                     .assign(Hour=lambda x: x.IntervalStart.dt.floor('H'))
-                     .groupby(['Hour', 'SignalID', 'Phase', 'Interval']).sum())
+                     .reset_index(level=['IntervalStart']))
+            df_gc['IntervalEnd'] = df_gc.groupby(level=['SignalID','Phase']).shift(-1)['IntervalStart']
+            df_gc['IntervalDuration'] = (df_gc.IntervalEnd - df_gc.IntervalStart).dt.total_seconds()
+            df_gc['Hour'] = df_gc.IntervalStart.dt.floor(per)
+            df_gc = df_gc.groupby(['Hour', 'SignalID', 'Phase', 'Interval']).sum()
 
             df_gc['Duration'] = df_gc.groupby(level=[0, 1, 2]).transform('sum')
             df_gc['gC'] = df_gc['IntervalDuration']/df_gc['Duration']
@@ -165,7 +164,8 @@ def get_aog(signalid, date_, det_config, conf):
                   .rename(columns={'IntervalDuration': 'Green_Duration'}))
 
             aog = pd.concat([aog, gC], axis=1).assign(pr=lambda x: x.AOG/x.gC)
-
+            aog = aog[~aog.Green_Arrivals.isna()]
+            
             print('.', end='')
 
             return aog
@@ -194,8 +194,10 @@ def main(start_date, end_date):
         print('Getting signals...', end='')
         signalids = get_signalids(date_, conf)
         print('done.')
-    
-        with Pool(8) as pool:
+
+
+        print('1 hour')
+        with get_context('spawn').Pool(24) as pool:
             results = pool.starmap_async(
                 get_aog,
                 list(itertools.product(signalids, [date_], [det_config], [conf])))
@@ -238,9 +240,12 @@ def main(start_date, end_date):
         
         num_signals = len(list(set(df.SignalID.values)))
         t1 = round(time.time() - t0, 1)
-        print(f'{num_signals} signals done in {t1} seconds.')
+        print(f'\n{num_signals} signals done in {t1} seconds.')
+
+
       except Exception as e:
         print(f'{date_}: Error: {e}')
+
 
 
 if __name__=='__main__':

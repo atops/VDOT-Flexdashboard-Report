@@ -29,12 +29,12 @@ suppressMessages({
     library(sp)
     library(odbc)
     library(shinycssloaders)
+    library(DT)
     library(compiler)
 })
 
 plan(multisession)
 
-suppressMessages(library(DT))
 
 options(dplyr.summarise.inform = FALSE)
 
@@ -77,7 +77,7 @@ RTOP2_ZONES <- c("Zone 4", "Zone 5", "Zone 6", "Zone 7m", "Zone 7d")
 metric.order <- c("du", "pau", "cctvu", "cu", "tp", "aog", "qs", "sf", "tti", "pti", "tasks")
 metric.names <- c(
     "Vehicle Detector Availability",
-    "Ped Detector Availability",
+    "Ped Pushbutton Availability",
     "CCTV Availability",
     "Communications Uptime",
     "Traffic Volume (Throughput)",
@@ -133,11 +133,11 @@ zone_group_options <- conf$zone_groups
 s3checkFunc <- function(bucket, object, aws_conf) {
     function() {
 	cat(file="dash.log", "checking\n", append=TRUE)
-        aws.s3::get_bucket(
-	    bucket = bucket, 
+    aws.s3::get_bucket(
+	    bucket = bucket,
 	    prefix = object,
 	    key = aws_conf$AWS_ACCESS_KEY_ID,
-            secret = aws_conf$AWS_SECRET_ACCESS_KEY)$Contents$LastModified
+        secret = aws_conf$AWS_SECRET_ACCESS_KEY)$Contents$LastModified
     }
 }
 
@@ -158,7 +158,7 @@ s3valueFunc <- function(bucket, object, aws_conf) {
             bucket = bucket,
             opts = list(
 		key = aws_conf$AWS_ACCESS_KEY_ID,
-                secret = aws_conf$AWS_SECRET_ACCESS_KEY))
+        secret = aws_conf$AWS_SECRET_ACCESS_KEY))
         cat(file="dash.log", "values passed\n", append=TRUE)
 	x
     }
@@ -405,7 +405,7 @@ perf_plot_ <- function(data_, value_, name_, color_,
     first <- data_[which.min(data_$Month), ]
     last <- data_[which.max(data_$Month), ]
 
-    p <- plot_ly(type = "scatter", mode = "markers") %>%
+    p <- plot_ly(type = "scatter", mode = "markers")
 
     if (!is.null(goal_)) {
         p <- p %>%
@@ -574,7 +574,8 @@ get_bar_line_dashboard_plot_ <- function(cor_weekly,
                                          x_line1_title = "___",
                                          x_line2_title = "___",
                                          plot_title = "___ ",
-                                         goal = NULL) {
+                                         goal = NULL,
+                                         accent_average = TRUE) {
     
     var_ <- as.name(var_)
     if (num_format == "percent") {
@@ -602,8 +603,14 @@ get_bar_line_dashboard_plot_ <- function(cor_weekly,
         mdf <- mdf %>%
             arrange(!!var_) %>%
             mutate(var = !!var_,
-                   col = factor(ifelse(Corridor==zone_group_, DARK_GRAY_BAR, LIGHT_GRAY_BAR)),
                    Corridor = factor(Corridor, levels = Corridor))
+        if (accent_average) {
+            mdf <- mdf %>% 
+                mutate(col = factor(ifelse(Corridor==zone_group_, DARK_GRAY_BAR, LIGHT_GRAY_BAR)))
+        } else {
+            mdf <- mdf %>%
+                mutate(col = factor(LIGHT_GRAY_BAR, levels = c(DARK_GRAY_BAR, LIGHT_GRAY_BAR)))
+        }
         
         sdm <- SharedData$new(mdf, ~Corridor, group = "grp")
         
@@ -646,8 +653,15 @@ get_bar_line_dashboard_plot_ <- function(cor_weekly,
         
         # Weekly Data - historical trend
         wdf <- wdf %>%
-            mutate(var = !!var_,
-                   col = factor(ifelse(Corridor == zone_group_, 0, 1))) %>%
+            mutate(var = !!var_)
+        if (accent_average) {
+            wdf <- wdf %>%
+                mutate(col = factor(ifelse(Corridor == zone_group_, 0, 1)))
+        } else {
+            wdf <- wdf %>%
+                mutate(col = factor(1, levels = c(0, 1)))
+        }
+        wdf <- wdf %>%
             group_by(Corridor)
         
         sdw <- SharedData$new(wdf, ~Corridor, group = "grp")
@@ -777,7 +791,7 @@ get_tt_plot_ <- function(cor_monthly_tti, cor_monthly_tti_by_hr,
     hrtt <- full_join(cor_monthly_tti_by_hr, cor_monthly_pti_by_hr,
                       by = c("Corridor", "Zone_Group", "Hour"),
                       suffix = c(".tti", ".pti"))  %>%
-        filter(!is.na(Corridor)) %>%#,
+        filter(!is.na(Corridor)) %>%
         mutate(bti = pti - tti) %>%
         ungroup() %>%
         select(Corridor, Zone_Group, Hour, tti, pti, bti)
@@ -934,197 +948,7 @@ get_tt_plot_ <- function(cor_monthly_tti, cor_monthly_tti_by_hr,
         no_data_plot("")
     }
 }
-#get_tt_plot <- memoise(get_tt_plot_)
-get_tt_plot <- cmpfun(get_tt_plot_)
 
-get_pct_ch_plot_ <- function(cor_monthly_vpd,
-                             month_,
-                             zone_group_) {
-    pl <- function(df) { 
-        neg <- dplyr::filter(df, delta < 0)
-        pos <- dplyr::filter(df, delta > 0)
-        
-        title_ <- df$Corridor[1]
-        
-        plot_ly() %>% 
-            add_bars(data = neg,
-                     x = ~Month, 
-                     y = ~delta, 
-                     marker = list(color = "#e31a1c")) %>%
-            add_bars(data = pos,
-                     x = ~Month, 
-                     y = ~delta, 
-                     marker = list(color = "#33a02c")) %>%
-            layout(xaxis = list(title = "",
-                                nticks = nrow(df)),
-                   yaxis = list(title = "",
-                                tickformat = "%"),
-                   showlegend = FALSE,
-                   annotations = list(text = title_,
-                                      font = list(size = 12),
-                                      xref = "paper",
-                                      yref = "paper",
-                                      yanchor = "bottom",
-                                      xanchor = "center",
-                                      align = "center",
-                                      x = 0.5,
-                                      y = 0.95,
-                                      showarrow = FALSE))
-    }
-    
-    df <- filter_mr_data(cor_monthly_vpd, zone_group_)
-    
-    df <- filter(df, Month <= month_)
-    
-    if (nrow(df) > 0) {
-        
-        pcts <- split(df, df$Corridor)
-        plts <- lapply(pcts[lapply(pcts, nrow)>0], pl)
-        subplot(plts,
-                margin = 0.03, nrows = min(length(plts), 4), shareX = TRUE, shareY = TRUE) %>%
-            layout(title = "Percent Change from Previous Month (vehicles/day)",
-                   margin = list(t = 60))
-    } else {
-        no_data_plot("")
-    }
-}
-get_pct_ch_plot <- memoise(get_pct_ch_plot_)
-
-get_vph_peak_plot_ <- function(df, chart_title, bar_subtitle, 
-                               month_ = current_month(), zone_group_ = zone_group()) {
-    
-    df <- filter_mr_data(df, zone_group_)
-
-    if (nrow(df) > 0) {
-        
-        sdw <- SharedData$new(dplyr::filter(df, Month <= month_), ~Corridor, group = "grp")
-        sdm <- SharedData$new(dplyr::filter(df, Month == month_), ~Corridor, group = "grp")
-        
-        base <- plot_ly(sdw, color = I("gray")) %>%
-            group_by(Corridor)
-        base_m <- plot_ly(sdm, color = I("gray")) %>%
-            group_by(Corridor)
-        
-        p1 <- base_m %>%
-            summarise(vph = mean(vph)) %>% # This has to be just the current month's vph
-            arrange(vph) %>%
-            add_bars(x = ~vph, 
-                     y = ~factor(Corridor, levels = Corridor),
-                     text = ~scales::comma_format()(as.integer(vph)),
-                     textposition = "inside",
-                     textfont = list(color = "black"),
-                     hoverinfo = "none") %>%
-            layout(
-                barmode = "overlay",
-                xaxis = list(title = bar_subtitle, zeroline = FALSE),
-                yaxis = list(title = ""),
-                showlegend = FALSE,
-                font = list(size = 11),
-                margin = list(pad = 4)
-            )
-        p2 <- base %>%
-            add_lines(x = ~Month, y = ~vph, alpha = 0.6) %>%
-            layout(xaxis = list(title = "Date"),
-                   showlegend = FALSE,
-                   annotations = list(text = chart_title,
-                                      font = list(size = 12),
-                                      xref = "paper",
-                                      yref = "paper",
-                                      yanchor = "bottom",
-                                      xanchor = "center",
-                                      align = "center",
-                                      x = 0.5,
-                                      y = 1,
-                                      showarrow = FALSE)
-            )
-        
-        
-        subplot(p1, p2, titleX = TRUE, widths = c(0.2, 0.8), margin = 0.03) %>%
-            layout(margin = list(l = 80, r = 40)) %>%
-            highlight(color = "#256194", opacityDim = 0.9, defaultValues = c(zone_group_),
-                      selected = attrs_selected(insidetextfont = list(color = "white"), textposition = "inside"))
-    } else {
-        no_data_plot("")
-    }
-}
-get_vph_peak_plot <- memoise(get_vph_peak_plot_)
-
-get_minmax_hourly_plot_ <- function(cor_monthly_vph, 
-                                    month_ = current_month(), 
-                                    zone_group_ = zone_group()) {
-    
-    mm_pl <- function(mm, tm) {
-        
-        title_ <- mm$Corridor[1]
-        
-        p <- plot_ly() %>%
-            add_bars(data = mm,
-                     x = ~Hour,
-                     y = ~min_vph,
-                     opacity = 0) %>%
-            add_bars(data = mm,
-                     x = ~Hour,
-                     y = ~(max_vph-min_vph),
-                     marker = list(color = "#a6cee3"))
-        if (!is.null(tm)) {
-            p <- p %>% add_markers(data = tm,
-                                   x = ~Hour,
-                                   y = ~vph,
-                                   marker = list(color = "#ca0020"))
-                
-        }
-        p %>%
-            layout(barmode = "stack",
-                   showlegend = FALSE,
-                   xaxis = list(title = "",
-                                tickformat = "%H:%M"),
-                   yaxis = list(title = "",
-                                range = c(0, round(max(minmax$max_vph), -3) + 1000)),
-                   title = "Current Month (veh/hr) compared to range over previous months",
-                   annotations = list(text = title_,
-                                      font = list(size = 12),
-                                      xref = "paper",
-                                      yref = "paper",
-                                      yanchor = "bottom",
-                                      xanchor = "center",
-                                      align = "center",
-                                      x = 0.5,
-                                      y = 0.85,
-                                      showarrow = FALSE))
-    }
-    
-    df <- filter_mr_data(cor_monthly_vph, zone_group_)
-    
-    df <- filter(df, date(Hour) <= month_)
-    
-    
-    # Current Month Data
-    this_month <- df %>% 
-        filter(date(Hour) == month_) 
-    
-    if (nrow(df) > 0) {
-        
-        minmax <- df %>% 
-            mutate(Hour = (Hour + (date(max(Hour)) - date(Hour)))) %>%
-            group_by(Corridor, Hour) %>% 
-            summarize(min_vph = min(vph), max_vph = max(vph))
-        
-        mms <- split(minmax, minmax$Corridor)
-        tms <- split(this_month, this_month$Corridor)
-        mms_ <- mms[lapply(mms, nrow)>0]
-        tms_ <- tms[lapply(mms, nrow)>0]
-        
-        plts <- lapply(seq_along(mms_), function(i) mm_pl(mms_[[i]], tms_[[i]]))
-        subplot(plts, 
-                margin = 0.02, nrows = min(length(plts), 4), shareX = TRUE, shareY = TRUE) %>%
-            layout(title = "Current Month (veh/hr) compared to range over previous months",
-                   yaxis = list(title = "vph"),
-                   margin = list(t = 60))
-    } else {
-        no_data_plot("")
-    }
-}
-get_minmax_hourly_plot <- memoise(get_minmax_hourly_plot_)
 
 
 det_uptime_bar_plot_ <- function(df, xtitle, month_) {
@@ -1199,6 +1023,7 @@ det_uptime_line_plot_ <- function(df, corr, showlegend_) {
 }
 det_uptime_line_plot <- memoise(det_uptime_line_plot_)
 
+
 get_cor_det_uptime_plot_ <- function(avg_daily_uptime, 
                                      avg_monthly_uptime,
                                      month_,
@@ -1256,7 +1081,6 @@ get_cor_det_uptime_plot_ <- function(avg_daily_uptime,
                 text = ~as_pct(uptime),
                 textposition = "auto",
                 insidetextfont = list(color = "black"),
-                #hoverinfo = "y+x",
                 showlegend = FALSE,
                 name = "",
                 customdata = ~glue(paste(
@@ -1300,7 +1124,7 @@ get_cor_det_uptime_plot_ <- function(avg_daily_uptime,
         cdfs <- split(avg_daily_uptime, avg_daily_uptime$Corridor)
         cdfs <- cdfs[lapply(cdfs, nrow)>0]
         
-        p1 <- plot_detector_uptime_bar(avg_monthly_uptime) #(avg_daily_uptime)
+        p1 <- plot_detector_uptime_bar(avg_monthly_uptime)
         
         plts <- lapply(seq_along(cdfs), function(i) { 
             plot_detector_uptime(cdfs[[i]], names(cdfs)[i], ifelse(i==1, TRUE, FALSE)) 
@@ -1364,7 +1188,6 @@ get_cor_comm_uptime_plot_ <- function(avg_daily_uptime,
                 text = ~as_pct(uptime),
                 textposition = "auto",
                 insidetextfont = list(color = "black"),
-                #hoverinfo = "y+x",
                 showlegend = FALSE,
                 name = "",
                 customdata = ~glue(paste(
@@ -1419,6 +1242,7 @@ get_cor_comm_uptime_plot_ <- function(avg_daily_uptime,
     }
 }
 get_cor_comm_uptime_plot <- memoise(get_cor_comm_uptime_plot_)
+
 
 # Reshape to show multiple on the same chart
 gather_outstanding_events <- function(cor_monthly_events) {
@@ -1575,40 +1399,6 @@ cum_events_plot <- memoise(cum_events_plot_)
 
 
 
-# plot_individual_cctvs_ <- function(daily_cctv_df, 
-#                                    month_ = current_month(), 
-#                                    zone_group_ = zone_group()) {
-#     
-#     #df <- filter(daily_cctv_df, Date < month_ + months(1))
-#     #df <- filter(df, Zone_Group == zone_group_)
-#     
-#     spr <- daily_cctv_df %>%
-#         filter(Date < month_ + months(1),
-#                Zone_Group == zone_group_, 
-#                Corridor != Zone_Group) %>% 
-#         rename(CameraID = Corridor, 
-#                Corridor = Zone_Group) %>%
-#         dplyr::select(-c(num, uptime, Corridor, Name, delta, Week)) %>% 
-#         distinct() %>% 
-#         spread(Date, up, fill = 0) %>%
-#         arrange(desc(CameraID))
-#     
-#     m <- as.matrix(spr %>% dplyr::select(-CameraID))
-#     row.names(m) <- spr$CameraID
-#     m <- round(m,0)
-#     
-#     plot_ly(x = colnames(m), 
-#             y = row.names(m), 
-#             z = m, 
-#             colors = c(LIGHT_GRAY_BAR, BROWN),
-#             type = "heatmap",
-#             #xgap = 1,
-#             ygap = 1,
-#             showscale = FALSE) %>% 
-#         layout(yaxis = list(type = "category",
-#                             title = ""),
-#                margin = list(l = 150))
-# }
 plot_individual_cctvs_ <- function(daily_cctv_df, 
                                    month_ = current_month(), 
                                    zone_group_ = zone_group()) {
@@ -1703,10 +1493,10 @@ uptime_heatmap <- function(df_,
             type = "heatmap",
             ygap = 1,
             showscale = FALSE,
-            #name = "",
             customdata = apply(apply(m, 2, bind_description), 1, as.list),
             hovertemplate="<br>%{customdata}<br>%{x}<extra></extra>",
             hoverlabel = list(font = list(family = "Source Sans Pro"))) %>% 
+        
         layout(yaxis = list(type = "category",
                             title = ""),
                showlegend = FALSE,
@@ -1715,16 +1505,16 @@ uptime_heatmap <- function(df_,
 
 
 get_uptime_plot_ <- function(daily_df,
-                             monthly_df,
-                             var_,
-                             num_format, # percent, integer, decimal
-                             month_, 
-                             zone_group_, 
-                             x_bar_title = "___",
-                             x_line1_title = "___",
-                             x_line2_title = "___",
-                             plot_title = "___ ",
-                             goal = NULL) {
+                            monthly_df,
+                            var_,
+                            num_format, # percent, integer, decimal
+                            month_, 
+                            zone_group_, 
+                            x_bar_title = "___",
+                            x_line1_title = "___",
+                            x_line2_title = "___",
+                            plot_title = "___ ",
+                            goal = NULL) {
     
     var <- as.name(var_)
     if (num_format == "percent") {
@@ -1752,7 +1542,7 @@ get_uptime_plot_ <- function(daily_df,
             # Current Month Data
             bar_chart <- plot_ly(monthly_df_,
                                  type = "bar",
-                                 x = ~var, #uptime.all, 
+                                 x = ~var,
                                  y = ~Corridor,
                                  marker = list(color = ~col),
                                  text = ~var_fmt(var),
@@ -1774,15 +1564,19 @@ get_uptime_plot_ <- function(daily_df,
                     font = list(size = 11),
                     margin = list(pad = 4,
                                   l = 100,
-                                  r = 50),
-                    shapes=list(type = 'line', 
-                                x0 = goal/0.2, 
-                                x1 = goal/0.2, 
-                                y0 = min(levels(monthly_df_$Corridor)), 
-                                y1 = max(levels(monthly_df_$Corridor)), 
-                                line = list(dash = 'dot', width = 1, color = RED))
-                )
-            
+                                  r = 50)
+                    )
+            if (!is.null(goal)) {
+                bar_chart <- bar_chart %>% 
+                    add_lines(x = goal,
+                              y = ~Corridor,
+                              mode = "lines",
+                              marker = NULL,
+                              line = list(color = LIGHT_RED),
+                              name = "Goal (95%)",
+                              showlegend = FALSE)
+                }
+
             # Daily Heatmap
             daily_heatmap <- uptime_heatmap(daily_df, 
                                             var,
@@ -1804,52 +1598,6 @@ get_uptime_plot_ <- function(daily_df,
 #get_uptime_plot <- memoise(get_uptime_plot_)
 get_uptime_plot <- cmpfun(get_uptime_plot_)
 
-# No longer used
-plot_cctvs <- function(df, month_) {
-    
-    start_date <- ymd("2018-02-01")
-    end_date <- month_ %m+% months(1) - days(1)
-    
-    df_ <- filter(df, Date >= start_date & Date <= end_date & Size > 0)
-    
-    if (nrow(df) > 0) {
-        
-        #date_range <- ymd(date_range)
-        
-        p <- ggplot() + 
-            
-            # tile plot
-            geom_tile(data = df, 
-                      aes(x = Date, 
-                          y = CameraID), 
-                      fill = "steelblue", 
-                      color = "white") + 
-            
-            # fonts, text size and labels and such
-            theme(panel.grid.major = element_blank(),
-                  panel.grid.minor = element_blank(),
-                  axis.ticks.x = element_line(color = "gray50"),
-                  axis.text.x = element_text(size = 11),
-                  axis.text.y = element_text(size = 11),
-                  axis.ticks.y = element_blank(),
-                  axis.title = element_text(size = 11)) +
-            scale_x_date(position = "top", limits = c(start_date, end_date)) +
-            labs(x = "", 
-                 y = "Camera") +
-            
-            # draw white gridlines between tick labels
-            geom_vline(xintercept = as.numeric(seq(start_date, end_date, by = "1 day")) - 0.5, 
-                       color = "white")
-        
-        if (length(unique(df$CameraID)) > 1) {
-            p <- p +
-                geom_hline(yintercept = seq(1.5, length(unique(df$CameraID)) - 0.5, by = 1), 
-                           color = "white")
-            
-        }
-        p
-    }
-}
 
 volplot_plotly <- function(df, title = "title", ymax = 1000) {
     
@@ -1909,12 +1657,18 @@ volplot_plotly2 <- function(db, signalid, plot_start_date, plot_end_date, title 
     pl <- function(dfi, i) {
         
         dfi <- dfi %>% 
-            mutate(maxy = if_else(bad_day==1, as.integer(max(1,max(vol_rc, na.rm = TRUE))), as.integer(0)),
-                   colr = colrs[CallPhase], 
-                   fill_colr = "")
+            mutate(
+                maxy = if_else(bad_day==1, as.integer(max(1, max(vol_rc, na.rm = TRUE))), as.integer(0)),
+                colr = colrs[as.character(CallPhase)], 
+                fill_colr = "")
         
-        plot_ly(data = dfi) %>%
-            add_trace(
+        dfis <- split(dfi, dfi$CallPhase)
+        dfis <- dfis[unlist(purrr::map(dfis, function(x) nrow(x)>0))]
+        
+        p <- plot_ly()
+        for (df in dfis) {
+            p <- p %>% add_trace(
+                data = df,
                 x = ~Timeperiod, 
                 y = ~vol_rc, 
                 type = "scatter", 
@@ -1929,15 +1683,16 @@ volplot_plotly2 <- function(db, signalid, plot_start_date, plot_end_date, title 
                     "<br>Volume: <b>{as_int(vol_rc)}</b>")),
                 hovertemplate = "%{customdata}",
                 hoverlabel = list(font = list(family = "Source Sans Pro")),
-                showlegend = FALSE) %>%
-            add_trace(
+                showlegend = FALSE)
+        }
+        p %>% add_trace(
+                data = dfi,
                 x = ~Timeperiod, 
                 y = ~vol_ac, 
                 type = "scatter", 
                 mode = "lines", 
                 #fill = "tozeroy",
                 line = list(color = DARK_GRAY),
-                #fillcolor = ~fill_colr,
                 name = "Adjusted Count",
                 customdata = ~glue(paste(
                     "<b>Detector: {Detector}</b>",
@@ -2128,7 +1883,7 @@ udcplot_plotly <- function(hourly_udc) {
                                       xref = "paper",
                                       yref = "paper",
                                       yanchor = "bottom",
-                                      xanchor = "center",
+                                      xanchor = "left",
                                       align = "center",
                                       x = 0.2,
                                       y = 0.5,
@@ -2603,6 +2358,7 @@ detector_dashboard_athena <- function(sigid, start_date, conf_athena, pth = "s3"
     }
 }
 
+# Watchdog Alerts Plots ---------------------------------------------------
 
 
 filter_alerts_by_date <- function(alerts, dr) {
@@ -3149,11 +2905,11 @@ get_corridor_summary_table <- function(data, current_month, zone_group) {
         
         # overall data table
         dt.overall <- dt[dt.deltas, on = .(Metrics = Metrics, Goal = Goal)] %>%
-            rename_at(vars(starts_with("i.")), funs(str_replace(., "i.", "Delta.")))
+            rename_at(vars(starts_with("i.")), ~str_replace(., "i.", "Delta."))
         dt.overall <- dt.overall[dt.checks, on = .(Metrics = Metrics, Goal = Goal)] %>%
-            rename_at(vars(starts_with("i.")), funs(str_replace(., "i.", "Check.Goal.")))
+            rename_at(vars(starts_with("i.")), ~str_replace(., "i.", "Check.Goal."))
         dt.overall <- dt.overall[dt.deltas.checks,on = .(Metrics=Metrics,Goal=Goal)] %>%
-            rename_at(vars(starts_with("i.")), funs(str_replace(., "i.", "Check.Delta.")))
+            rename_at(vars(starts_with("i.")), ~str_replace(., "i.", "Check.Delta."))
         
         no.corridors <- (ncol(dt.overall) - 2) / 4 # how many corridors are we working with?
         

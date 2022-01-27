@@ -6,12 +6,9 @@ Created on Mon Nov 27 16:27:29 2017
 """
 import sys
 from datetime import datetime, timedelta
-#from multiprocessing.dummy import Pool
-from multiprocessing import Pool
+from multiprocessing import get_context
 import pandas as pd
 import sqlalchemy as sq
-from pyathenajdbc import connect
-import pyodbc
 import time
 import os
 import itertools
@@ -19,9 +16,7 @@ import boto3
 import yaml
 import io
 import re
-
-import urllib3
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+import psutil
 
 from spm_events import etl_main
 from parquet_lib import read_parquet_file
@@ -44,7 +39,7 @@ from parquet_lib import read_parquet_file
 '''
 
 def etl2(s, date_, det_config, conf):
-    
+
     date_str = date_.strftime('%Y-%m-%d')
 
     det_config_good = det_config[det_config.SignalID==s]
@@ -54,12 +49,13 @@ def etl2(s, date_, det_config, conf):
 
 
     t0 = time.time()
-    
+
     try:
+        bucket = conf['bucket']
         key = f'atspm/date={date_str}/atspm_{s}_{date_str}.parquet'
-        df = read_parquet_file(conf['bucket'], key)
-        
-    
+        df = read_parquet_file(bucket, key)
+
+
         if len(df)==0:
             print(f'{date_str} | {s} | No event data for this signal')
 
@@ -73,10 +69,10 @@ def etl2(s, date_, det_config, conf):
 
             if len(c) > 0 and len(d) > 0:
 
-                c.to_parquet(f's3://{conf["bucket"]}/cycles/date={date_str}/cd_{s}_{date_str}.parquet',
+                c.to_parquet(f's3://bucket}/cycles/date={date_str}/cd_{s}_{date_str}.parquet',
                              allow_truncated_timestamps=True)
 
-                d.to_parquet(f's3://{conf["bucket"]}/detections/date={date_str}/de_{s}_{date_str}.parquet',
+                d.to_parquet(f's3://bucket}/detections/date={date_str}/de_{s}_{date_str}.parquet',
                              allow_truncated_timestamps=True)
 
             else:
@@ -84,7 +80,10 @@ def etl2(s, date_, det_config, conf):
 
 
     except Exception as e:
-        print(s, e)
+        print(f'{s}: {e}')
+
+
+
 
 
 
@@ -113,7 +112,6 @@ def main(start_date, end_date):
     region = os.environ['AWS_DEFAULT_REGION']
     bucket = conf['bucket']
     staging_dir = conf['athena']['staging_dir']
-    staging_bucket = re.search('s3\://([^/]*)', staging_dir).group(1)
     
     #-----------------------------------------------------------------------------------------
     # Placeholder for manual override of signalids
@@ -128,7 +126,8 @@ def main(start_date, end_date):
 
         print(date_str)
 
-        objects = s3.list_objects(Bucket='vdot-spm', Prefix=f'atspm_det_config_good/date={date_str}')
+		# Use boto3 s3 client rather than pd.read_feather or pd.read_parquet to utilize ssl verify parameters
+        objects = s3.list_objects(Bucket=bucket, Prefix=f'atspm_det_config_good/date={date_str}')
         keys = [obj['Key'] for obj in objects['Contents']]
 
         def f(key):
@@ -176,14 +175,14 @@ def main(start_date, end_date):
 
         except FileNotFoundError:
             det_config = pd.DataFrame()
-        
-        if len(det_config) > 0:    
-            ncores = 1  # os.cpu_count()
+
+        if len(det_config) > 0:
+            nthreads = round(psutil.virtual_memory().total/1e9)  # ensure 1 MB memory per thread
 
             #-----------------------------------------------------------------------------------------
-            with Pool(processes=ncores * 24) as pool: #24
-                pool.starmap_async(
-                    etl2, list(itertools.product(signalids, [date_], [det_config], [conf])), chunksize=ncores*4-1)
+            with get_context('spawn').Pool(processes=nthreads) as pool:
+                result = pool.starmap_async(
+                    etl2, list(itertools.product(signalids, [date_], [det_config], [conf])), chunksize=(nthreads-1)*4)
                 pool.close()
                 pool.join()
             #-----------------------------------------------------------------------------------------

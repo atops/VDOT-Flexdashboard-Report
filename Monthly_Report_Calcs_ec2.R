@@ -93,21 +93,23 @@ print(Sys.time())
 
 # # GET CAMERA UPTIMES ########################################################
 
-print(glue("{Sys.time()} parse cctv logs [1 of 10]"))
+print(glue("{Sys.time()} parse cctv logs [1 of 11]"))
 
 if (conf$run$cctv == TRUE) {
     # Run python scripts asynchronously
     system("c:/users/ATSPM/miniconda3/python.exe parse_cctvlog.py", wait = FALSE)
     system("c:/users/ATSPM/miniconda3/python.exe parse_cctvlog_encoders.py", wait = FALSE)
+    system("~/miniconda3/bin/python parse_cctvlog.py", wait = FALSE)
+    system("~/miniconda3/bin/python parse_cctvlog_encoders.py", wait = FALSE)
 }
 
 # # GET RSU UPTIMES ###########################################################
 
-print(glue("{Sys.time()} parse rsu logs [2 of 10]"))
+print(glue("{Sys.time()} parse rsu logs [2 of 11]"))
 
 # # TRAVEL TIMES FROM RITIS API ###############################################
 
-print(glue("{Sys.time()} travel times [3 of 10]"))
+print(glue("{Sys.time()} travel times [3 of 11]"))
 
 if (conf$run$travel_times == TRUE) {
     # Run python script asynchronously
@@ -117,7 +119,7 @@ if (conf$run$travel_times == TRUE) {
 
 # # COUNTS ####################################################################
 
-print(glue("{Sys.time()} counts [4 of 10]"))
+print(glue("{Sys.time()} counts [4 of 11]"))
 
 if (conf$run$counts == TRUE) {
     date_range <- seq(ymd(start_date), ymd(end_date), by = "1 day")
@@ -140,15 +142,14 @@ if (conf$run$counts == TRUE) {
                 uptime = TRUE,
                 counts = TRUE
             )
-        })
+        }
     }
 }
 
 
-
 print("\n---------------------- Finished counts ---------------------------\n")
 
-print(glue("{Sys.time()} monthly cu [5 of 10]"))
+print(glue("{Sys.time()} monthly cu [5 of 11]"))
 
 
 # --- Everything up to here needs the ATSPM Database ---
@@ -165,7 +166,7 @@ signals_list <- unique(as.character(signals_list[signals_list > 0]))
 #   adjusted_counts_1hr
 #   BadDetectors
 
-print(glue("{Sys.time()} counts-based measures [6 of 10]"))
+print(glue("{Sys.time()} counts-based measures [6 of 11]"))
 
 get_counts_based_measures <- function(month_abbrs) {
     lapply(month_abbrs, function(yyyy_mm) {
@@ -202,26 +203,26 @@ get_counts_based_measures <- function(month_abbrs) {
                 table_name = "adjusted_counts_1hr",
                 conf_athena = conf$athena
             )
-        gc()
 
         lapply(date_range, function(date_) {
             # date_ <- date_range[1] # for debugging
+            date_str <- format(date_, "%F")
             if (between(date_, start_date, end_date)) {
                 print(glue("filtered_counts_1hr: {date_}"))
                 filtered_counts_1hr <- s3_read_parquet_parallel(
                     "filtered_counts_1hr",
-                    as.character(date_),
-                    as.character(date_),
+                    date_str,
+                    date_str,
                     bucket = conf$bucket
                 )
                 if (!is.null(filtered_counts_1hr) && nrow(filtered_counts_1hr)) {
                     filtered_counts_1hr <- filtered_counts_1hr %>%
-                    mutate(
-                        Date = date(Date),
-                        SignalID = factor(SignalID),
-                        CallPhase = factor(CallPhase),
-                        Detector = factor(Detector)
-                    )
+                        mutate(
+                            Date = date(Date),
+                            SignalID = factor(SignalID),
+                            CallPhase = factor(CallPhase),
+                            Detector = factor(Detector)
+                        )
 
                     # BAD DETECTORS
                     print(glue("detectors: {date_}"))
@@ -394,7 +395,7 @@ print("--- Finished counts-based measures ---")
 
 
 # -- Run etl_dashboard (Python): cycledata, detectionevents to S3/Athena --
-print(glue("{Sys.time()} etl [7 of 10]"))
+print(glue("{Sys.time()} etl [7 of 11]"))
 
 if (conf$run$etl == TRUE) {
 
@@ -406,15 +407,13 @@ if (conf$run$etl == TRUE) {
 # --- ----------------------------- -----------
 
 # # GET ARRIVALS ON GREEN #####################################################
-print(glue("{Sys.time()} aog [8 of 10]"))
+print(glue("{Sys.time()} aog [8 of 11]"))
 
 if (conf$run$arrivals_on_green == TRUE) {
 
     # run python script and wait for completion
     # system2("get_aog.bat", args = c(start_date, end_date))
     system2("./get_aog.sh", args = c(start_date, end_date))
-
-
 }
 gc()
 
@@ -437,7 +436,7 @@ get_queue_spillback_date_range <- function(start_date, end_date) {
         }
     })
 }
-print(glue("{Sys.time()} queue spillback [9 of 10]"))
+print(glue("{Sys.time()} queue spillback [9 of 11]"))
 
 if (conf$run$queue_spillback == TRUE) {
     get_queue_spillback_date_range(start_date, end_date)
@@ -445,39 +444,10 @@ if (conf$run$queue_spillback == TRUE) {
 
 
 
-# # GET SPLIT FAILURES ########################################################
-
-print(glue("{Sys.time()} split failures [10 of 10]"))
-
-get_sf_date_range <- function(start_date, end_date) {
-    date_range <- seq(ymd(start_date), ymd(end_date), by = "1 day")
-
-    lapply(date_range, function(date_) {
-        print(date_)
-
-            sf <- get_sf_utah(date_, conf, signals_list)
-            s3_upload_parquet_date_split(
-                sf,
-                bucket = conf$bucket,
-                prefix = "sf",
-                table_name = "split_failures",
-                conf_athena = conf$athena
-            )
-    })
-    gc()
-}
-
-if (conf$run$split_failures == TRUE) {
-    # Utah method, based on green, start-of-red occupancies
-    get_sf_date_range(start_date, end_date)
-}
-
-
-
 # # GET PED DELAY ########################################################
 
 # Ped delay using ATSPM method, based on push button-start of walk durations
-print(glue("{Sys.time()} ped delay [11 of 10]"))
+print(glue("{Sys.time()} ped delay [10 of 11]"))
 
 get_pd_date_range <- function(start_date, end_date) {
     date_range <- seq(ymd(start_date), ymd(end_date), by = "1 day")
@@ -501,6 +471,34 @@ get_pd_date_range <- function(start_date, end_date) {
 
 if (conf$run$ped_delay == TRUE) {
     get_pd_date_range(start_date, end_date)
+}
+
+
+
+# # GET SPLIT FAILURES ########################################################
+
+print(glue("{Sys.time()} split failures [11 of 11]"))
+
+get_sf_date_range <- function(start_date, end_date) {
+    date_range <- seq(ymd(start_date), ymd(end_date), by = "1 day")
+
+    lapply(date_range, function(date_) {
+        print(date_)
+
+            sf <- get_sf_utah(date_, conf, signals_list)
+            s3_upload_parquet_date_split(
+                sf,
+                bucket = conf$bucket,
+                prefix = "sf",
+                table_name = "split_failures",
+                conf_athena = conf$athena
+            )
+    })
+}
+
+if (conf$run$split_failures == TRUE) {
+    # Utah method, based on green, start-of-red occupancies
+    get_sf_date_range(start_date, end_date)
 }
 
 

@@ -27,10 +27,10 @@ s3 = boto3.client('s3')
 
 
 def is_success(response):
-    x = json.loads(response.content.decode('utf-8'))
-    if 'state' in x.keys() and x['state']=='SUCCEEDED':
-        return True
-    else:
+    try:
+        x = json.loads(response.content.decode('utf-8'))
+        return('state' in x.keys() and x['state']=='SUCCEEDED')
+    except:
         return False
 
 

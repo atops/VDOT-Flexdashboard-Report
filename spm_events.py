@@ -35,9 +35,15 @@ def get_pairs(df, a, b):
             .set_index(['SignalID','EventParam']))
 
     j['Duration'] = (j.EndTimeStamp - j.StartTimeStamp) / np.timedelta64(1, 's')
+    j = j[['StartTimeStamp','EndTimeStamp','EventCode','Duration']]
+    
+    # Remove secondary matches when there are multiple matches on the first item    
+    j = j.set_index('StartTimeStamp', append=True).sort_index()
+    j['rank'] = j.groupby(level=[0,1,2]).rank()['Duration']
+    j = j.loc[j['rank']==1].drop(columns='rank').reset_index(level=-1, drop=False)
 
     # returns SignalID|EventParam || StartTimeStamp|EndTimeStamp|EventCode|Duration
-    return j[['StartTimeStamp','EndTimeStamp','EventCode','Duration']]
+    return j
 
 def get_green_time(df):
     # start of green to start of yellow

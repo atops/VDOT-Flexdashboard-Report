@@ -60,8 +60,11 @@ usable_cores <- get_usable_cores()
 doParallel::registerDoParallel(cores = usable_cores)
 
 
-#----- DEFINE DATE RANGE FOR CALCULATIONS ------------------------------------#
+# # ###########################################################################
 
+# # Package everything up for Monthly Report back 13 months
+
+#----- DEFINE DATE RANGE FOR CALCULATIONS ------------------------------------#
 
 # report_end_date <- floor_date(today() - days(6), unit = "months")
 report_end_date <- Sys.Date() - days(1)
@@ -96,9 +99,9 @@ month_abbrs <- get_month_abbrs(report_start_date, report_end_date)
 
 report_start_date <- as.character(report_start_date)
 report_end_date <- as.character(report_end_date)
-print(wk_calcs_start_date)
-print(calcs_start_date)
-print(report_end_date)
+print(glue("{Sys.time()} Week Calcs Start Date: {wk_calcs_start_date}"))
+print(glue("{Sys.time()} Calcs Start Date: {calcs_start_date}"))
+print(glue("{Sys.time()} Report End Date: {report_end_date}"))
 
 date_range <- seq(ymd(report_start_date), ymd(report_end_date), by = "1 day")
 date_range_str <- paste0("{", paste0(as.character(date_range), collapse = ","), "}")

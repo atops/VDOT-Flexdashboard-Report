@@ -1,22 +1,19 @@
----
+# ------------------------------
 title: "ATSPM Dashboard"
-resource_files:
-- AthenaJDBC42_2.0.9.jar
-runtime: shiny
+# ------------------------------
 output:
   flexdashboard::flex_dashboard:
-    css: style.css
-    favicon: VDOT_Logo.gif
-    logo: VDOT_Logo.gif
     orientation: rows
-    self_contained: no
     vertical_layout: scroll
+    logo: VDOT_Logo.gif
+    favicon: VDOT_Logo.gif
+    css: style.css
+    self_contained: no
+runtime: shiny
 ---
 
 <style>
-
-.table thead tr th:nth-child(2n+4) {
-    /*color: white;*/
+.corridor_summary_table th:nth-child(2n+4) {
     visibility: hidden;
     font-size:1px;
     width:"50px";
@@ -28,21 +25,24 @@ output:
 
 </style>
 
-```{r global, cache = FALSE, include = FALSE, warning = FALSE}
+
+```{r global, include = FALSE, warning = FALSE}
 # FLEXDASHBOARD - RTOP_MONTHLY_REPORT
 
 conf_mode <- "beta"
 
 source("Monthly_Report_UI_Functions.R")
 
-FIG_WIDTH = 14
-FIG_HEIGHT = 7
+FIG_WIDTH <- 14
+FIG_HEIGHT <- 7
 
-
-
-styl <- "font-family: Source Sans Pro; font-size: 14px; padding-top: 25px"                                                 
-
+styl <- "font-family: Source Sans Pro; font-size: 14px; padding-top: 25px"
 ```
+
+
+
+
+
 
 Inputs {.sidebar}
 =====================================
@@ -51,41 +51,53 @@ Past month reports can be viewed back to `r format(first_month, "%B %Y")`.
 
 
 
-```{r sidebar, warning = FALSE, cache = FALSE}
+```{r sidebar, warning = FALSE}
 # shiny inputs defined here
 
-selectInput("month", "Month:",
-                       choices = month_options,
-                       selected = month_options[1]) # Default to current month
+selectInput(
+	"month", "Month:",
+	choices = month_options,
+	selected = month_options[1]
+) # Default to current month
 
-selectInput("zone_group", "Signal Group:",
-                       choices = zone_group_options,
-                       selected = "All RTOP")
+selectInput(
+    "zone_group", "Signal Group:",
+    choices = zone_group_options,
+    selected = "All RTOP"  # TODO: This needs to change
+)
 
 # Corridor Selection Drop Down based on Zone/Zone Group ---
 
-conditionalPanel("input.zone_group != 'All RTOP'",
-                 selectInput("corridor_x", "Corridor:",
-                             choices = c("All Corridors"),
-                             selected = "All Corridors"))
+conditionalPanel(
+    "input.zone_group != 'All RTOP'",
+    selectInput("corridor_x", "Corridor:",
+        choices = c("All Corridors"),
+        selected = "All Corridors"
+    )
+)
 
 observe({
     choices_ <- if (is.null(input$zone_group)) {
-                    NULL
-                } else {
-                    if (input$zone_group == "All RTOP") {
-                        c("All Corridors")
-                    } else if (input$zone_group %in% c("RTOP1", "RTOP2")) {
-                        c("All Corridors",
-                          as.character(unique(filter(
-                              corridors(), Zone_Group == input$zone_group)$Corridor)))
-                    } else {
-                        c("All Corridors",
-                          as.character(unique(filter(
-                              corridors(), Zone == input$zone_group)$Corridor)))
-                    }
-                }
-
+        NULL
+    } else {
+        if (input$zone_group == "All RTOP") {
+            c("All Corridors")
+        } else if (input$zone_group %in% c("RTOP1", "RTOP2")) {
+            c(
+                "All Corridors",
+                as.character(unique(filter(
+                    corridors(), Zone_Group == input$zone_group
+                )$Corridor))
+            )
+        } else {
+            c(
+                "All Corridors",
+                as.character(unique(filter(
+                    corridors(), Zone == input$zone_group
+                )$Corridor))
+            )
+        }
+    }
     updateSelectInput(session, "corridor_x", choices = sort(choices_), selected = "All Corridors")
 })
 
