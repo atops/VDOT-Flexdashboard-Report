@@ -69,10 +69,10 @@ def etl2(s, date_, det_config, conf):
 
             if len(c) > 0 and len(d) > 0:
 
-                c.to_parquet(f's3://bucket}/cycles/date={date_str}/cd_{s}_{date_str}.parquet',
+                c.to_parquet(f's3://{bucket}/cycles/date={date_str}/cd_{s}_{date_str}.parquet',
                              allow_truncated_timestamps=True)
 
-                d.to_parquet(f's3://bucket}/detections/date={date_str}/de_{s}_{date_str}.parquet',
+                d.to_parquet(f's3://{bucket}/detections/date={date_str}/de_{s}_{date_str}.parquet',
                              allow_truncated_timestamps=True)
 
             else:
@@ -93,6 +93,9 @@ def main(start_date, end_date):
 
     with open('Monthly_Report.yaml') as yaml_file:
         conf = yaml.load(yaml_file, Loader=yaml.Loader)
+
+    s3 = boto3.client('s3', verify=conf['ssl_cert'])
+    ath = boto3.client('athena', verify=conf['ssl_cert'])
 
     #-----------------------------------------------------------------------------------------
     # Placeholder for manual override of start/end dates
@@ -126,7 +129,7 @@ def main(start_date, end_date):
 
         print(date_str)
 
-		# Use boto3 s3 client rather than pd.read_feather or pd.read_parquet to utilize ssl verify parameters
+        # Use boto3 s3 client rather than pd.read_feather or pd.read_parquet to utilize ssl verify parameters
         objects = s3.list_objects(Bucket=bucket, Prefix=f'atspm_det_config_good/date={date_str}')
         keys = [obj['Key'] for obj in objects['Contents']]
 
@@ -230,9 +233,6 @@ if __name__=='__main__':
     with open('Monthly_Report.yaml') as yaml_file:
         conf = yaml.load(yaml_file, Loader=yaml.Loader)
 
-
-	s3 = boto3.client('s3', verify=conf['ssl_cert'])
-	ath = boto3.client('athena', verify=conf['ssl_cert'])
 
 
     if len(sys.argv) > 1:

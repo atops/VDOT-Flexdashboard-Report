@@ -24,7 +24,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 pp = pprint.PrettyPrinter()
 
 
-def get_keys(bucket, prefix, callback=lambda x: x):
+def get_keys(s3, bucket, prefix, callback=lambda x: x):
     response = s3.list_objects_v2(
         Bucket=bucket, 
         Prefix=prefix)
@@ -41,12 +41,12 @@ def get_keys(bucket, prefix, callback=lambda x: x):
             yield callback(cont['Key'])
             
             
-def get_signalids(date_, conf):
+def get_signalids(s3, date_, conf):
 
     bucket = conf['bucket']
     prefix = 'detections/date={d}'.format(d=date_.strftime('%Y-%m-%d'))
 
-    return get_keys(bucket, prefix, callback = lambda k: re.search('(?<=_)\d+(?=_)', k).group())
+    return get_keys(s3, bucket, prefix, callback = lambda k: re.search('(?<=_)\d+(?=_)', k).group())
 
 
 def get_det_config(date_, conf):
@@ -55,7 +55,7 @@ def get_det_config(date_, conf):
     conf [dict]
     '''
 
-    def read_det_config(bucket, key):
+    def read_det_config(s3, bucket, key):
     
         with io.BytesIO() as data:
             s3.download_fileobj(Bucket=bucket, Key=key, Fileobj=data)
@@ -63,6 +63,7 @@ def get_det_config(date_, conf):
         dc.loc[dc.DetectionTypeDesc.isna(), 'DetectionTypeDesc'] = '[]'
         return dc
 
+    s3 = boto3.client('s3', verify=conf['ssl_cert'])
 
     date_str = date_.strftime('%Y-%m-%d')
 
@@ -79,9 +80,9 @@ def get_det_config(date_, conf):
             Detector = lambda x: x.Detector.astype('int64'))
 
     dc_prefix = 'atspm_det_config_good/date={d}'.format(d=date_str)
-    dc_keys = get_keys(bucket, dc_prefix)
+    dc_keys = get_keys(s3, bucket, dc_prefix)
     
-    dc = pd.concat(list(map(lambda k: read_det_config(bucket, k), dc_keys)))
+    dc = pd.concat(list(map(lambda k: read_det_config(s3, bucket, k), dc_keys)))
     
     df = pd.merge(dc, bd, how='outer', on=['SignalID','Detector']).fillna(value={'Good_Day': 1})
     df = df.loc[df.Good_Day==1].drop(columns=['Good_Day'])
@@ -94,6 +95,8 @@ def get_aog(signalid, date_, det_config, conf, per='H'):
     date_ [Timestamp]
     '''
     try:
+        s3 = boto3.client('s3', verify=conf['ssl_cert'])
+        
         date_str = date_.strftime('%Y-%m-%d')
 
         bucket = conf['bucket']
@@ -180,6 +183,9 @@ def main(start_date, end_date):
     with open('Monthly_Report.yaml') as yaml_file:
         conf = yaml.load(yaml_file, Loader=yaml.Loader)
 
+    ath = boto3.client('athena', verify=conf['ssl_cert'])
+    s3 = boto3.client('s3', verify=conf['ssl_cert'])
+
     dates = pd.date_range(start_date, end_date, freq='1D')
     #dates = pd.date_range('2021-05-01', '2021-05-17')
 
@@ -192,7 +198,7 @@ def main(start_date, end_date):
         det_config = get_det_config(date_, conf)
         print('done.')
         print('Getting signals...', end='')
-        signalids = get_signalids(date_, conf)
+        signalids = get_signalids(s3, date_, conf)
         print('done.')
 
 
@@ -253,9 +259,6 @@ if __name__=='__main__':
     with open('Monthly_Report.yaml') as yaml_file:
         conf = yaml.load(yaml_file, Loader=yaml.Loader)
 
-
-	ath = boto3.client('athena', verify=conf['ssl_cert'])
-	s3 = boto3.client('s3', verify=conf['ssl_cert'])
 
 
     if len(sys.argv) > 1:
