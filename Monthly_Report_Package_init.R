@@ -68,7 +68,7 @@ doParallel::registerDoParallel(cores = usable_cores)
 
 # report_end_date <- floor_date(today() - days(6), unit = "months")
 report_end_date <- Sys.Date() - days(1)
-report_start_date <- report_end_date - months(12)
+report_start_date <- floor_date(report_end_date - months(12), unit = "months")
 
 calcs_end_date <- Sys.Date() - days(1)
 if (conf$calcs_start_date == "auto") {
