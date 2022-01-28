@@ -4,8 +4,8 @@ runtime: shiny
 output:
   flexdashboard::flex_dashboard:
     css: style.css
-    favicon: VDOT_V_Logo.gif # VDOT_Logo.gif
-    logo: VDOT_48px.png # VDOT_Logo.gif
+    favicon: VDOT_V_Logo.gif
+    logo: VDOT_48px.png
     orientation: rows
     self_contained: no
     vertical_layout: scroll
@@ -21,7 +21,6 @@ output:
 .table thead tr th:nth-child(2) {
     width:"1000px";
 }
-
 </style>
 
 
