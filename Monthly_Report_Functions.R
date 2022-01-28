@@ -2070,7 +2070,8 @@ get_weekly_avg_by_hr <- function(df, var_, wt_ = NULL) {
         mutate(Date = date(Hour)) %>%
         get_Tuesdays()
 
-    df_ <- left_join(df, Tuesdays) %>%
+    df_ <- select(df, -Date) %>%
+        left_join(Tuesdays, by = c("Week")) %>%
         filter(!is.na(Date))
     year(df_$Hour) <- year(df_$Date)
     month(df_$Hour) <- month(df_$Date)
@@ -3310,7 +3311,7 @@ get_corridor_summary_data <- function(cor) {
         rename(cor$mo$du, du = uptime, du.delta = delta), # detector uptime - note that zone group is factor not character
         rename(cor$mo$pau, pau = uptime, pau.delta = delta),
         rename(cor$mo$cu, cu = uptime, cu.delta = delta),
-        rename(cor$mo$tp, tp.delta = delta), # no longer pulling from vpd (volume) table - this is throughput
+        rename(cor$mo$tp, tp = vph, tp.delta = delta),
         rename(cor$mo$aogd, aog.delta = delta),
         rename(cor$mo$prd, pr.delta = delta),
         rename(cor$mo$qsd, qs = qs_freq, qs.delta = delta),
