@@ -53,7 +53,7 @@ def query_athena(query, database, output_bucket):
 
 
 # Read Corridors File from S3
-def get_corridors(bucket, key):
+def get_corridors(s3, bucket, key):
 
     with io.BytesIO() as data:
         s3.download_fileobj(
@@ -69,7 +69,7 @@ def get_corridors(bucket, key):
 
 
 # Upload watchdog alerts to predetermined location in S3
-def s3_upload_watchdog_alerts(df, bucket, region):
+def s3_upload_watchdog_alerts(s3, df, bucket, region):
 
     feather_filename = f'SPMWatchDogErrorEvents_{region}.feather'
     zipfile_filename = feather_filename + '.zip'
@@ -149,9 +149,9 @@ def main():
     with open('Monthly_Report.yaml') as yaml_file:
         conf = yaml.load(yaml_file, Loader=yaml.Loader)
 
-	s3 = boto3.client('s3', verify=conf['ssl_cert'])
-	ath = boto3.client('athena', verify=conf['ssl_cert'])
-	s3r = boto3.resource('s3', verify=conf['ssl_cert'])
+    s3 = boto3.client('s3', verify=conf['ssl_cert'])
+    ath = boto3.client('athena', verify=conf['ssl_cert'])
+    s3r = boto3.resource('s3', verify=conf['ssl_cert'])
 
     try:
         engine = get_atspm_engine(
@@ -162,6 +162,7 @@ def main():
             dsn=cred['ATSPM_DSN'])
 
         corridors = get_corridors(
+                s3, 
                 conf['bucket'],
                 conf['corridors_filename_s3'].replace('.xlsx','.feather'))
 
@@ -170,7 +171,7 @@ def main():
 
         try:
             # Write to Feather file - WatchDog
-            s3_upload_watchdog_alerts(wd, conf['bucket'], conf['region'])
+            s3_upload_watchdog_alerts(s3, wd, conf['bucket'], conf['region'])
             print('{now} - successfully uploaded to s3'.format(now=now))
         except Exception as e:
             print('{now} - ERROR: Could not upload to s3 - {err}'.format(now=now, err=e))
