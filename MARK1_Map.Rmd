@@ -8,9 +8,7 @@ output:
     orientation: columns
     vertical_layout: fill
     css: MARK1_Map.css
-
 ---
-
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -137,8 +135,6 @@ get_geom_coords <- function(coords_string) {
 #----------------------------------------------------------
 ```
 
-
-
 ```{r Corridors and Colors, echo=FALSE, eval=TRUE}
 
 # --- Corridors Listing ---
@@ -180,8 +176,6 @@ corridor_colors <- corridors %>%
     left_join(zone_colors, by = "Zone")
 ```
 
-
-
 ```{r Intersections, echo=FALSE, eval=TRUE}
 
 # --- Intersections (Point Layer) ---
@@ -207,8 +201,6 @@ statewide_signals_sp <- read_excel("VDOT_TrafficSignals_Export_2022-01-20.xlsx",
     select(REG_SIGNAL, KITS_ID, MAJ_NAME, MINOR_NAME, DISTRICT, ATSPM, Latitude, Longitude)
 ```
 
-
-
 ```{r TMC Segments from s3 xlsx 2, echo=FALSE, eval=TRUE}
 tmcs <- s3read_using(
     read_excel,
@@ -218,8 +210,6 @@ tmcs <- s3read_using(
     replace_na(list(color = GRAY)) %>%
     mutate(Zone = factor(Zone))
 ```
-
-
 
 ```{r Create SpatialDataFrame, echo=FALSE, eval=TRUE}
 tic()
@@ -252,8 +242,6 @@ map_data <- list(
 toc()
 ```
 
-
-
 ```{r, echo=FALSE, eval=FALSE}
 # == Save locally and to S3 == ==
 qsave(map_data, "map_data.qs")
@@ -268,13 +256,9 @@ put_object("map_data.qs",
 # == == == ==
 ```
 
-
-
 ```{r Read Map Data, echo=FALSE, eval=FALSE}
 map_data <- qread("map_data.qs")
 ```
-
-
 
 ```{r TMCs Map, echo=FALSE, fig.height=14, eval=TRUE}
 
@@ -389,5 +373,3 @@ s3write_using(map, qs::qsave, bucket = BUCKET, object = "VDOT_Corridors_Map.qs")
 
 map
 ```
-
-
