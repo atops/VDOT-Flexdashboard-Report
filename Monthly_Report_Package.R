@@ -126,7 +126,7 @@ tryCatch(
             signals_list = signals_list,
             parallel = FALSE
         ) %>%
-            filter(!is.na(CallPhase)) %>%   # Added 1/14/20 to perhaps exclude non-programmed ped pushbuttons
+            filter(!is.na(CallPhase)) %>%
             mutate(
                 SignalID = factor(SignalID),
                 Detector = factor(Detector),
@@ -142,8 +142,17 @@ tryCatch(
             summarize(papd = sum(vol, na.rm = TRUE), .groups = "drop") %>%
             complete(
                 Date = seq(ymd(pau_start_date), ymd(report_end_date), by = "1 day"),
-                nesting(SignalID, Detector, CallPhase), fill = list("papd"=0)) %>%
-            transmute(SignalID, Date, DOW = wday(Date), Week = week(Date), Detector, CallPhase, papd)
+                nesting(SignalID, Detector, CallPhase), 
+                fill = list("papd"=0)
+            ) %>%
+            transmute(
+                SignalID, 
+                Date, 
+                DOW = wday(Date), 
+                Week = week(Date), 
+                Detector, 
+                CallPhase, 
+                papd)
 
         papd <- counts_ped_daily
         paph <- counts_ped_hourly %>%
