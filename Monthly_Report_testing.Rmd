@@ -788,12 +788,6 @@ fillCol(
     fillRow(
         div("Detector Uptime", style = styl),
         renderPlotly({
-            print(mr_str())
-            print(zone_group())
-            print(endof_current_month())
-            print(mr()$wk$du)
-            print(sigdata()$wk$du)
-            
             data.set <- filter(mr()$wk$du, Corridor == zone_group() & Date <= endof_current_month())
             shiny::validate(need(nrow(data.set) > 0, "No Data"))
             perf_plot_week(
@@ -809,12 +803,6 @@ fillCol(
     fillRow(
         div("Ped Pushbutton Uptime", style = styl),
         renderPlotly({
-            print(mr_str())
-            print(zone_group())
-            print(endof_current_month())
-            print(mr()$wk$du)
-            print(sigdata()$wk$pau)
-
             data.set <- filter(mr()$wk$pau, Corridor == zone_group() & Date <= endof_current_month())
             shiny::validate(need(nrow(data.set) > 0, "No Data"))
             perf_plot_week(
