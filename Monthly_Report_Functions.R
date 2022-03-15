@@ -87,13 +87,13 @@ Sys.setenv(TZ="America/New_York")
 
 
 get_cor <- function() {
-    s3read_using(qs::qread, bucket = "gdot-spm", object = "cor_ec2.qs")
+    s3read_using(qs::qread, bucket = conf$bucket, object = "cor_ec2.qs")
 }
 get_sub <- function() {
-    s3read_using(qs::qread, bucket = "gdot-spm", object = "sub_ec2.qs")
+    s3read_using(qs::qread, bucket = conf$bucket, object = "sub_ec2.qs")
 }
 get_sig <- function() {
-    s3read_using(qs::qread, bucket = "gdot-spm", object = "sig_ec2.qs")
+    s3read_using(qs::qread, bucket = conf$bucket, object = "sig_ec2.qs")
 }
 
 sizeof <- function(x) {
@@ -3854,8 +3854,6 @@ get_signals_sp <- function(corridors) {
 }
 
 
-#tls <- s3readRDS(bucket = "gdot-spm", object = "teams_locations_shp.rds")
-
 get_map_data <- function() {
     
     BLACK <- "#000000"
@@ -4065,7 +4063,7 @@ get_flash_events <- function(conf_athena, start_date, end_date) {
     conn <- get_athena_connection(conf_athena)
     x <- tbl(conn, sql(glue(paste(
             "select date, timestamp, signalid, eventcode, eventparam", 
-            "from gdot_spm.atspm2 where eventcode = 173", 
+            "from {conf_athena$database}.{conf_athena$atspm_table} where eventcode = 173", 
             "and date between '{start_date}' and '{end_date}'")))) %>% 
         collect()
     
@@ -4158,9 +4156,10 @@ get_latest_det_config <- function() {
             bucket = "gdot-devices", 
             prefix = glue("atspm_det_config_good/date={format(date_, '%F')}"))
         if (length(x)) {
-            det_config <- s3read_using(arrow::read_feather, 
-                                       bucket = "gdot-devices", 
-                                       object = x$Contents$Key
+            det_config <- s3read_using(
+                arrow::read_feather, 
+                bucket = "gdot-devices", 
+                object = x$Contents$Key
             )
             break
         } else {

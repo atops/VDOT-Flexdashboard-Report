@@ -206,13 +206,16 @@ def query_athena(query, database, output_bucket):
 
 if __name__ == '__main__':
     
-    Bucket = 'gdot-spm'
+    with open('Monthly_Report.yaml') as yaml_file:
+        conf = yaml.load(yaml_file, Loader=yaml.Loader)
+    
+    Bucket = conf['bucket']
     Key = 'mark/comm_uptime/date=2019-02-15/cu_2019-02-15.parquet'
     Filename = 'cu_2019-02-15.feather'
     
     upload_parquet(Bucket, Key, Filename)
     
-    read_parquet('gdot-spm', 'comm_uptime', '2019-02-15', '2019-02-15')
+    read_parquet(Bucket, 'comm_uptime', '2019-02-15', '2019-02-15')
     
     
 

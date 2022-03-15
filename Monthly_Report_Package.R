@@ -1654,6 +1654,8 @@ tryCatch(
                 select(Zone_Group, Corridor, Date, sf_freq),
             "sfo" = sigify(readRDS("wsfo.rds"), cor$wk$sfo, corridors) %>%
                 select(Zone_Group, Corridor, Date, sf_freq),
+            "du" = sigify(readRDS("weekly_detector_uptime.rds"), cor$wk$du, corridors) %>%
+                select(Zone_Group, Corridor, Date, uptime),
             "cu" = sigify(readRDS("weekly_comm_uptime.rds"), cor$wk$cu, corridors) %>%
                 select(Zone_Group, Corridor, Date, uptime),
             "pau" = sigify(readRDS("weekly_pa_uptime.rds"), cor$wk$pau, corridors) %>%
