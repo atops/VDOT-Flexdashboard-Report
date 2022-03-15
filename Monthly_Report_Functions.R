@@ -1527,7 +1527,7 @@ get_sf_utah <- function(date_, conf, signals_list = NULL, first_seconds_of_red =
 
     de <- de %>%
         left_join(dc, by = c("SignalID", "Phase", "Detector", "Date")) %>%
-        filter(!is.na(TimeFromStopBar)) %>%
+        filter(!is.na(TimeFromStopBar), !is.na(DetOff)) %>%
         mutate(SignalID = factor(SignalID),
                Phase = factor(Phase),
                Detector = factor(Detector))
@@ -1883,8 +1883,6 @@ get_daily_avg <- function(df, var_, wt_ = "ones", peak_only = FALSE) {
                delta = ((!!var_) - lag_)/lag_) %>%
         ungroup() %>%
         dplyr::select(SignalID, Date, !!var_, !!wt_, delta)
-
-    # SignalID | Date | var_ | wt_ | delta
 }
 
 
@@ -2657,8 +2655,7 @@ get_cor_monthly_ti <- function(ti, cor_monthly_vph, corridors) {
                   .groups = "drop_last")
 
     left_join(ti,
-              distinct(corridors, Zone_Group, Zone, Corridor),
-              by = c("Zone_Group", "Zone", "Corridor")) %>%
+              distinct(corridors, Zone_Group, Zone, Corridor)) %>%
         mutate(hr = hour(Hour)) %>%
         left_join(day_dist) %>%
         ungroup() %>%
