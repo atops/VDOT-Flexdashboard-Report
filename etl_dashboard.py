@@ -6,7 +6,7 @@ Created on Mon Nov 27 16:27:29 2017
 """
 import sys
 from datetime import datetime, timedelta
-from multiprocessing import get_context
+from multiprocessing import get_context, Pool
 import pandas as pd
 import sqlalchemy as sq
 import time
@@ -183,7 +183,7 @@ def main(start_date, end_date):
             nthreads = round(psutil.virtual_memory().total/1e9)  # ensure 1 MB memory per thread
 
             #-----------------------------------------------------------------------------------------
-            with get_context('spawn').Pool(processes=nthreads) as pool:
+            with Pool(processes=nthreads) as pool:
                 result = pool.starmap_async(
                     etl2, list(itertools.product(signalids, [date_], [det_config], [conf])), chunksize=(nthreads-1)*4)
                 pool.close()
@@ -195,20 +195,29 @@ def main(start_date, end_date):
     print(f'{len(signalids)} signals in {len(dates)} days. Done in {int((time.time()-t0)/60)} minutes')
 
 
-    # Add a partition for each day
-    for date_ in dates:
-
-        date_str = date_.strftime('%Y-%m-%d')
-
+    # Add a partition for each day. If more than ten days, update all partitions in one command.
+    if len(dates) > 10:
         response_repair_cycledata = ath.start_query_execution(
-            QueryString=f"ALTER TABLE cycledata ADD PARTITION (date = '{date_str}');",
+            QueryString=f"MSCK REPAIR TABLE cycledata;",
             QueryExecutionContext={'Database': conf['athena']['database']},
             ResultConfiguration={'OutputLocation': conf['athena']['staging_dir']})
 
         response_repair_detection_events = ath.start_query_execution(
-            QueryString=f"ALTER TABLE detectionevents ADD PARTITION (date = '{date_str}');",
+            QueryString=f"MSCK REPAIR TABLE detectionevents",
             QueryExecutionContext={'Database': conf['athena']['database']},
             ResultConfiguration={'OutputLocation': conf['athena']['staging_dir']})
+    else:
+        for date_ in dates:
+            date_str = date_.strftime('%Y-%m-%d')
+            response_repair_cycledata = ath.start_query_execution(
+                QueryString=f"ALTER TABLE cycledata ADD PARTITION (date = '{date_str}');",
+                QueryExecutionContext={'Database': conf['athena']['database']},
+                ResultConfiguration={'OutputLocation': conf['athena']['staging_dir']})
+
+            response_repair_detection_events = ath.start_query_execution(
+                QueryString=f"ALTER TABLE detectionevents ADD PARTITION (date = '{date_str}');",
+                QueryExecutionContext={'Database': conf['athena']['database']},
+                ResultConfiguration={'OutputLocation': conf['athena']['staging_dir']})
 
 
     # Check if the partitions for the last day were successfully added before moving on
