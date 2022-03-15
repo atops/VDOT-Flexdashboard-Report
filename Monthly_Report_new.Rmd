@@ -1045,7 +1045,7 @@ fillCol(
         div("Ped Pushbutton Uptime", style = styl),
         renderPlotly({
             data.set <- filter(
-                cordata()$mo$pau,
+                mr()$mo$pau,
                 Corridor == zone_group() & Month <= current_month()
             )
             shiny::validate(need(nrow(data.set) > 0, "No Data"))
@@ -1850,7 +1850,7 @@ renderDataTable({
 # Map
 # =====================================
 
-# map_data <- s3readRDS(bucket = "gdot-spm", object = "map_data.rds")
+# map_data <- s3readRDS(bucket = conf$bucket, object = "map_data.rds")
 
 renderLeaflet({
     line_popups <- function(num, name, corr, tmc) {
