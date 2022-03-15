@@ -181,7 +181,7 @@ read_zipped_feather <- function(x) {
 
 
 
-keep_trying = function(func, n_tries, ...){
+keep_trying <- function(func, n_tries, ...){
 
     possibly_func = purrr::possibly(func, otherwise = NULL)
 
@@ -379,7 +379,6 @@ s3_upload_parquet_date_split <- function(df, prefix, bucket, table_name, conf_at
                                       table_name = table_name,
                                       conf_athena = conf_athena)
                 })
-
         }
     }
 
@@ -773,7 +772,7 @@ get_counts2 <- function(date_, bucket, conf_athena, uptime = TRUE, counts = TRUE
 
         cu <- uptime$sig %>%
             ungroup() %>%
-            left_join(uptime$all) %>%
+            left_join(uptime$all, by = c("Date")) %>%
             mutate(SignalID = factor(SignalID),
                    CallPhase = factor(0),
                    uptime = uptime + (1 - uptime_all),
@@ -1917,18 +1916,13 @@ get_weekly_sum_by_day <- function(df, var_) {
         group_by(SignalID, Week, CallPhase) %>%
         summarize(!!var_ := mean(!!var_, na.rm = TRUE),
                   .groups = "drop_last") %>% # Mean over 3 days in the week
-
-        #group_by(SignalID, Week) %>%
         summarize(!!var_ := sum(!!var_, na.rm = TRUE),
                   .groups = "drop_last") %>% # Sum of phases 2,6
-
         mutate(lag_ = lag(!!var_),
                delta = ((!!var_) - lag_)/lag_) %>%
         ungroup() %>%
-        left_join(Tuesdays) %>%
+        left_join(Tuesdays, by = c("Week")) %>%
         dplyr::select(SignalID, Date, Week, !!var_, delta)
-
-    # SignalID | Date | var_
 }
 
 
@@ -1964,7 +1958,7 @@ get_weekly_avg_by_day <- function(df, var_, wt_ = "ones", peak_only = TRUE) {
         mutate(lag_ = lag(!!var_),
                delta = ((!!var_) - lag_)/lag_) %>%
         ungroup() %>%
-        left_join(Tuesdays) %>%
+        left_join(Tuesdays, by = c("Week")) %>%
         dplyr::select(SignalID, Date, Week, !!var_, !!wt_, delta) %>%
         ungroup()
 
@@ -2312,8 +2306,10 @@ get_cor_avg_daily_detector_uptime <- function(avg_daily_detector_uptime, corrido
         get_cor_weekly_avg_by_day(corridors, "uptime", "ones"))
 
     full_join(dplyr::select(cor_daily_sb_uptime, -c(all.sb, delta)),
-              dplyr::select(cor_daily_pr_uptime, -c(all.pr, delta))) %>%
-        left_join(dplyr::select(cor_daily_all_uptime, -c(ones, delta))) %>%
+              dplyr::select(cor_daily_pr_uptime, -c(all.pr, delta)),
+              by = c("Zone_Group", "Corridor", "Date", "Week")) %>%
+        left_join(dplyr::select(cor_daily_all_uptime, -c(ones, delta)),
+        by = c("Zone_Group", "Corridor", "Date", "Week")) %>%
         mutate(Zone_Group = factor(Zone_Group))
 }
 
@@ -2519,8 +2515,10 @@ get_cor_monthly_detector_uptime <- function(avg_daily_detector_uptime, corridors
         get_cor_monthly_avg_by_day(corridors, "uptime", "all"))
 
     full_join(dplyr::select(cor_daily_sb_uptime, -c(all.sb, delta)),
-              dplyr::select(cor_daily_pr_uptime, -c(all.pr, delta))) %>%
-        left_join(dplyr::select(cor_daily_all_uptime, -c(all))) %>%
+              dplyr::select(cor_daily_pr_uptime, -c(all.pr, delta)),
+              by = c("Zone_Group", "Corridor", "Month")) %>%
+        left_join(dplyr::select(cor_daily_all_uptime, -c(all)),
+                  by = c("Zone_Group", "Corridor", "Month")) %>%
         mutate(Corridor = factor(Corridor),
                Zone_Group = factor(Zone_Group))
 }
@@ -3628,29 +3626,6 @@ get_ped_delay_s3 <- function(date_, conf) {
         )
     }
     
-}
-
-
-
-keep_trying = function(func, n_tries, ...){
-    
-    possibly_func = purrr::possibly(func, otherwise = NULL)
-    
-    result = NULL
-    try_number = 1
-    sleep = 1
-    
-    while(is.null(result) && try_number <= n_tries){
-        if (try_number > 1) {
-            print(paste("Attempt:", try_number))
-        }
-        try_number = try_number + 1
-        result = possibly_func(...)
-        Sys.sleep(sleep)
-        sleep = sleep + 1
-    }
-    
-    return(result)
 }
 
 
