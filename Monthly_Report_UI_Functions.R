@@ -323,14 +323,18 @@ perf_plot_beta_ <- function(data_, value_, name_, color_, fill_color_,
                        hoverformat_ = ",.0f",
                        goal_ = NULL) {
 
-    ax <- list(title = "", showticklabels = TRUE, showgrid = FALSE)
-    ay <- list(title = "", showticklabels = FALSE, showgrid = FALSE, zeroline = FALSE, hoverformat = hoverformat_)
-
     value_ <- as.name(value_)
     data_ <- dplyr::rename(data_, value = !!value_)
 
     first <- data_[which.min(data_$Month), ]
     last <- data_[which.max(data_$Month), ]
+    first_last <- c(first$Month, last$Month)
+    
+    arrow <- if_else(last$delta >= 0, "\u25b2", "\u25bc")
+
+    ax <- list(title = "", showticklabels = TRUE, showgrid = FALSE, 
+               ticktext = format(first_last, "%b %Y"), tickvals = first_last)
+    ay <- list(title = "", showticklabels = FALSE, showgrid = FALSE, zeroline = FALSE, hoverformat = hoverformat_)
 
     p <- plot_ly(type = "scatter", mode = "markers")
 
@@ -349,7 +353,12 @@ perf_plot_beta_ <- function(data_, value_, name_, color_, fill_color_,
                       fill = 'tonexty',
                       fillcolor = fill_color_)
     } else {
-        p <- p %>%
+         p <- p %>%
+            add_trace(x = data_$Month, 
+                      y = first$value,
+                      name = NULL,
+                      line = list(color = LIGHT_GRAY_BAR, width = 1),
+                      mode = 'lines') %>%
             add_trace(data = data_,
                       x = ~Month, y = ~value,
                       name = name_,
@@ -368,19 +377,19 @@ perf_plot_beta_ <- function(data_, value_, name_, color_, fill_color_,
                         borderpad = 5) %>%
         add_annotations(x = 1,
                         y = last$value,
-                        text = format_func(last$value),
-                        font = list(size = 16),
+                        text = glue("{format_func(last$value)} ({arrow}{as_pct(last$delta)})"),
+                        font = list(size = 14),
                         showarrow = FALSE,
                         xanchor = "left",
                         xref = "paper",
-                        width = 60,
+                        width = 120,
                         align = "left",
                         borderpad = 5) %>%
         layout(xaxis = ax,
                yaxis = ay,
                showlegend = FALSE,
                margin = list(l = 50, #120
-                             r = 60,
+                             r = 120,
                              t = 10,
                              b = 10)) %>%
         plotly::config(displayModeBar = F)

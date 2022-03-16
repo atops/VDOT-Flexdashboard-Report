@@ -1036,7 +1036,7 @@ fillCol(
                 format_func = as_pct,
                 hoverformat = ".1%",
                 fill_color_ = LIGHT_ORANGE,
-                goal_ = goal$du
+                goal_ = NULL # goal$du
             )
         }),
         flex = c(2, 10)
@@ -1054,7 +1054,7 @@ fillCol(
                 format_func = as_pct,
                 hoverformat = ".1%",
                 fill_color_ = LIGHT_ORANGE,
-                goal_ = goal$pau
+                goal_ = NULL  # goal$pau
             )
         }),
         flex = c(2, 10)
@@ -1069,7 +1069,7 @@ fillCol(
                 format_func = as_pct,
                 hoverformat = ".1%",
                 fill_color_ = LIGHT_ORANGE,
-                goal_ = goal$cu
+                goal_ = NULL  # goal$cu
             )
         }),
         flex = c(2, 10)
