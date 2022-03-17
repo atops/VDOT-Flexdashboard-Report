@@ -33,8 +33,21 @@ suppressMessages({
     library(compiler)
 })
 
-plan(multisession)
 
+if (interactive()) {
+    plan(multisession)
+} else {
+    plan(multicore)
+}
+
+source("Utilities.R")
+source("Classes.R")
+source("zone_manager_reports_editor.R")
+
+usable_cores <- get_usable_cores()
+doParallel::registerDoParallel(cores = usable_cores)
+
+logger <- log4r::logger(threshold = "DEBUG")
 
 options(dplyr.summarise.inform = FALSE)
 
@@ -101,16 +114,59 @@ metric.goals.sign <- c(rep(">", 4), ">", ">", rep("<", 4), "<")
 yes.color <- "green"
 no.color <- "red"
 
-# ###########################################################
+
+as_int <- function(x) {scales::comma_format()(as.integer(x))}
+as_2dec <- function(x) {sprintf(x, fmt = "%.2f")}
+as_pct <- function(x) {sprintf(x * 100, fmt = "%.1f%%")}
+as_currency <- function(x) {scales::dollar_format(accuracy = 1)(x)}
+
+data_format <- function(data_type) {
+    switch(
+        data_type,
+        "integer" = as_int,
+        "decimal" = as_2dec,
+        "percent" = as_pct,
+        "currency" = as_currency)
+}
+
+tick_format <- function(data_type) {
+    switch(
+        data_type,
+        "integer" = ",.0",
+        "decimal" = ".2f",
+        "percent" = ".0%",
+        "currency" = "$,.2f")
+}
+
+
+
+
+goal <- list("tp" = NULL,
+             "aogd" = 0.80,
+             "prd" = 1.20,
+             "qsd" = NULL,
+             "sfd" = NULL,
+             "tti" = 1.20,
+             "pti" = 1.30,
+             "du" = 0.95,
+             "ped" = 0.95,
+             "cctv" = 0.95,
+             "cu" = 0.95,
+             "pau" = 0.95)
+
 
 conf <- read_yaml("Monthly_Report.yaml")
 
 conf$mode <- conf_mode
-aws_conf <- read_yaml("Monthly_Report_AWS.yaml")
 
+aws_conf <- read_yaml("Monthly_Report_AWS.yaml")
 conf$athena$uid <- aws_conf$AWS_ACCESS_KEY_ID
 conf$athena$pwd <- aws_conf$AWS_SECRET_ACCESS_KEY
-conf$athena$region <- aws_conf$AWS_DEFAULT_REGION
+
+source("Database_Functions.R")
+
+athena_connection_pool <- get_athena_connection_pool(conf$athena)
+
 
 if (conf$mode == "production") {
     last_month <- ymd(conf$production_report_end_date)   # Production
@@ -120,7 +176,7 @@ if (conf$mode == "production") {
     
 } else {
     stop("mode defined in configuration yaml file must be either production or beta")
-}    
+}
 
 endof_last_month <- last_month + months(1) - days(1)
 first_month <- last_month - months(12)
@@ -128,6 +184,9 @@ report_months <- seq(last_month, first_month, by = "-1 month")
 month_options <- report_months %>% format("%B %Y")
 
 zone_group_options <- conf$zone_groups
+
+poll_interval <- 1000*3600 # 3600 seconds = 1 hour
+
 
 
 s3checkFunc <- function(bucket, object, aws_conf) {
@@ -164,6 +223,8 @@ s3valueFunc <- function(bucket, object, aws_conf) {
     }
 }
 
+
+
 s3reactivePoll <- function(intervalMillis, bucket, object, aws_s3) {
     reactivePoll(intervalMillis, session = NULL,
                  checkFunc = s3checkFunc(bucket = bucket, object = object, aws_s3),
@@ -196,33 +257,6 @@ if (conf$mode == "production") {
 }
 
 
-as_int <- function(x) {scales::comma_format()(as.integer(x))}
-as_2dec <- function(x) {sprintf(x, fmt = "%.2f")}
-as_pct <- function(x) {sprintf(x * 100, fmt = "%.1f%%")}
-as_currency <- function(x) {scales::dollar_format(accuracy = 1)(x)}
-
-goal <- list("tp" = NULL,
-             "aogd" = 0.80,
-             "prd" = 1.20,
-             "qsd" = NULL,
-             "sfd" = NULL,
-             "tti" = 1.20,
-             "pti" = 1.30,
-             "du" = 0.95,
-             "ped" = 0.95,
-             "cctv" = 0.95,
-             "cu" = 0.95,
-             "pau" = 0.95)
-
-
-get_athena_connection <- function(conf_athena, f = dbConnect) {
-    f(odbc::odbc(), dsn = "athena")
-}
-
-
-get_athena_connection_pool <- function(conf_athena) {
-    get_athena_connection(conf_athena, pool::dbPool)
-}
 
 
 read_zipped_feather <- function(x) {
@@ -1367,207 +1401,6 @@ get_cor_comm_uptime_plot_ <- function(avg_daily_uptime,
 get_cor_comm_uptime_plot <- memoise(get_cor_comm_uptime_plot_)
 
 
-# Reshape to show multiple on the same chart
-gather_outstanding_events <- function(cor_monthly_events) {
-    
-    cor_monthly_events %>% 
-        ungroup() %>% 
-        select(Zone_Group, Corridor, Month, Reported, Resolved, Outstanding) %>%
-        gather(Events, Status, -c(Month, Corridor, Zone_Group))
-}
-
-plot_teams_tasks_ <- function(tab, var_,
-                              title_ = "", textpos = "auto", height_ = 300) { #
-    
-    var_ <- as.name(var_)
-    
-    tab <- tab %>% 
-        mutate(var = fct_reorder(!!var_, Reported))
-    
-    p1 <- plot_ly(data = tab, height = height_) %>%
-        add_bars(x = ~Reported,  # ~Rep, 
-                 y = ~var,
-                 color = I(LIGHT_BLUE),
-                 name = "Reported",
-                 text = ~Reported, #  ~Rep,
-                 textposition = textpos,
-                 insidetextfont = list(size = 11, color = "black"),
-                 outsidetextfont = list(size = 11)) %>%
-        layout(margin = list(l = 180),
-               showlegend = FALSE,
-               yaxis = list(title = ""),
-               xaxis = list(title = "Reported",
-                            zeroline = FALSE),
-               margin = list(pad = 4))
-    p2 <- plot_ly(data = tab) %>%
-        add_bars(x = ~Resolved,  # ~Res, 
-                 y = ~var,
-                 color = I(BLUE),
-                 name = "Resolved",
-                 text = ~Resolved,  # ~Res,
-                 textposition = textpos,
-                 insidetextfont = list(size = 11, color = "white"),
-                 outsidetextfont = list(size = 11)) %>%
-        layout(margin = list(l = 180),
-               showlegend = FALSE,
-               yaxis = list(title = ""),
-               xaxis = list(title = "Resolved",
-                            zeroline = FALSE),
-               margin = list(pad = 4))
-    p3 <- plot_ly(data = tab) %>% 
-        add_bars(x = ~Outstanding,  # ~outstanding, 
-                 y = ~var, 
-                 color = I(ORANGE),
-                 name = "Outstanding",
-                 text = ~Outstanding, 
-                 textposition = textpos, 
-                 insidetextfont = list(size = 11, color = "white"),
-                 outsidetextfont = list(size = 11)) %>%
-        layout(margin = list(l = 180),
-               showlegend = FALSE,
-               yaxis = list(title = ""),
-               xaxis = list(title = "Cum. Outstanding",
-                            zeroline = FALSE),
-               margin = list(pad = 4))
-    subplot(p1, p2, p3, shareY = TRUE, shareX = TRUE) %>% 
-        layout(title = list(text = title_, font = list(size = 12)))
-}
-plot_teams_tasks <- memoise(plot_teams_tasks_)
-
-plot_tasks_ <- function(type_plot, source_plot, priority_plot, 
-                        month_name = input$month) {
-    
-    p1 <- subplot(type_plot, source_plot, priority_plot, 
-                  heights = c(0.42, 0.42, 0.16), nrows = 3, margin = 0.05) %>% 
-        layout(paper_bgcolor = "#f0f0f0", 
-               annotations = list(
-                   list(text = paste("Tasks by Type -", month_name), 
-                        font = list(size = 11), 
-                        xref = "paper", 
-                        yref = "paper", 
-                        yanchor = "bottom",
-                        xanchor = "center",
-                        x = 0.5, 
-                        y = 1.0,
-                        showarrow = FALSE,
-                        showlegend = FALSE), 
-                   list(text = paste("Tasks by Source -", month_name), 
-                        font = list(size = 11), 
-                        xref = "paper", 
-                        yref = "paper", 
-                        yanchor = "top",
-                        xanchor = "center",
-                        x = 0.5, 
-                        y = 0.58,
-                        showarrow = FALSE,
-                        showlegend = FALSE), 
-                   list(text = paste("Tasks by Priority -", month_name), 
-                        font = list(size = 11), 
-                        xref = "paper", 
-                        yref = "paper", 
-                        yanchor = "top",
-                        xanchor = "center",
-                        x = 0.5, 
-                        y = 0.16,
-                        showarrow = FALSE,
-                        showlegend = FALSE)))
-    
-    p2 <- subtype_plot %>% 
-        layout(annotations = list(text = paste("Tasks by Subtype -", month_name), 
-                                  font = list(size = 11), 
-                                  xref = "paper", 
-                                  yref = "paper", 
-                                  yanchor = "bottom",
-                                  xanchor = "center",
-                                  x = 0.5, 
-                                  y = 1.0,
-                                  showarrow = FALSE))
-    
-    subplot(p1, p2, nrows = 1, margin = 0.1)
-}
-plot_tasks <- memoise(plot_tasks_)
-
-# Number reported and resolved in each month. Side-by-side.
-cum_events_plot_ <- function(df) {
-    plot_ly(height = 300) %>%
-        add_bars(data = filter(df, Events == "Reported"),
-                 x = ~Month,
-                 y = ~Status,
-                 name = "Reported",
-                 marker = list(color = LIGHT_BLUE)) %>%
-        add_bars(data = filter(df, Events == "Resolved"),
-                 x = ~Month,
-                 y = ~Status,
-                 name = "Resolved",
-                 marker = list(color = BLUE)) %>%
-        add_trace(data = filter(df, Events == "Outstanding"),
-                  x = ~Month,
-                  y = ~Status,
-                  type = 'scatter', mode = 'lines', name = 'Outstanding', #fill = 'tozeroy',
-                  line = list(color = ORANGE)) %>%
-        add_trace(data = filter(df, Events == "Outstanding"),
-                  x = ~Month,
-                  y = ~Status,
-                  type = 'scatter',
-                  mode = 'markers', 
-                  name = 'Outstanding',
-                  marker = list(color = ORANGE),
-                  showlegend = FALSE) %>%
-        layout(barmode = "group",
-               yaxis = list(title = "Events"),
-               xaxis = list(title = ""),
-               legend = list(x = 0.5, y = 0.9, orientation = "h"))
-}
-cum_events_plot <- memoise(cum_events_plot_)
-
-
-
-plot_individual_cctvs_ <- function(daily_cctv_df, 
-                                   month_ = current_month(), 
-                                   zone_group_ = zone_group()) {
-    
-    spr <- daily_cctv_df %>%
-        filter(Date < month_ + months(1),
-               Zone_Group == zone_group_, 
-               as.character(Corridor) != as.character(Zone_Group)) %>% 
-        rename(CameraID = Corridor, 
-               Corridor = Zone_Group) %>%
-        dplyr::select(CameraID, Description, Date, up) %>%
-        distinct() %>% 
-        spread(Date, up, fill = 0) %>%
-        arrange(desc(CameraID))
-    
-    m <- as.matrix(spr %>% dplyr::select(-CameraID, -Description))
-    m <- round(m,0)
-    
-    row_names <- spr$CameraID
-    col_names <- colnames(m)
-    colnames(m) <- NULL
-    
-    status <- function(x) {
-        options <- c("Camera Down", "Working at encoder, but not 511", "Working on 511")
-        options[x+1]
-    }
-    bind_description <- function(camera_status) {
-        glue("<b>{as.character(spr$Description)}</b><br>{camera_status}")
-    }
-    
-    plot_ly(x = col_names, 
-            y = row_names, 
-            z = m, 
-            colors = c(LIGHT_GRAY_BAR, "#e48c5b", BROWN),
-            type = "heatmap",
-            ygap = 1,
-            showscale = FALSE,
-            customdata = apply(apply(apply(m, 2, status), 2, bind_description), 1, as.list),
-            hovertemplate="<br>%{customdata}<br>%{x}<extra></extra>",
-            hoverlabel = list(font = list(family = "Source Sans Pro"))) %>% 
-        layout(yaxis = list(type = "category",
-                            title = ""),
-               margin = list(l = 150))
-}
-plot_individual_cctvs <- memoise(plot_individual_cctvs_)
-
 
 
 uptime_heatmap <- function(df_,
@@ -2606,126 +2439,6 @@ filter_alerts <- function(alerts, alert_type_, zone_group_, corridor_, phase_, i
 
 
 
-filter_alerts_prestreak <- function(alerts, alert_type_, zone_group_, phase_, id_filter_)  {
-    
-    df_is_empty <- FALSE
-    
-    if (nrow(alerts) == 0) {
-        df_is_empty <- TRUE
-    } else {
-        df <- filter(alerts, Alert == alert_type_,
-                     grepl(pattern = id_filter_, x = Name, ignore.case = TRUE))
-        
-        if (nrow(df) == 0) {
-            df_is_empty <- TRUE
-        } else {
-            
-            if (zone_group_ == "All RTOP") {
-                df <- filter(df, Zone_Group %in% c("RTOP1", "RTOP2"))
-                
-            } else if (zone_group_ == "Zone 7") {
-                df <- filter(df, Zone %in% c("Zone 7m", "Zone 7d"))
-                
-            } else if (grepl("^Zone", zone_group_)) {
-                df <- filter(df, Zone == zone_group_)
-                
-            } else {
-                df <- filter(df, Zone_Group == zone_group_)
-            }
-            
-            if (nrow(df) == 0) {
-                df_is_empty <- TRUE
-            } else {
-                
-                if (alert_type_ != "Missing Records" & phase_ != "All") {
-                    df <- filter(df, Phase == as.numeric(phase_)) # filter
-                }
-                
-                if (nrow(df) == 0) {
-                    df_is_empty <- TRUE
-                }
-            }
-        }
-    }
-    
-    if (!df_is_empty) {
-        
-        if (alert_type_ == "Missing Records") {
-            
-            table_df <- df %>%
-                group_by(Zone, SignalID, Name, Alert) %>% 
-                summarize("Occurrences" = n()) %>% 
-                ungroup() 
-            
-            plot_df <- df %>%
-                mutate(SignalID2 = SignalID) %>%
-                unite(Name2, SignalID2, Name, sep = ": ") %>%
-                mutate(signal_phase = factor(Name2)) 
-            
-        } else if (alert_type_ == "Bad Vehicle Detection") {
-            
-            table_df <- df %>%
-                group_by(
-                    Zone, 
-                    SignalID, 
-                    Name, 
-                    Detector = as.integer(as.character(Detector)), 
-                    Alert) %>% 
-                summarize("Occurrences" = n()) %>% 
-                ungroup() 
-            
-            plot_df <- df %>%
-                mutate(Detector = as.character(Detector)) %>%
-                unite(signal_phase2, Name, Detector, sep = " | det ") %>%
-                
-                mutate(SignalID2 = SignalID) %>%
-                unite(signal_phase, SignalID2, signal_phase2, sep = ": ") %>% 
-                mutate(signal_phase = factor(signal_phase))
-            
-        } else if (alert_type_ == "No Camera Image") {
-            
-            table_df <- df %>%
-                group_by(Zone, SignalID, Name, Alert) %>% 
-                summarize("Occurrences" = n()) %>% 
-                ungroup() 
-            
-            plot_df <- df %>%
-                mutate(SignalID2 = SignalID) %>%
-                unite(signal_phase, SignalID2, Name, sep = ": ") %>% 
-                mutate(signal_phase = factor(signal_phase))
-            
-        } else {
-            
-            table_df <- df %>%
-                group_by(Zone, SignalID, Name, Phase, Alert) %>% 
-                summarize("Occurrences" = n()) %>% 
-                ungroup() 
-            plot_df <- df %>%
-                # mutate(Phase = as.character(Phase)) %>% 
-                unite(signal_phase2, Name, Phase, sep = " | ph ") %>% # potential problem
-                
-                mutate(SignalID2 = SignalID) %>%
-                unite(signal_phase, SignalID2, signal_phase2, sep = ": ") %>% 
-                mutate(signal_phase = factor(signal_phase))
-            
-        }
-        
-        intersections <- length(unique(plot_df$signal_phase))
-        
-    } else { #df_is_empty
-        
-        plot_df <- data.frame()
-        table_df <- data.frame()
-        intersections <- 0
-    }
-    
-    list("plot" = plot_df, 
-         "table" = table_df, 
-         "intersections" = intersections)
-}
-
-
-
 plot_alerts <- function(df, date_range) {
     
     if (nrow(df) > 0) {
@@ -2795,41 +2508,7 @@ reconstitute <- function(df, col_name) {
 }
 
 
-m1dynq_ <- function(res, per, tab, start_date, end_date = NULL, corridor = NULL, zone_group = NULL) {
-    cid <- glue("{res}-{per}-{tab}")
-    
-    if (class(start_date) == "Date") {
-        start_date <- format(start_date, "%Y-%m-%d")
-    }
-    
-    if (is.null(end_date)) {
-        df <- query_dynamodb_beta(cid, start_date, corridor = corridor, zone_group = zone_group)
-    } else {
-        if (class(end_date) == "Date") {
-            end_date <- format(end_date, "%Y-%m-%d")
-        }
-        df <- query_dynamodb_beta(cid, start_date, end_date, corridor = corridor, zone_group = zone_group)
-    }
 
-    if ("Corridor" %in% names(df)) {
-        df <- mutate(df, Corridor = factor(Corridor))
-    }
-    if ("Zone_Group" %in% names(df)) {
-        df <- mutate(df, Zone_Group = factor(Zone_Group))
-    }
-    if ("Month" %in% names(df)) {
-        df <- mutate(df, Month = ymd(Month))
-    }
-    if ("Date" %in% names(df)) {
-        df <- mutate(df, Date = ymd(Date))
-    }
-    if ("Hour" %in% names(df)) {
-        df <- mutate(df, Hour = ymd_hms(sub("(\\d{4}-\\d{2}-\\d{2})$", "\\1 00:00:00", Hour)))
-    }
-    
-    df
-}
-m1dynq <- memoise(m1dynq_)
 
 rds_vb_query_ <- function(mr, per, tab, zone_group, current_month = NULL, current_quarter = NULL) {
     

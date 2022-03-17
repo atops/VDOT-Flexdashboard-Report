@@ -9,8 +9,8 @@ get_counts <- function(df, det_config, units = "hours", date_, event_code = 82, 
         
         # Group by hour using Athena/Presto SQL
         if (units == "hours") {
-            df <- df %>%
-                group_by(timeperiod = date_trunc('hour', timestamp),  # timeperiod = dateadd(HOUR, datediff(HOUR, 0, timestamp), 0),
+            df <- df %>% 
+                group_by(timeperiod = date_trunc('hour', timestamp),
                          signalid,
                          eventparam)
             
@@ -74,6 +74,20 @@ get_counts2 <- function(date_, bucket, conf_athena, uptime = TRUE, counts = TRUE
         # select(timestamp = Timestamp, signalid = SignalID, eventcode = EventCode, eventparam = EventParam) %>%
         mutate(signalid = as.integer(signalid)) %>%
         filter(as_date(timestamp) == as_date(date_))
+    
+    # atspm_ds <- arrow::open_dataset(glue("s3://vdot-spm/atspm/date={date_}/"))
+    # atspm_ds %>% 
+    #     mutate(yr = year(Timestamp), mo = month(Timestamp), dy = day(Timestamp), hr = hour(Timestamp)) %>% 
+    #     filter(EventCode == 82) %>% group_by(SignalID, yr, mo, dy, hr, EventParam) %>% 
+    #     count() %>% 
+    #     collect() %>% 
+    #     ungroup() %>%
+    #     transmute(
+    #         SignalID, 
+    #         Timestamp = make_datetime(yr, mo, dy, hr, 0, 0),
+    #         Detector = EventParam,
+    #         vol = as.integer(n)) %>%
+    #     arrange(SignalID, Timestamp, EventParam, vol)
     
     print(paste("-- Get Counts for:", date_, "-----------"))
     
@@ -199,10 +213,31 @@ get_counts2 <- function(date_, bucket, conf_athena, uptime = TRUE, counts = TRUE
                 conf_athena)
         }
         
+        conn <- get_athena_connection(conf_athena)
+
+	# get 15min ped counts
+        print("15-minute pedestrian counts")
+        counts_ped_15min <- get_counts(
+            tbl(conn, atspm_query), 
+            ped_config, 
+            "15min", 
+            date_, 
+            event_code = 90, 
+            TWR_only = FALSE
+        ) %>% 
+            arrange(SignalID, Detector, Timeperiod)
+        
+        dbDisconnect(conn)
+        
+        s3_upload_parquet(counts_ped_15min, date_, 
+                          fn = counts_ped_15min_fn, 
+                          bucket = bucket,
+                          table_name = "counts_ped_15min", 
+                          conf_athena = conf_athena)
+        rm(counts_ped_15min)
+        
+        
     }
-    
-    dbDisconnect(conn)
-    #gc()
 }
 
 
@@ -215,19 +250,19 @@ get_counts2 <- function(date_, bucket, conf_athena, uptime = TRUE, counts = TRUE
 get_filtered_counts_3stream <- function(counts, interval = "1 hour") { # interval (e.g., "1 hour", "15 min")
     
     if (interval == "1 hour") {
-        max_volume <- 1200
-        
+        max_volume <- 1200  # 1000 - increased on 3/19/2020 (down to 2000 on 3/31) to accommodate mainline ramp meters
+        max_volume_mainline <- 3000 # New on 5/21/2020
         max_delta <- 500
-        max_abs_delta <- 200
-        
+        max_abs_delta <- 200  # 200 - increased on 3/24 to make less stringent
+        max_abs_delta_mainline <- 500 # New on 5/21/2020
         max_flat <- 5
         hi_vol_pers <- 5
     } else if (interval == "15 min") {
-        max_volume <- 300
-        
+        max_volume <- 300  #250 - increased on 3/19/2020 (down to 500 on 3/31) to accommodate mainline ramp meter detectors
+        max_volume_mainline <- 750 # New on 5/21/2020
         max_delta <- 125
-        max_abs_delta <- 50
-        
+        max_abs_delta <- 50  # 50 - increased on 3/24 to make less stringent
+        max_abs_delta_mainline <- 125
         max_flat <- 20
         hi_vol_pers <- 20
     } else {
@@ -246,13 +281,14 @@ get_filtered_counts_3stream <- function(counts, interval = "1 hour") { # interva
     det_config <- lapply(all_days, function(d) {
         all_timeperiods <- seq(ymd_hms(paste(d, "00:00:00")), ymd_hms(paste(d, "23:59:00")), by = interval)
         get_det_config(d) %>%
-            expand(nesting(SignalID, Detector, CallPhase),
+            expand(nesting(SignalID, Detector, CallPhase, ApproachDesc), ## ApproachDesc is new
                    Timeperiod = all_timeperiods)
     }) %>% bind_rows() %>%
         transmute(SignalID = factor(SignalID),
                   Timeperiod = Timeperiod,
                   Detector = factor(Detector),
-                  CallPhase = factor(CallPhase))
+                  CallPhase = factor(CallPhase),
+                  Mainline = grepl("Mainline", ApproachDesc)) ## New
     
     expanded_counts <- full_join(
         det_config,
@@ -275,11 +311,15 @@ get_filtered_counts_3stream <- function(counts, interval = "1 hour") { # interva
                flatlined = streak_run(vol_streak),
                flatlined = if_else(hour(Timeperiod) < 5, 0, as.double(flatlined)),
                flat_flag = max(flatlined, na.rm = TRUE) > max_flat,
-               maxvol_flag = sum(vol > max_volume) > hi_vol_pers,
-               mad_flag = mean_abs_delta > max_abs_delta) %>%
+               maxvol_flag = if_else(Mainline, 
+                                     sum(vol > max_volume_mainline) > hi_vol_pers, 
+                                     sum(vol > max_volume) > hi_vol_pers),
+               mad_flag = if_else(Mainline,
+                                  mean_abs_delta > max_abs_delta_mainline,
+                                  mean_abs_delta > max_abs_delta)) %>%
         
         ungroup() %>%
-        select(-vol_streak)
+        select(-Mainline, -vol_streak) 
     
     # bad day = any of the following:
     #    flatlined for at least 5 hours (starting at 5am hour)
@@ -312,92 +352,6 @@ get_filtered_counts_3stream <- function(counts, interval = "1 hour") { # interva
             vol = if_else(Good_Day==1, vol, as.double(NA)))
 }
 
-
-# Single threaded
-get_filtered_counts <- function(counts, interval = "1 hour") { # interval (e.g., "1 hour", "15 min")
-    
-    if (interval == "1 hour") {
-        max_volume <- 3000  # 1000 - increased on 3/19/2020 to accommodate mainline ramp meter detectors
-        max_delta <- 500
-        max_abs_delta <- 500  # 200 - increased on 3/24 to make less stringent
-    } else if (interval == "15 min") {
-        max_volume <- 750  #250 - increased on 3/19/2020 to accommodate mainline ramp meter detectors
-        max_delta <- 125
-        max_abs_delta <- 125  # 50 - increased on 3/24 to make less stringent
-    } else {
-        stop("interval must be '1 hour' or '15 min'")
-    }
-    
-    counts <- counts %>%
-        mutate(SignalID = factor(SignalID),
-               Detector = factor(Detector),
-               CallPhase = factor(CallPhase)) %>%
-        filter(!is.na(CallPhase))
-    
-    # Identify detectors/phases from detector config file. Expand.
-    #  This ensures all detectors are included in the bad detectors calculation.
-    all_days <- unique(date(counts$Timeperiod))
-    det_config <- lapply(all_days, function(d) {
-        all_timeperiods <- seq(ymd_hms(paste(d, "00:00:00")), ymd_hms(paste(d, "23:59:00")), by = interval)
-        get_det_config(d) %>%
-            expand(nesting(SignalID, Detector, CallPhase),
-                   Timeperiod = all_timeperiods)
-    }) %>% bind_rows() %>%
-        transmute(SignalID = factor(SignalID),
-                  Timeperiod = Timeperiod,
-                  Detector = factor(Detector),
-                  CallPhase = factor(CallPhase))
-    
-    
-    expanded_counts <- full_join(det_config, counts) %>%
-        transmute(SignalID = factor(SignalID),
-                  Date = date(Timeperiod),
-                  Timeperiod = Timeperiod,
-                  Detector = factor(Detector),
-                  CallPhase = factor(CallPhase),
-                  vol = as.double(vol),
-                  vol0 = if_else(is.na(vol), 0.0, vol)) %>%
-        group_by(SignalID, CallPhase, Detector) %>%
-        arrange(SignalID, CallPhase, Detector, Timeperiod) %>%
-        
-        mutate(delta_vol = vol0 - lag(vol0)) %>%
-        ungroup() %>%
-        mutate(Good = ifelse(is.na(vol) |
-                                 vol > max_volume |
-                                 is.na(delta_vol) |
-                                 abs(delta_vol) > max_delta |
-                                 abs(delta_vol) == 0,
-                             0, 1)) %>%
-        dplyr::select(-vol0) %>%
-        ungroup()
-    
-    
-    # bad day = any of the following:
-    #    too many bad hours (60%) based on the above criteria
-    #    mean absolute change in hourly volume > 200
-    bad_days <- expanded_counts %>%
-        filter(hour(Timeperiod) >= 5) %>%
-        group_by(SignalID, CallPhase, Detector, Date = date(Timeperiod)) %>%
-        summarize(Good = sum(Good, na.rm = TRUE),
-                  All = n(),
-                  Pct_Good = as.integer(sum(Good, na.rm = TRUE)/n()*100),
-                  mean_abs_delta = mean(abs(delta_vol), na.rm = TRUE),
-                  .groups = "drop") %>%
-        ungroup() %>%
-        
-        # manually calibrated
-        mutate(Good_Day = as.integer(ifelse(Pct_Good >= 70 & mean_abs_delta < max_abs_delta, 1, 0))) %>%
-        dplyr::select(SignalID, CallPhase, Detector, Date, mean_abs_delta, Good_Day)
-    
-    # counts with the bad days taken out
-    filtered_counts <- left_join(expanded_counts, bad_days) %>%
-        mutate(vol = if_else(Good_Day==1, vol, as.double(NA)),
-               Month_Hour = Timeperiod - days(day(Timeperiod) - 1),
-               Hour = Month_Hour - months(month(Month_Hour) - 1)) %>%
-        ungroup()
-    
-    filtered_counts
-}
 
 
 get_adjusted_counts <- function(filtered_counts) {

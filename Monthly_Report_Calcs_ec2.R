@@ -9,8 +9,13 @@ source("Monthly_Report_Functions.R")
 
 print(glue("{Sys.time()} Starting Calcs Script"))
 
-
+if (interactive()) {
+    plan(multisession)
+} else {
+    plan(multicore)
+}
 usable_cores <- get_usable_cores(4)
+# usable_cores <- 1
 doParallel::registerDoParallel(cores = usable_cores)
 
 
@@ -18,16 +23,9 @@ doParallel::registerDoParallel(cores = usable_cores)
 # aurora <- get_aurora_connection()
 
 #----- DEFINE DATE RANGE FOR CALCULATIONS ------------------------------------#
-start_date <- ifelse(
-    conf$start_date == "yesterday",
-    format(today() - days(1), "%Y-%m-%d"),
-    conf$start_date
-)
-end_date <- ifelse(
-    conf$end_date == "yesterday",
-    format(today() - days(1), "%Y-%m-%d"),
-    conf$end_date
-)
+
+start_date <- get_date_from_string(conf$start_date) 
+end_date <- get_date_from_string(conf$end_date) 
 
 # Manual overrides
 # start_date <- "2020-01-04"
@@ -115,6 +113,7 @@ if (conf$run$travel_times == TRUE) {
     # Run python script asynchronously
     # system("c:/users/ATSPM/miniconda3/python.exe get_travel_times_1hr.py", wait = FALSE)
     system("~/miniconda3/bin/python get_travel_times.py travel_times_1hr.yaml", wait = FALSE)
+    system("~/miniconda3/bin/python get_travel_times.py travel_times_15min.yaml", wait = FALSE)
 }
 
 # # COUNTS ####################################################################
@@ -181,40 +180,44 @@ get_counts_based_measures <- function(month_abbrs) {
         ed <- sd + months(1) - days(1)
         ed <- min(ed, ymd(end_date))
         date_range <- seq(sd, ed, by = "1 day")
-
-
-        print("adjusted counts")
-        s3_read_parquet_parallel(
-            "filtered_counts_1hr",
-            as.character(sd),
-            as.character(ed),
-            bucket = conf$bucket
-        ) %>%
-            mutate(
-                Date = date(Date),
-                SignalID = factor(SignalID),
-                CallPhase = factor(CallPhase),
-                Detector = factor(Detector)
-            ) %>%
-            get_adjusted_counts() %>%
+        
+        
+        print("1-hour adjusted counts")
+        prep_db_for_adjusted_counts_arrow("filtered_counts_1hr", conf, date_range)
+        get_adjusted_counts_arrow("filtered_counts_1hr", "adjusted_counts_1hr", conf)
+        
+        fc_ds <- arrow::open_dataset(sources = "filtered_counts_1hr/")
+        ac_ds <- arrow::open_dataset(sources = "adjusted_counts_1hr/")
+        
+        lapply(date_range, function(date_) {
+            # print(date_)
+            adjusted_counts_1hr <- ac_ds %>% 
+                filter(Date == date_) %>% 
+                select(-c(Date, date)) %>% 
+                collect()
             s3_upload_parquet_date_split(
+                adjusted_counts_1hr,
                 bucket = conf$bucket,
                 prefix = "adjusted_counts_1hr",
                 table_name = "adjusted_counts_1hr",
-                conf_athena = conf$athena
+                conf_athena = conf$athena, parallel = FALSE
             )
+        })
+        
+        mclapply(date_range, mc.cores = usable_cores, mc.preschedule = FALSE, FUN = function(x) {
+            write_signal_details(x, conf$athena, signals_list)
+        })
 
-        lapply(date_range, function(date_) {
-            # date_ <- date_range[1] # for debugging
+
+        mclapply(date_range, mc.cores = usable_cores, mc.preschedule = FALSE, FUN = function(date_) {
             date_str <- format(date_, "%F")
             if (between(date_, start_date, end_date)) {
-                print(glue("filtered_counts_1hr: {date_}"))
-                filtered_counts_1hr <- s3_read_parquet_parallel(
-                    "filtered_counts_1hr",
-                    date_str,
-                    date_str,
-                    bucket = conf$bucket
-                )
+                print(glue("filtered_counts_1hr: {date_str}"))
+                filtered_counts_1hr <- fc_ds %>%
+                    filter(date == date_str) %>%
+                    select(-date) %>%
+                    collect()
+
                 if (!is.null(filtered_counts_1hr) && nrow(filtered_counts_1hr)) {
                     filtered_counts_1hr <- filtered_counts_1hr %>%
                         mutate(
@@ -249,14 +252,12 @@ get_counts_based_measures <- function(month_abbrs) {
                 }
             }
 
-            print(glue("reading adjusted_counts_1hr: {date_}"))
-            adjusted_counts_1hr <- s3_read_parquet_parallel(
-                "adjusted_counts_1hr",
-                as.character(date_),
-                as.character(date_),
-                bucket = conf$bucket
-            )
-
+            print(glue("reading adjusted_counts_1hr: {date_str}"))
+            adjusted_counts_1hr <- ac_ds %>% 
+                filter(date == date_str) %>% 
+                select(-date) %>% 
+                collect()
+            
             if (!is.null(adjusted_counts_1hr) && nrow(adjusted_counts_1hr)) {
                 adjusted_counts_1hr <- adjusted_counts_1hr %>%
                     mutate(
@@ -279,7 +280,7 @@ get_counts_based_measures <- function(month_abbrs) {
 
                 # VPH
                 print(glue("vph: {date_}"))
-                vph <- get_vph(adjusted_counts_1hr)
+                vph <- get_vph(adjusted_counts_1hr, interval = "1 hour")
                 s3_upload_parquet_date_split(
                     vph,
                     bucket = conf$bucket,
@@ -289,6 +290,13 @@ get_counts_based_measures <- function(month_abbrs) {
                 )
             }
         })
+        if (dir.exists("filtered_counts_1hr")) {
+            unlink("filtered_counts_1hr", recursive = TRUE)
+        }
+        if (dir.exists("adjusted_counts_1hr")) {
+            unlink("adjusted_counts_1hr", recursive = TRUE)
+        }
+
 
 
         #-----------------------------------------------
@@ -296,55 +304,57 @@ get_counts_based_measures <- function(month_abbrs) {
         # FOR EVERY TUE, WED, THU OVER THE WHOLE MONTH
         print("15-minute counts and throughput")
 
-        doParallel::registerDoParallel(cores = usable_cores)
-
-        date_range_twr <- date_range[lubridate::wday(date_range, label = TRUE) %in% c("Tue", "Wed", "Thu")]
-
-        filtered_counts_15min <- lapply(date_range_twr, function(date_) {
-            date_ <- as.character(date_)
+        print("15-minute adjusted counts")
+        prep_db_for_adjusted_counts_arrow("filtered_counts_15min", conf, date_range)
+        get_adjusted_counts_arrow("filtered_counts_15min", "adjusted_counts_15min", conf)
+        
+        fc_ds <- arrow::open_dataset(sources = "filtered_counts_15min/")
+        ac_ds <- arrow::open_dataset(sources = "adjusted_counts_15min/")
+        
+        lapply(date_range, function(date_) {
             print(date_)
-            s3_read_parquet_parallel(
-                "filtered_counts_15min", date_, date_, bucket = conf$bucket)
-        }) %>% bind_rows()
+            adjusted_counts_15min <- ac_ds %>% 
+                filter(Date == date_) %>% 
+                select(-c(Date, date)) %>% 
+                collect()
+            s3_upload_parquet_date_split(
+                adjusted_counts_15min,
+                bucket = conf$bucket,
+                prefix = "adjusted_counts_15min",
+                table_name = "adjusted_counts_15min",
+                conf_athena = conf$athena, parallel = FALSE
+            )
 
-        if (!is.null(filtered_counts_15min) && nrow(filtered_counts_15min)) {
-            filtered_counts_15min <- filtered_counts_15min %>%
-                transmute(
-                    SignalID = factor(SignalID),
-                    CallPhase = factor(CallPhase),
-                    Detector = factor(Detector),
-                    Date = date(Date),
-                    Timeperiod = Timeperiod,
-                    Month_Hour = Month_Hour,
-                    Hour = Hour,
-                    vol = vol,
-                    Good_Day = Good_Day,
-                    delta_vol = delta_vol,
-                    mean_abs_delta = mean_abs_delta
-                )
-        }
-
-        print("adjusted counts and throughput")
-
-        if (length(filtered_counts_15min) > 0) {
-            print("15-min adjusted counts")
-            adjusted_counts_15min <- get_adjusted_counts(filtered_counts_15min) %>%
-                mutate(Date = date(Timeperiod))
-            rm(filtered_counts_15min)
-
-            # Calculate and write Throughput
             throughput <- get_thruput(adjusted_counts_15min)
-
             s3_upload_parquet_date_split(
                 throughput,
                 bucket = conf$bucket,
                 prefix = "tp",
                 table_name = "throughput",
+                conf_athena = conf$athena, parallel = FALSE
+            )
+            
+            # Vehicles per 15-minute timeperiod
+            print(glue("vp15: {date_}"))
+            vp15 <- get_vph(adjusted_counts_15min, interval = "15 min")
+            s3_upload_parquet_date_split(
+                vp15,
+                bucket = conf$bucket,
+                prefix = "vp15",
+                table_name = "vehicles_15min",
                 conf_athena = conf$athena
             )
+        })
+        
+        if (dir.exists("filtered_counts_15min")) {
+            unlink("filtered_counts_15min", recursive = TRUE)
+        }
+        if (dir.exists("adjusted_counts_15min")) {
+            unlink("adjusted_counts_15min", recursive = TRUE)
         }
 
-
+        
+        
         #-----------------------------------------------
         # 1-hour pedestrian activation counts
         print("1-hour pedestrian activation counts")
@@ -373,13 +383,38 @@ get_counts_based_measures <- function(month_abbrs) {
 
             # PAPH - pedestrian activations per hour
             print("paph")
-            paph <- get_vph(counts_ped_1hr, mainline_only = FALSE) %>%
+            paph <- get_vph(counts_ped_1hr, interval = "1 hour", mainline_only = FALSE) %>%
                 rename(paph = vph)
             s3_upload_parquet_date_split(
                 paph,
                 bucket = conf$bucket,
                 prefix = "paph",
                 table_name = "ped_actuations_ph",
+                conf_athena = conf$athena
+            )
+	}
+
+        #-----------------------------------------------
+        # 15-min pedestrian activation counts
+        print("15-minute pedestrian activation counts")
+
+        counts_ped_15min <- s3_read_parquet_parallel(
+            "counts_ped_15min",
+            as.character(sd),
+            as.character(ed),
+            bucket = conf$bucket
+        )
+
+        if (!is.null(counts_ped_15min) && nrow(counts_ped_15min)) {
+            # PA15 - pedestrian activations per 15min
+            print("pa15")
+            pa15 <- get_vph(counts_ped_15min, interval = "15 min", mainline_only = FALSE) %>%
+                rename(pa15 = vph)
+            s3_upload_parquet_date_split(
+                pa15,
+                bucket = conf$bucket,
+                prefix = "pa15",
+                table_name = "ped_actuations_15min",
                 conf_athena = conf$athena
             )
         }
@@ -426,13 +461,23 @@ get_queue_spillback_date_range <- function(start_date, end_date) {
 
         detection_events <- get_detection_events(date_, date_, conf$athena, signals_list)
         if (nrow(collect(head(detection_events))) > 0) {
-            qs <- get_qs(detection_events)
+
+            qs <- get_qs(detection_events, intervals = c("hour", "15min"))
+
             s3_upload_parquet_date_split(
-                qs,
+                qs$hour,
                 bucket = conf$bucket,
                 prefix = "qs",
                 table_name = "queue_spillback",
-                conf_athena = conf$athena)
+                conf_athena = conf$athena
+            )
+            s3_upload_parquet_date_split(
+                qs$`15min`,
+                bucket = conf$bucket,
+                prefix = "qs",
+                table_name = "queue_spillback_15min",
+                conf_athena = conf$athena
+            )
         }
     })
 }
@@ -484,15 +529,23 @@ get_sf_date_range <- function(start_date, end_date) {
 
     lapply(date_range, function(date_) {
         print(date_)
-
-            sf <- get_sf_utah(date_, conf, signals_list)
-            s3_upload_parquet_date_split(
-                sf,
-                bucket = conf$bucket,
-                prefix = "sf",
-                table_name = "split_failures",
-                conf_athena = conf$athena
-            )
+        
+        sf <- get_sf_utah(date_, conf, signals_list, intervals = c("hour", "15min"))
+        
+        s3_upload_parquet_date_split(
+            sf$hour,
+            bucket = conf$bucket,
+            prefix = "sf",
+            table_name = "split_failures",
+            conf_athena = conf$athena
+        )
+        s3_upload_parquet_date_split(
+            sf$`15min`,
+            bucket = conf$bucket,
+            prefix = "sf",
+            table_name = "split_failures_15min",
+            conf_athena = conf$athena
+        )
     })
 }
 

@@ -359,8 +359,8 @@ tryCatch(
 
         s3write_using(
             bad_det,
-            FUN = write_fst,
-            object = "mark/watchdog/bad_detectors.fst",
+            FUN = write_parquet,
+            object = "mark/watchdog/bad_detectors.parquet",
             bucket = conf$bucket,
             opts = list(multipart = TRUE)
         )
@@ -490,7 +490,6 @@ print(glue("{Sys.time()} Hourly Pedestrian Activations [5 of 23]"))
 
 tryCatch(
     {
-
         weekly_paph <- get_weekly_paph(paph)
         monthly_paph <- get_monthly_paph(paph)
 
@@ -535,16 +534,10 @@ if (FALSE) {
 tryCatch(
     {
         cb <- function(x) {
-            x <- if ("Avg.Max.Ped.Delay" %in% names(x)) {
-                x %>%
-                    rename(
-                        pd = Avg.Max.Ped.Delay
-                    ) %>%
-                    mutate(
-                        CallPhase = factor(0)
-                    )
-            } else {
-                x
+            if ("Avg.Max.Ped.Delay" %in% names(x)) {
+                x <- x %>%
+                    rename(pd = Avg.Max.Ped.Delay) %>%
+                    mutate(CallPhase = factor(0))
             }
             x %>%
                 mutate(
@@ -1276,13 +1269,16 @@ tryCatch(
             filter(!is.na(Zone_Group))
 
         tti <- tt %>%
-            dplyr::select(-c(pti, bi))
+            dplyr::select(-c(pti, bi, speed_mph))
 
         pti <- tt %>%
-            dplyr::select(-c(tti, bi))
+            dplyr::select(-c(tti, bi, speed_mph))
 
         bi <- tt %>%
-            dplyr::select(-c(tti, pti))
+            dplyr::select(-c(tti, pti, speed_mph))
+
+        spd <- tt %>%
+            dplyr::select(-c(tti, pti, bi))
 
         cor_monthly_vph <- readRDS("cor_monthly_vph.rds") %>%
             rename(Zone = Zone_Group) %>%
@@ -1291,10 +1287,12 @@ tryCatch(
         cor_monthly_tti_by_hr <- get_cor_monthly_ti_by_hr(tti, cor_monthly_vph, all_corridors)
         cor_monthly_pti_by_hr <- get_cor_monthly_ti_by_hr(pti, cor_monthly_vph, all_corridors)
         cor_monthly_bi_by_hr <- get_cor_monthly_ti_by_hr(bi, cor_monthly_vph, all_corridors)
+        cor_monthly_spd_by_hr <- get_cor_monthly_ti_by_hr(spd, cor_monthly_vph, all_corridors)
 
         cor_monthly_tti <- get_cor_monthly_ti_by_day(tti, cor_monthly_vph, all_corridors)
         cor_monthly_pti <- get_cor_monthly_ti_by_day(pti, cor_monthly_vph, all_corridors)
         cor_monthly_bi <- get_cor_monthly_ti_by_day(bi, cor_monthly_vph, all_corridors)
+        cor_monthly_spd <- get_cor_monthly_ti_by_day(spd, cor_monthly_vph, all_corridors)
 
         addtoRDS(cor_monthly_tti, "cor_monthly_tti.rds", "tti", report_start_date, calcs_start_date)
         addtoRDS(cor_monthly_tti_by_hr, "cor_monthly_tti_by_hr.rds", "tti", report_start_date, calcs_start_date)
@@ -1305,6 +1303,9 @@ tryCatch(
         addtoRDS(cor_monthly_bi, "cor_monthly_bi.rds", "bi", report_start_date, calcs_start_date)
         addtoRDS(cor_monthly_bi_by_hr, "cor_monthly_bi_by_hr.rds", "bi", report_start_date, calcs_start_date)
 
+        addtoRDS(cor_monthly_spd, "cor_monthly_spd.rds", "speed_mph", report_start_date, calcs_start_date)
+        addtoRDS(cor_monthly_spd_by_hr, "cor_monthly_spd_by_hr.rds", "speed_mph", report_start_date, calcs_start_date)
+
         # ------- Subcorridor Travel Time Metrics ------- #
 
         tt <- s3_read_parquet_parallel(
@@ -1312,7 +1313,7 @@ tryCatch(
             table_name = "sub_travel_time_metrics_1hr",
             start_date = calcs_start_date,
             end_date = report_end_date
-            ) %>%
+        ) %>%
             mutate(
                 Corridor = factor(Corridor),
                 Subcorridor = factor(Subcorridor)
@@ -1324,13 +1325,16 @@ tryCatch(
             left_join(distinct(subcorridors, Zone_Group, Zone))
 
         tti <- tt %>%
-            dplyr::select(-c(pti, bi))
+            dplyr::select(-c(pti, bi, speed_mph))
 
         pti <- tt %>%
-            dplyr::select(-c(tti, bi))
+            dplyr::select(-c(tti, bi, speed_mph))
 
         bi <- tt %>%
-            dplyr::select(-c(tti, pti))
+            dplyr::select(-c(tti, pti, speed_mph))
+
+        spd <- tt %>%
+            dplyr::select(-c(tti, pti, bi))
 
         sub_monthly_vph <- readRDS("sub_monthly_vph.rds") %>%
             rename(Zone = Zone_Group) %>%
@@ -1339,10 +1343,12 @@ tryCatch(
         sub_monthly_tti_by_hr <- get_cor_monthly_ti_by_hr(tti, sub_monthly_vph, subcorridors)
         sub_monthly_pti_by_hr <- get_cor_monthly_ti_by_hr(pti, sub_monthly_vph, subcorridors)
         sub_monthly_bi_by_hr <- get_cor_monthly_ti_by_hr(bi, sub_monthly_vph, subcorridors)
+        sub_monthly_spd_by_hr <- get_cor_monthly_ti_by_hr(spd, sub_monthly_vph, subcorridors)
 
         sub_monthly_tti <- get_cor_monthly_ti_by_day(tti, sub_monthly_vph, subcorridors)
         sub_monthly_pti <- get_cor_monthly_ti_by_day(pti, sub_monthly_vph, subcorridors)
         sub_monthly_bi <- get_cor_monthly_ti_by_day(bi, sub_monthly_vph, subcorridors)
+        sub_monthly_spd <- get_cor_monthly_ti_by_day(spd, sub_monthly_vph, subcorridors)
 
         addtoRDS(sub_monthly_tti, "sub_monthly_tti.rds", "tti", report_start_date, calcs_start_date)
         addtoRDS(sub_monthly_tti_by_hr, "sub_monthly_tti_by_hr.rds", "tti", report_start_date, calcs_start_date)
@@ -1353,6 +1359,8 @@ tryCatch(
         addtoRDS(sub_monthly_bi, "sub_monthly_bi.rds", "bi", report_start_date, calcs_start_date)
         addtoRDS(sub_monthly_bi_by_hr, "sub_monthly_bi_by_hr.rds", "bi", report_start_date, calcs_start_date)
 
+        addtoRDS(sub_monthly_spd, "sub_monthly_spd.rds", "speed_mph", report_start_date, calcs_start_date)
+        addtoRDS(sub_monthly_spd_by_hr, "sub_monthly_spd_by_hr.rds", "speed_mph", report_start_date, calcs_start_date)
 
         rm(tt)
         rm(tti)
@@ -1450,16 +1458,17 @@ tryCatch(
         )
         cor$wk <- list(
             "vpd" = readRDS("cor_weekly_vpd.rds"),
-            #"vph" = readRDS("cor_weekly_vph.rds"),
-            "vphp" = readRDS("cor_weekly_vph_peak.rds"),
+            # "vph" = readRDS("cor_weekly_vph.rds"),
+            "vphpa" = readRDS("cor_weekly_vph_peak.rds")$am,
+            "vphpp" = readRDS("cor_weekly_vph_peak.rds")$pm,
             "papd" = readRDS("cor_weekly_papd.rds"),
-            #"paph" = readRDS("cor_weekly_paph.rds"),
-            #"pd" = readRDS("cor_weekly_pd_by_day.rds"),
+            # "paph" = readRDS("cor_weekly_paph.rds"),
+            "pd" = readRDS("cor_weekly_pd_by_day.rds"),
             "tp" = readRDS("cor_weekly_throughput.rds"),
-            "aog" = readRDS("cor_weekly_aog_by_day.rds"),
-            "pr" = readRDS("cor_weekly_pr_by_day.rds"),
-            "qs" = readRDS("cor_wqs.rds"),
-            "sf" = readRDS("cor_wsf.rds"),
+            "aogd" = readRDS("cor_weekly_aog_by_day.rds"),
+            "prd" = readRDS("cor_weekly_pr_by_day.rds"),
+            "qsd" = readRDS("cor_wqs.rds"),
+            "sfd" = readRDS("cor_wsf.rds"),
             "sfo" = readRDS("cor_wsfo.rds"),
             "du" = readRDS("cor_weekly_detector_uptime.rds"),
             "cu" = readRDS("cor_weekly_comm_uptime.rds"),
@@ -1467,11 +1476,12 @@ tryCatch(
         )
         cor$mo <- list(
             "vpd" = readRDS("cor_monthly_vpd.rds"),
-            #"vph" = readRDS("cor_monthly_vph.rds"),
-            "vphp" = readRDS("cor_monthly_vph_peak.rds"),
+            # "vph" = readRDS("cor_monthly_vph.rds"),
+            "vphpa" = readRDS("cor_monthly_vph_peak.rds")$am,
+            "vphpp" = readRDS("cor_monthly_vph_peak.rds")$pm,
             "papd" = readRDS("cor_monthly_papd.rds"),
-            #"paph" = readRDS("cor_monthly_paph.rds"),
-            #"pd" = readRDS("cor_monthly_pd_by_day.rds"),
+            # "paph" = readRDS("cor_monthly_paph.rds"),
+            "pd" = readRDS("cor_monthly_pd_by_day.rds"),
             "tp" = readRDS("cor_monthly_throughput.rds"),
             "aogd" = readRDS("cor_monthly_aog_by_day.rds"),
             "aogh" = readRDS("cor_monthly_aog_by_hr.rds"),
@@ -1488,6 +1498,8 @@ tryCatch(
             "ptih" = readRDS("cor_monthly_pti_by_hr.rds"),
             "bi" = readRDS("cor_monthly_bi.rds"),
             "bih" = readRDS("cor_monthly_bi_by_hr.rds"),
+            "spd" = readRDS("cor_monthly_spd.rds"),
+            "spdh" = readRDS("cor_monthly_spd_by_hr.rds"),
             "du" = readRDS("cor_monthly_detector_uptime.rds"),
             "cu" = readRDS("cor_monthly_comm_uptime.rds"),
             "pau" = readRDS("cor_monthly_pa_uptime.rds")
@@ -1495,9 +1507,9 @@ tryCatch(
         )
         cor$qu <- list(
             "vpd" = get_quarterly(cor$mo$vpd, "vpd"),
-            #"vph" = data.frame(), # get_quarterly(cor$mo$vph, "vph"),
-            "vphpa" = get_quarterly(cor$mo$vphp$am, "vph"),
-            "vphpp" = get_quarterly(cor$mo$vphp$pm, "vph"),
+            # "vph" = data.frame(), # get_quarterly(cor$mo$vph, "vph"),
+            "vphpa" = get_quarterly(cor$mo$vphpa, "vph"),
+            "vphpp" = get_quarterly(cor$mo$vphpp, "vph"),
             "papd" = get_quarterly(cor$mo$papd, "papd"),
             #"pd" = get_quarterly(cor$mo$pd, "Duration"),
             "tp" = get_quarterly(cor$mo$tp, "vph"),
@@ -1537,9 +1549,10 @@ tryCatch(
         sub$wk <- list(
             "vpd" = readRDS("sub_weekly_vpd.rds") %>%
                 select(Zone_Group, Corridor, Date, vpd),
-            #"vph" = readRDS("sub_weekly_vph.rds"),
-            "vphp" = readRDS("sub_weekly_vph_peak.rds") %>%
-                map(~select(., Zone_Group, Corridor, Date, vph)),
+            "vphpa" = readRDS("sub_weekly_vph_peak.rds")$am %>%
+                select(Zone_Group, Corridor, Date, vph),
+            "vphpp" = readRDS("sub_weekly_vph_peak.rds")$pm %>%
+                select(Zone_Group, Corridor, Date, vph),
             "papd" = readRDS("sub_weekly_papd.rds") %>%
                 select(Zone_Group, Corridor, Date, papd),
             #"paph" = readRDS("sub_weekly_paph.rds"),
@@ -1547,13 +1560,13 @@ tryCatch(
             #    select(Zone_Group, Corridor, Date, Duration),
             "tp" = readRDS("sub_weekly_throughput.rds") %>%
                 select(Zone_Group, Corridor, Date, vph),
-            "aog" = readRDS("sub_weekly_aog_by_day.rds") %>%
+            "aogd" = readRDS("sub_weekly_aog_by_day.rds") %>%
                 select(Zone_Group, Corridor, Date, aog),
-            "pr" = readRDS("sub_weekly_pr_by_day.rds") %>%
+            "prd" = readRDS("sub_weekly_pr_by_day.rds") %>%
                 select(Zone_Group, Corridor, Date, pr),
-            "qs" = readRDS("sub_wqs.rds") %>%
+            "qsd" = readRDS("sub_wqs.rds") %>%
                 select(Zone_Group, Corridor, Date, qs_freq),
-            "sf" = readRDS("sub_wsf.rds") %>%
+            "sfd" = readRDS("sub_wsf.rds") %>%
                 select(Zone_Group, Corridor, Date, sf_freq),
             "sfo" = readRDS("sub_wsfo.rds") %>%
                 select(Zone_Group, Corridor, Date, sf_freq),
@@ -1566,8 +1579,9 @@ tryCatch(
         )
         sub$mo <- list(
             "vpd" = readRDS("sub_monthly_vpd.rds"),
-            #"vph" = readRDS("sub_monthly_vph.rds"),
-            "vphp" = readRDS("sub_monthly_vph_peak.rds"),
+            # "vph" = readRDS("sub_monthly_vph.rds"),
+            "vphpa" = readRDS("sub_monthly_vph_peak.rds")$am,
+            "vphpp" = readRDS("sub_monthly_vph_peak.rds")$pm,
             "papd" = readRDS("sub_monthly_papd.rds"),
             #"paph" = readRDS("sub_monthly_paph.rds"),
             #"pd" = readRDS("sub_monthly_pd_by_day.rds"),
@@ -1593,9 +1607,9 @@ tryCatch(
         )
         sub$qu <- list(
             "vpd" = get_quarterly(sub$mo$vpd, "vpd"),
-            #"vph" = get_quarterly(sub$mo$vph, "vph"),
-            "vphpa" = get_quarterly(sub$mo$vphp$am, "vph"),
-            "vphpp" = get_quarterly(sub$mo$vphp$pm, "vph"),
+            # "vph" = get_quarterly(sub$mo$vph, "vph"),
+            "vphpa" = get_quarterly(sub$mo$vphpa, "vph"),
+            "vphpp" = get_quarterly(sub$mo$vphpp, "vph"),
             "tp" = get_quarterly(sub$mo$tp, "vph"),
             "aogd" = get_quarterly(sub$mo$aogd, "aog", "vol"),
             "prd" = get_quarterly(sub$mo$prd, "pr", "vol"),
@@ -1629,14 +1643,10 @@ tryCatch(
         sig$wk <- list(
             "vpd" = sigify(readRDS("weekly_vpd.rds"), cor$wk$vpd, corridors) %>%
                 select(Zone_Group, Corridor, Date, vpd),
-            #"vph" = sigify(readRDS("weekly_vph.rds"), cor$wk$vph, corridors),
-            "vphp" = purrr::map2(
-                readRDS("weekly_vph_peak.rds"), cor$wk$vphp,
-                function(x, y) {
-                    sigify(x, y, corridors) %>%
-                        select(Zone_Group, Corridor, Date, vph)
-                }
-            ),
+            "vphpa" = sigify(readRDS("weekly_vph_peak.rds")$am, cor$wk$vphpa, corridors) %>%
+                select(Zone_Group, Corridor, Date, vph),
+            "vphpp" = sigify(readRDS("weekly_vph_peak.rds")$pm, cor$wk$vphpp, corridors) %>%
+                select(Zone_Group, Corridor, Date, vph),
             "papd" = sigify(readRDS("weekly_papd.rds"), cor$wk$papd, corridors) %>%
                 select(Zone_Group, Corridor, Date, papd),
             #"paph" = sigify(readRDS("weekly_paph.rds"), cor$wk$paph, corridors),
@@ -1644,13 +1654,13 @@ tryCatch(
             #    select(Zone_Group, Corridor, Date, Duration),
             "tp" = sigify(readRDS("weekly_throughput.rds"), cor$wk$tp, corridors) %>%
                 select(Zone_Group, Corridor, Date, vph),
-            "aog" = sigify(readRDS("weekly_aog_by_day.rds"), cor$wk$aog, corridors) %>%
+            "aogd" = sigify(readRDS("weekly_aog_by_day.rds"), cor$wk$aogd, corridors) %>%
                 select(Zone_Group, Corridor, Date, aog),
-            "pr" = sigify(readRDS("weekly_pr_by_day.rds"), cor$wk$pr, corridors) %>%
+            "prd" = sigify(readRDS("weekly_pr_by_day.rds"), cor$wk$prd, corridors) %>%
                 select(Zone_Group, Corridor, Date, pr),
-            "qs" = sigify(readRDS("wqs.rds"), cor$wk$qs, corridors) %>%
+            "qsd" = sigify(readRDS("wqs.rds"), cor$wk$qsd, corridors) %>%
                 select(Zone_Group, Corridor, Date, qs_freq),
-            "sf" = sigify(readRDS("wsf.rds"), cor$wk$sf, corridors) %>%
+            "sfd" = sigify(readRDS("wsf.rds"), cor$wk$sfd, corridors) %>%
                 select(Zone_Group, Corridor, Date, sf_freq),
             "sfo" = sigify(readRDS("wsfo.rds"), cor$wk$sfo, corridors) %>%
                 select(Zone_Group, Corridor, Date, sf_freq),
@@ -1664,15 +1674,10 @@ tryCatch(
         sig$mo <- list(
             "vpd" = sigify(readRDS("monthly_vpd.rds"), cor$mo$vpd, corridors) %>%
                 select(-c(Name, ones)),
-            #"vph" = sigify(readRDS("monthly_vph.rds"), cor$mo$vph, corridors) %>%
-            #    select(-c(Name, ones)),
-            "vphp" = purrr::map2(
-                readRDS("monthly_vph_peak.rds"), cor$mo$vphp,
-                function(x, y) {
-                    sigify(x, y, corridors) %>%
-                        select(-c(Name, ones))
-                }
-            ),
+            "vphpa" = sigify(readRDS("monthly_vph_peak.rds")$am, cor$mo$vphpa, corridors) %>%
+                select(-c(Name, ones)),
+            "vphpp" = sigify(readRDS("monthly_vph_peak.rds")$pm, cor$mo$vphpp, corridors) %>%
+                select(-c(Name, ones)),
             "papd" = sigify(readRDS("monthly_papd.rds"), cor$mo$papd, corridors) %>%
                 select(-c(Name, ones)),
             #"paph" = sigify(readRDS("monthly_paph.rds"), cor$mo$paph, corridors) %>%
@@ -1702,6 +1707,7 @@ tryCatch(
             "tti" = data.frame(),
             "pti" = data.frame(),
             "bi" = data.frame(),
+            "spd" = data.frame(),
             "du" = sigify(readRDS("monthly_detector_uptime.rds"), cor$mo$du, corridors) %>%
                 select(Zone_Group, Corridor, Month, uptime, uptime.sb, uptime.pr, delta),
             "cu" = sigify(readRDS("monthly_comm_uptime.rds"), cor$mo$cu, corridors) %>%
@@ -1725,11 +1731,10 @@ descs <- corridors %>%
     ungroup()
 
 for (tab in c(
-    "vpd","papd","pd",
-    "tp","aog","aogd","aogh","pr","prd","prh","qs","qsd","qsh","sf","sfd","sfh","sfo",
-    "du","cu","pau"
+    "vpd", "vphpa", "vphpp", "papd", "pd", "bpsi", "rsi", "cri", "kabco",
+    "tp", "aog", "aogd", "aogh", "prd", "prh", "qsd", "qsh", "sfd", "sfh", "sfo",
+    "du", "cu", "pau", "cctv", "maint_plot", "ops_plot", "safety_plot"
 )) {
-    print(tab)
     if (tab %in% names(sig$mo) & tab != "cctv") {
         sig$mo[[tab]] <- sig$mo[[tab]] %>%
             left_join(descs, by = c("Corridor" = "SignalID", "Zone_Group" = "Corridor")) %>%
@@ -1764,7 +1769,6 @@ for (tab in c(
 }
 
 for (tab in c("du", "cu", "pau")) {
-    print(tab)
     sig$dy[[tab]] <- sig$dy[[tab]] %>%
         left_join(descs, by = c("Corridor" = "SignalID", "Zone_Group" = "Corridor")) %>%
         mutate(
@@ -1802,3 +1806,57 @@ aws.s3::put_object(
     bucket = conf$bucket,
     multipart = TRUE
 )
+
+
+print(glue("{Sys.time()} Write to Database [29 of 29]"))
+
+source("write_sigops_to_db.R")
+
+# Update Aurora Nightly
+conn <- keep_trying(get_aurora_connection, n_tries = 5)
+# recreate_database(conn)
+# append_to_database(
+#    conn, cor, sub, sig, 
+#    calcs_start_date = report_start_date, 
+#    report_start_date = report_start_date)
+
+append_to_database(
+    conn, cor, "cor",
+    calcs_start_date, report_start_date, report_end_date = NULL)
+append_to_database(
+    conn, sub, "sub",
+    calcs_start_date, report_start_date, report_end_date = NULL)
+append_to_database(
+    conn, sig, "sig",
+    calcs_start_date, report_start_date, report_end_date = NULL)
+
+
+# Update DuckDB Once per Month for Staging/Main
+if (file.exists("sigops.duckdb")) file.remove("sigops.duckdb")
+duckconn <- get_duckdb_connection("sigops.duckdb")
+recreate_database(duckconn, cor, "cor")
+recreate_database(duckconn, sub, "sub")
+recreate_database(duckconn, sig, "sig")
+append_to_database(
+    duckconn, cor, "cor",
+    report_start_date, report_start_date, report_end_date = NULL)
+append_to_database(
+    duckconn, sub, "sub",
+    report_start_date, report_start_date, report_end_date = NULL)
+append_to_database(
+    duckconn, sig, "sig",
+    report_start_date, report_start_date, report_end_date = NULL)
+# Optional for production API
+#                                         report_end_date = conf$production_report_end_date)
+
+# Need to execute checkpoint to commit write-ahead log (wal)
+DBI::dbExecute(duckconn, "CHECKPOINT")
+dbDisconnect(duckconn)
+
+aws.s3::put_object(
+    file = "sigops.duckdb",
+    object = "code/sigops.duckdb",
+    bucket = conf$bucket,
+    multipart = TRUE
+)
+
