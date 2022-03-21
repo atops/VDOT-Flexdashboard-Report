@@ -170,7 +170,7 @@ print(glue("{Sys.time()} counts-based measures [6 of 11]"))
 
 get_counts_based_measures <- function(month_abbrs) {
     lapply(month_abbrs, function(yyyy_mm) {
-        # yyyy_mm <- month_abbrs # for debugging
+        # yyyy_mm <- month_abbrs[1] # for debugging
         gc()
 
         #-----------------------------------------------
@@ -466,7 +466,6 @@ get_pd_date_range <- function(start_date, end_date) {
             )
         }
     })
-    gc()
 }
 
 if (conf$run$ped_delay == TRUE) {
