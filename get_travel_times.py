@@ -7,6 +7,7 @@ Created on Mon Sep 24 20:42:51 2018
 
 
 import sys
+import os
 import pandas as pd
 import numpy as np
 import requests
@@ -21,16 +22,21 @@ import json
 import io
 import boto3
 import dask.dataframe as dd
+from config import get_date_from_string
 
 s3 = boto3.client('s3')
 
 
-
 def is_success(response):
-    try:
-        x = json.loads(response.content.decode('utf-8'))
-        return('state' in x.keys() and x['state']=='SUCCEEDED')
-    except:
+    x = json.loads(response.content.decode('utf-8'))
+    if type(x) == dict and 'state' in x.keys() and x['state']=='SUCCEEDED':
+        return True
+    elif type(x) == str:
+        print(x)
+        time.sleep(60)
+        return False
+    else:
+        # print(f"state: {x['state']} | progress: {x['progress']}")
         return False
 
 
@@ -98,7 +104,7 @@ def get_tmc_data(start_date, end_date, tmcs, key, dow=[2,3,4], bin_minutes=60, i
         polling.poll(
             lambda: requests.get(uri.format('jobs/status'), params = {'key': key, 'jobId': jobid}),
             check_success = is_success,
-            step=10,
+            step=30,
             timeout=600)
 
         results = requests.get(uri.format('jobs/export/results'), 
@@ -117,8 +123,8 @@ def get_tmc_data(start_date, end_date, tmcs, key, dow=[2,3,4], bin_minutes=60, i
     else:
         df = pd.DataFrame()
 
-    print('{} travel times records'.format(len(df)))
-    
+    print(f'{len(df)} travel times records')
+        
     return df
 
 def get_corridor_travel_times(df, corr_grouping, bucket, table_name):
@@ -174,16 +180,14 @@ if __name__=='__main__':
 
     # start_date is either the given day or the first day of the month
     start_date = conf['start_date']
-    if start_date == 'yesterday': 
-        start_date = (datetime.now(pytz.timezone('America/New_York')) - timedelta(days=7))
-    start_date = start_date.strftime('%Y-%m-%d')
-
-    # end date is either the given date + 1 or today. 
-    # end_date is not included in the query results
     end_date = conf['end_date']
-    if end_date == 'yesterday': 
-        end_date = datetime.now(pytz.timezone('America/New_York')) - timedelta(days=1)
-    end_date = (end_date + timedelta(days=1)).strftime('%Y-%m-%d')
+    
+    # start_date is 7 days ago or conf['start_date'], whichever is earlier
+    start_date = get_date_from_string(start_date)
+    sd = datetime.fromisoformat(start_date)
+    start_date = min(sd, sd - timedelta(days=7)).strftime('%Y-%m-%d')
+
+    end_date = get_date_from_string(end_date)
 
 
     suff = tt_conf['table_suffix']

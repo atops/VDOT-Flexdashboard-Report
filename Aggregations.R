@@ -188,20 +188,24 @@ get_daily_avg <- function(df, var_, wt_ = "ones", peak_only = FALSE) {
 }
 
 
-get_daily_sum <- function(df, var_, per_) {
+get_daily_sum <- function(df, var_) {
     
     var_ <- as.name(var_)
+    # leave this in for possible generalization in the future
+    # to different time periods besides daily
+    per_ <- "Date"
     per_ <- as.name(per_)
     
     
     df %>%
-        complete(nesting(SignalID, CallPhase), !!var_ := full_seq(!!var_, 1)) %>%
-        group_by(SignalID, !!per_) %>%
+        group_by(SignalID, !!per_) %>% 
         summarize(!!var_ := sum(!!var_, na.rm = TRUE),
                   .groups = "drop_last") %>%
         mutate(lag_ = lag(!!var_),
                delta = ((!!var_) - lag_)/lag_) %>%
         ungroup() %>%
+        complete(SignalID, !!per_ := full_seq(!!per_, 1)) %>%
+        mutate(!!var_ := ifelse(is.na(!!var_), 0, !!var_)) %>%
         dplyr::select(SignalID, !!per_, !!var_, delta)
 }
 
@@ -216,8 +220,10 @@ get_weekly_sum_by_day <- function(df, var_) {
         group_by(SignalID, Week, CallPhase) %>%
         summarize(!!var_ := mean(!!var_, na.rm = TRUE),
                   .groups = "drop_last") %>% # Mean over 3 days in the week
+        
         summarize(!!var_ := sum(!!var_, na.rm = TRUE),
                   .groups = "drop_last") %>% # Sum of phases 2,6
+        
         mutate(lag_ = lag(!!var_),
                delta = ((!!var_) - lag_)/lag_) %>%
         ungroup() %>%
@@ -744,7 +750,7 @@ get_monthly_vpd <- function(vpd) {
 get_monthly_flashevent <- function(flash) {
     flash <- flash %>%
         select(SignalID, Date)
-    
+
     day(flash$Date) <- 1
     
     flash <- flash %>%

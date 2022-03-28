@@ -55,29 +55,33 @@ def query_athena(query, database, output_bucket):
 
 def get_split_failures(start_date, end_date, signals_string):
 
+    with open('Monthly_Report.yaml') as yaml_file:
+        conf = yaml.load(yaml_file, Loader=yaml.Loader)
+    athena = conf['athena']
+
     between_clause = "= '{}'".format(start_date.strftime('%Y-%m-%d'))
 
     cycle_query = """SELECT DISTINCT SignalID, Phase, PhaseStart
-                     FROM vdot_spm.CycleData
+                     FROM {db}.CycleData
                      WHERE Phase not in (2,6)
                      AND EventCode = 9
-                     AND date {}
-                     AND SignalID in {}
-                     """.format(between_clause, signals_string)
+                     AND date {b}
+                     AND SignalID in {s}
+                     """.format(db=athena['database'], b=between_clause, s=signals_string)
 
     detector_query = """SELECT DISTINCT SignalID, Phase, EventCode, DetTimeStamp as DetOn, DetDuration
-                        FROM vdot_spm.DetectionEvents
+                        FROM {db}.DetectionEvents
                         WHERE Phase not in (2,6)
-                        AND date {}
-                        AND SignalID in {}
-                        """.format(between_clause, signals_string)
+                        AND date {b}
+                        AND SignalID in {s}
+                        """.format(db=athena['database'], b=between_clause, s=signals_string)
 
     print(between_clause)
 
-    sor = (query_athena(cycle_query, 'vdot_spm', 'vdot-spm-athena')
+    sor = (query_athena(cycle_query, athena['database'], os.path.basename(athena['staging_dir']))
             .assign(PhaseStart = lambda x: pd.to_datetime(x.PhaseStart)))
 
-    det = (query_athena(detector_query, 'vdot_spm', 'vdot-spm-athena')
+    det = (query_athena(detector_query, athena['database'], os.path.basename(athena['staging_dir']))
             .assign(DetOn = lambda x: pd.to_datetime(x.DetOn))
             .assign(DetOff = lambda x: x.DetOn + pd.to_timedelta(x.DetDuration, unit='s')))
 
@@ -126,31 +130,10 @@ if __name__=='__main__':
     if end_date == 'yesterday':
         end_date = (datetime.today() - timedelta(days=1)).strftime('%Y-%m-%d')
 
-    #start_date = '2018-10-01'
-    #end_date = '2018-10-04'
-    """
-    signals_file = sys.argv[3]
-
-    with open(signals_file) as f:
-        signals = [s.strip() for s in f.readlines()]
-
-    signals_to_exclude = [248,1389,3391,3491,
-                          6329,6330,6331,6347,6350,6656,6657,
-                          7063,7287,7289,7292,7293,7542,
-                          71000,78296] + list(range(1600,1799))
-
-    signals = list(set(signals) - set(signals_to_exclude))
-    """
     corridors = pd.read_feather(conf['corridors_filename'])
     corridors = corridors[~corridors.SignalID.isna()]
 
     signals_list = list(corridors.SignalID.values)
-
-    #signals_to_exclude = [248,1389,3391,3491,
-    #                      6329,6330,6331,6347,6350,6656,6657,
-    #                      7063,7287,7289,7292,7293,7542,
-    #                      71000,78296] + list(range(1600,1799))
-    #signalids = list(set(signalids) - set(signals_to_exclude))
 
     signals_string = "({})".format(','.join(signals_list))
 

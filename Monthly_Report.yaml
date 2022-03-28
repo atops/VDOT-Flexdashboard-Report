@@ -5,8 +5,8 @@
 mode: beta
 
 agency: VDOT
-bucket: vdot-spm
-region: 
+bucket: vdot-spm2
+profile: KH_VDOT
 athena:
     staging_dir: s3://vdot-spm-athena  # this has to be <bucket>-athena
     database: vdot_spm
@@ -29,17 +29,15 @@ run:
     etl: TRUE
     arrivals_on_green: TRUE
     queue_spillback: TRUE
-    split_failures: TRUE
     ped_delay: TRUE
+    split_failures: TRUE
 
 
-start_date: yesterday
+start_date: 4 days ago
 end_date: yesterday
 
-report_start_date: 2020-10-01
 report_end_date: yesterday
 calcs_start_date: auto
-production_report_end_date: 2021-10-01
 
 corridors_filename_s3: VDOT_Corridors_Latest.xlsx
 corridors_TMCs_filename_s3: Corridor_TMCs_Virginia.xlsx

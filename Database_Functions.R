@@ -49,17 +49,16 @@ get_maxview_eventlog_connection <- function() {
 get_cel_connection <- get_maxview_eventlog_connection
 
 
-
-get_aurora_connection <- function(f = RMySQL::dbConnect) {
+get_aurora_connection <- function(f = RMariaDB::dbConnect, driver = RMariaDB::MariaDB()) {
     
-    f(drv = RMySQL::MySQL(),
+    # f(drv = RMariaDB::MariaDB(), # RMySQL::MySQL(), # 
+    f(drv = driver,
       host = cred$RDS_HOST,
       port = 3306,
       dbname = cred$RDS_DATABASE,
       username = cred$RDS_USERNAME,
       password = cred$RDS_PASSWORD)
-}
-
+}    
 
 get_aurora_connection_pool <- function() {
     get_aurora_connection(pool::dbPool)

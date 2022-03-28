@@ -47,11 +47,13 @@ filter <- dplyr::filter
 options(future.rng.onMisue = "ignore")
 
 conf <- read_yaml("Monthly_Report.yaml")
-aws_conf <- read_yaml("Monthly_Report_AWS.yaml")
-conf$athena$uid <- aws_conf$AWS_ACCESS_KEY_ID
-conf$athena$pwd <- aws_conf$AWS_SECRET_ACCESS_KEY
-conf$athena$region <- aws_conf$AWS_DEFAULT_REGION
+aws.signature::use_credentials(profile = conf$profile)
+cred <- aws.signature::read_credentials()[[conf$profile]]
+conf$athena$uid <- cred$AWS_ACCESS_KEY_ID
+conf$athena$pwd <- cred$AWS_SECRET_ACCESS_KEY
+conf$athena$region <- cred$AWS_DEFAULT_REGION
 
+aws_conf <- read_yaml("Monthly_Report_AWS.yaml")
 
 if (Sys.info()["sysname"] == "Windows") {
     home_path <- dirname(path.expand("~"))

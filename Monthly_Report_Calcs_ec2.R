@@ -113,7 +113,7 @@ if (conf$run$travel_times == TRUE) {
     # Run python script asynchronously
     # system("c:/users/ATSPM/miniconda3/python.exe get_travel_times_1hr.py", wait = FALSE)
     system("~/miniconda3/bin/python get_travel_times.py travel_times_1hr.yaml", wait = FALSE)
-    system("~/miniconda3/bin/python get_travel_times.py travel_times_15min.yaml", wait = FALSE)
+    # system("~/miniconda3/bin/python get_travel_times.py travel_times_15min.yaml", wait = FALSE)
 }
 
 # # COUNTS ####################################################################

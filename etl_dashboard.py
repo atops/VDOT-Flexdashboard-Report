@@ -111,7 +111,13 @@ def main(start_date, end_date):
 
     signalids = list(corridors.SignalID.astype('int').values)
     # signalids = list(corridors.SignalID.values)
-    
+  
+    # Workaround as I can't read the region from aws config file. Supposed to work.
+    # config = configparser.ConfigParser()
+    # config.read(os.environ['AWS_CONFIG_FILE'])
+    # profile = conf['profile']
+    # region = config[f'profile {KH_VDOT}']['region']
+
     region = os.environ['AWS_DEFAULT_REGION']
     bucket = conf['bucket']
     staging_dir = conf['athena']['staging_dir']
