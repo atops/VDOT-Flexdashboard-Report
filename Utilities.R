@@ -487,17 +487,28 @@ write_signal_details <- function(plot_date, conf_athena, signals_list = NULL) {
         object = glue("mark/signal_details/date={plot_date}/sg_{plot_date}.parquet"),
         opts = list(multipart=TRUE))
     
-    conn <- get_athena_connection(conf_athena)
     table_name <- "signal_details"
+    
+    athena <- get_athena_connection(conf_athena)
     tryCatch({
-        response <- dbGetQuery(conn,
+        response <- dbGetQuery(athena,
                                sql(glue(paste("ALTER TABLE {conf_athena$database}.{table_name}",
                                               "ADD PARTITION (date='{plot_date}')"))))
         print(glue("Successfully created partition (date='{plot_date}') for {conf_athena$database}.{table_name}"))
     }, error = function(e) {
         message <- e
     })
-    dbDisconnect(conn)
+    dbDisconnect(athena)
+    
+    aurora <- get_aurora_connection()
+    tryCatch({
+        dbWriteTable(aurora, table_name, df, append = TRUE, overwrite = FALSE, row.names = FALSE)
+        print(glue("Successfully wrote {table_name} to database (date='{plot_date}')"))
+    }, error = function(e) {
+        message <- e
+    })
+    dbDisconnect(aurora)
+    
 }
 
 
