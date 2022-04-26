@@ -25,7 +25,7 @@ get_corridors <- function(corr_fn, filter_signals = TRUE) {
         # Get the last modified record for the Signal|Zone|Corridor combination
         replace_na(replace = list(Modified = ymd("1900-01-01"))) %>%
         group_by(SignalID, Zone, Corridor) %>%
-        filter(Modified == max(Modified)) %>%
+        filter(Modified == max(Modified), Include == TRUE) %>%
         ungroup() %>%
         
         filter(!is.na(Corridor))

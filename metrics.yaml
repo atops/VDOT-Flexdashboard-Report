@@ -141,7 +141,7 @@ travel_time_index:
     data_type: decimal
     highlight_color: "#007338"
     fill_color: "#99E6BF"
-    goal: 1.2
+    goal: NULL
     hourly_table: ttih
     has_weekly: False
 
@@ -154,7 +154,7 @@ planning_time_index:
     data_type: decimal
     highlight_color: "#007338"
     fill_color: "#99E6BF"
-    goal: 1.3
+    goal: NULL
     hourly_table: ptih
     has_weekly: False
 
@@ -194,7 +194,7 @@ uptime:
     data_type: percent
     highlight_color: "#990000"
     fill_color: "#FF9999"
-    goal: 0.95
+    goal: NULL
     hourly_table: NULL
     has_weekly: True
 

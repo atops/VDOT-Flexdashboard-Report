@@ -1526,7 +1526,7 @@ tryCatch(
             "pau" = get_quarterly(cor$mo$pau, "uptime")
         )
 
-        cor$summary_data <- get_corridor_summary_data(cor)
+        # cor$summary_data <- get_corridor_summary_data(cor)
     },
     error = function(e) {
         print("ENCOUNTERED AN ERROR:")
@@ -1788,24 +1788,25 @@ qsave(cor, "cor.qs")
 qsave(sig, "sig.qs")
 qsave(sub, "sub.qs")
 
-aws.s3::put_object(
-    file = "cor.qs",
-    object = "cor_ec2.qs",
-    bucket = conf$bucket,
-    multipart = TRUE
-)
-aws.s3::put_object(
-    file = "sig.qs",
-    object = "sig_ec2.qs",
-    bucket = conf$bucket,
-    multipart = TRUE
-)
-aws.s3::put_object(
-    file = "sub.qs",
-    object = "sub_ec2.qs",
-    bucket = conf$bucket,
-    multipart = TRUE
-)
+# TODO: Temporary while testing on local PC
+# aws.s3::put_object(
+#     file = "cor.qs",
+#     object = "cor_ec2.qs",
+#     bucket = conf$bucket,
+#     multipart = TRUE
+# )
+# aws.s3::put_object(
+#     file = "sig.qs",
+#     object = "sig_ec2.qs",
+#     bucket = conf$bucket,
+#     multipart = TRUE
+# )
+# aws.s3::put_object(
+#     file = "sub.qs",
+#     object = "sub_ec2.qs",
+#     bucket = conf$bucket,
+#     multipart = TRUE
+# )
 
 
 print(glue("{Sys.time()} Write to Database [29 of 29]"))
@@ -1814,7 +1815,10 @@ source("write_sigops_to_db.R")
 
 # Update Aurora Nightly
 conn <- keep_trying(get_aurora_connection, n_tries = 5)
-# recreate_database(conn)
+# recreate_database(conn, cor, "cor")
+# recreate_database(conn, sub, "sub")
+# recreate_database(conn, sub, "sub")
+
 # append_to_database(
 #    conn, cor, sub, sig, 
 #    calcs_start_date = report_start_date, 
@@ -1829,34 +1833,3 @@ append_to_database(
 append_to_database(
     conn, sig, "sig",
     calcs_start_date, report_start_date, report_end_date = NULL)
-
-
-# Update DuckDB Once per Month for Staging/Main
-if (file.exists("sigops.duckdb")) file.remove("sigops.duckdb")
-duckconn <- get_duckdb_connection("sigops.duckdb")
-recreate_database(duckconn, cor, "cor")
-recreate_database(duckconn, sub, "sub")
-recreate_database(duckconn, sig, "sig")
-append_to_database(
-    duckconn, cor, "cor",
-    report_start_date, report_start_date, report_end_date = NULL)
-append_to_database(
-    duckconn, sub, "sub",
-    report_start_date, report_start_date, report_end_date = NULL)
-append_to_database(
-    duckconn, sig, "sig",
-    report_start_date, report_start_date, report_end_date = NULL)
-# Optional for production API
-#                                         report_end_date = conf$production_report_end_date)
-
-# Need to execute checkpoint to commit write-ahead log (wal)
-DBI::dbExecute(duckconn, "CHECKPOINT")
-dbDisconnect(duckconn)
-
-aws.s3::put_object(
-    file = "sigops.duckdb",
-    object = "code/sigops.duckdb",
-    bucket = conf$bucket,
-    multipart = TRUE
-)
-

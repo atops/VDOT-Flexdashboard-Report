@@ -36,16 +36,13 @@ run:
 start_date: yesterday
 end_date: yesterday
 
-report_start_date: 2020-10-01
+# report_start_date: 2020-10-01
+# production_report_end_date: 2021-10-01
 report_end_date: yesterday
 calcs_start_date: auto
-production_report_end_date: 2021-10-01
 
 corridors_filename_s3: VDOT_Corridors_Latest.xlsx
 corridors_TMCs_filename_s3: Corridor_TMCs_Virginia.xlsx
-
-cctv_config_filename: 
-cctv_parsed_filename: 
 
 AM_PEAK_HOURS: [6, 7, 8, 9]
 PM_PEAK_HOURS: [15, 16, 17, 18, 19]
@@ -57,3 +54,11 @@ zone_groups:
     - Eastern Region
     - Central Region
     - Fredericksburg District
+
+map_center:
+    Northwest Region: [38.15589575605525, -79.06788915404293, 10]
+    Northern Region: [38.8375682589661, -77.5332641601563, 10]
+    Southwest Region: [37.1734487120096, -80.5380249023438, 10]
+    Eastern Region: [37.2860725770286, -76.8576049804688, 10]
+    Central Region: [37.5545857581022, -77.46923076416782, 10]
+    Fredericksburg District: [38.30679772237872, -77.48709379600896, 10]
