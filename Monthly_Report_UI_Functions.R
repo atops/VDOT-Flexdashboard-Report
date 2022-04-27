@@ -13,24 +13,27 @@ suppressMessages({
     library(stringr)
     library(readr)
     library(glue)
-#    library(arrow)
+    library(arrow)
     library(fst)
     library(forcats)
     library(plotly)
     library(crosstalk)
     library(memoise)
+    library(compiler)
     library(future)
+    library(promises)
     library(pool)
     library(rsconnect)
     library(formattable)
     library(data.table)
     library(htmltools)
     library(leaflet)
+    library(leaflet.extras)
     library(sp)
-    library(odbc)
+    library(jsonlite)
     library(shinycssloaders)
     library(DT)
-    library(compiler)
+    library(log4r)
 })
 
 
@@ -42,7 +45,7 @@ if (interactive()) {
 
 source("Utilities.R")
 source("Classes.R")
-source("zone_manager_reports_editor.R")
+# source("zone_manager_reports_editor.R")
 
 usable_cores <- get_usable_cores()
 doParallel::registerDoParallel(cores = usable_cores)
@@ -157,7 +160,6 @@ goal <- list("tp" = NULL,
 
 conf <- read_yaml("Monthly_Report.yaml")
 
-conf$mode <- conf_mode
 
 aws_conf <- read_yaml("Monthly_Report_AWS.yaml")
 conf$athena$uid <- aws_conf$AWS_ACCESS_KEY_ID
@@ -168,15 +170,7 @@ source("Database_Functions.R")
 athena_connection_pool <- get_athena_connection_pool(conf$athena)
 
 
-if (conf$mode == "production") {
-    last_month <- ymd(conf$production_report_end_date)   # Production
-    
-} else if (conf$mode == "beta") {
-    last_month <- floor_date(today() - days(6), unit = "months")   # Beta
-    
-} else {
-    stop("mode defined in configuration yaml file must be either production or beta")
-}
+last_month <- floor_date(today() - days(6), unit = "months")   # Beta
 
 endof_last_month <- last_month + months(1) - days(1)
 first_month <- last_month - months(12)
@@ -231,31 +225,16 @@ s3reactivePoll <- function(intervalMillis, bucket, object, aws_s3) {
                  valueFunc = s3valueFunc(bucket = bucket, object = object, aws_s3))
 }
 
-if (conf$mode == "production") {
-    
-    # corridors %<-% read_feather("all_corridors.feather")
-    # cor <- readRDS("cor.rds")
-    # sig %<-% readRDS("sig.rds")
-    # sub %<-% readRDS("sub.rds")
-    # teams_tables %<-% readRDS("teams_tables.rds")
-    
-} else if (conf$mode == "beta") {
-    
-    poll_interval <- 1000*3600 # 3600 seconds = 1 hour
-    
-    corridors_key <- sub("\\..*", ".qs", paste0("all_", conf$corridors_filename_s3))
-    corridors <- s3reactivePoll(poll_interval, bucket = conf$bucket, object = corridors_key, aws_conf)
+poll_interval <- 1000*3600 # 3600 seconds = 1 hour
 
-    cordata <- s3reactivePoll(poll_interval, bucket = conf$bucket, object = "cor_ec2.qs", aws_conf)
-    sigdata <- s3reactivePoll(poll_interval, bucket = conf$bucket, object = "sig_ec2.qs", aws_conf)
-    subdata <- s3reactivePoll(poll_interval, bucket = conf$bucket, object = "sub_ec2.qs", aws_conf)
+corridors_key <- sub("\\..*", ".qs", paste0("all_", conf$corridors_filename_s3))
+corridors <- s3reactivePoll(poll_interval, bucket = conf$bucket, object = corridors_key, aws_conf)
 
-    alerts <- s3reactivePoll(poll_interval, bucket = conf$bucket, object = "mark/watchdog/alerts.qs", aws_conf) 
+sigops_connection_pool <<- get_aurora_connection_pool()
+aurora_connection_pool <<- sigops_connection_pool
 
-} else {
-    stop("mode defined in configuration yaml file must be either production or beta")
-}
-
+# alerts <- dbReadTable(aurora_connection_pool, "WatchdogAlerts")
+alerts <- s3reactivePoll(poll_interval, bucket = conf$bucket, object = "mark/watchdog/alerts.qs", aws_conf) 
 
 
 
@@ -264,38 +243,70 @@ read_zipped_feather <- function(x) {
 }
 
 
-# Filter for zone_group and zone
-filter_mr_data_ <- function(df, zone_group_) {
-    if (zone_group_ == "All RTOP") {
-       df %>% 
-            filter(Zone_Group %in% c(RTOP1_ZONES, RTOP2_ZONES, "RTOP1", "RTOP2", "All RTOP"),
-                   !Corridor %in% c(RTOP1_ZONES, RTOP2_ZONES))
-        
-    } else if (zone_group_ == "RTOP1") {
-        df %>%
-            filter(Zone_Group %in% c(RTOP1_ZONES, "RTOP1"),
-                   !Corridor %in% c(RTOP1_ZONES))
-        
-    } else if (zone_group_ == "RTOP2") {
-       df %>%
-            filter(Zone_Group %in% c(RTOP2_ZONES, "RTOP2"),
-                   !Corridor %in% c(RTOP2_ZONES))
-        
-    } else if (zone_group_ == "Zone 7") {
-        df %>%
-            filter(Zone_Group %in% c("Zone 7m", "Zone 7d", "Zone 7"))
-        
-    } else {
-        df %>% 
-            filter(Zone_Group == zone_group_)
-    }
+
+# Functions to get and filter data for plotting ---------------------------
+
+
+
+read_signal_data <- function(conn, signalid, plot_start_date, plot_end_date) {
+    # Query for nested parquet data in Athena. The preferred way to do this.    
+
+    q <- glue(paste("select signalid, date, dat from signal_details, unnest (data) t(dat)",
+                    "where signalid = {signalid}", 
+                    "and date >= '{plot_start_date}' and date <= '{plot_end_date}'"))
+    q <- glue(paste("select signalid, date, dat.hour, dat.detector, dat.callphase,",
+                    "dat.vol_rc, dat.vol_ac, dat.bad_day", 
+                    "from ({q}) order by dat.detector, date, dat.hour"))
+    
+    dbGetQuery(conn, sql(q)) %>%
+        replace_na(list(callphase = 0)) %>%
+        transmute(
+            Timeperiod = as_date(date) + hours(hour),
+            SignalID = factor(signalid),
+            Detector = factor(detector),
+            CallPhase = factor(callphase),
+            vol_rc,
+            vol_ac,
+            bad_day = as.logical(as.integer(bad_day)))
 }
-#filter_mr_data <- memoise(filter_mr_data_)
-filter_mr_data <- cmpfun(filter_mr_data_)
 
-get_valuebox_ <- function(cor_monthly_df, var_, var_fmt, break_ = FALSE, 
-                          zone, mo, qu = NULL) {
 
+
+get_last_modified <- function(zmdf_, zone_ = NULL, month_ = NULL) {
+    df <- zmdf_ %>%
+        dplyr::group_by(Month, Zone) %>%
+        dplyr::filter(LastModified == max(LastModified)) %>%
+        ungroup()
+    # Filter by zone if provided
+    if (!is.null(zone_)) {
+        df <- df %>% filter(Zone == zone_)
+    }
+    # Filter by month if provided
+    if (!is.null(month_)) {
+        df <- df %>% filter(Month == month_)
+    }
+    df
+}
+
+
+read_from_db <- function(conn) {
+    dbReadTable(conn, "progress_report_content") %>%
+        group_by(Month, Zone) %>%
+        top_n(10, LastModified) %>%
+        ungroup() %>%
+        mutate(Month = date(Month),
+               LastModified = lubridate::as_datetime(LastModified))
+}
+
+
+
+
+# Performance Metrics Plots -----------------------------------------------
+
+
+get_valuebox <- function(cor_monthly_df, var_, var_fmt, break_ = FALSE, 
+                         zone, mo, qu = NULL) {
+    
     if (is.null(qu)) { # want monthly, not quarterly data
         vals <- cor_monthly_df %>%
             dplyr::filter(Corridor == zone & Month == mo) %>% as.list()
@@ -323,39 +334,17 @@ get_valuebox_ <- function(cor_monthly_df, var_, var_fmt, break_ = FALSE,
         )))
     }
 }
-get_valuebox <- memoise(get_valuebox_)
 
 
 
-perf_plot_no_data_ <- function(name_) {
-    
-    ax <- list(title = "", showticklabels = FALSE, showgrid = FALSE, zeroline = FALSE)
-    ay <- list(title = "", showticklabels = FALSE, showgrid = FALSE, zeroline = FALSE)
-    
-    plot_ly(type = "scatter", mode = "markers") %>%
-        layout(xaxis = ax, 
-               yaxis = ay,
-               annotations = list(x = -.02,
-                                  y = 0.4,
-                                  xref = "paper",
-                                  yref = "paper",
-                                  xanchor = "right",
-                                  text = name_,
-                                  font = list(size = 12),
-                                  showarrow = FALSE),
-               showlegend = FALSE,
-               margin = list(l = 120,
-                             r = 40)) %>% 
-        plotly::config(displayModeBar = F)
-}
-perf_plot_no_data <- memoise(perf_plot_no_data_)
-
-
-## ------------ With Goals and Fill Colors ---------------------------------------
-perf_plot_beta_ <- function(data_, value_, name_, color_, fill_color_,
+# With Goals and Fill Colors
+perf_plot_beta <- function(data_, value_, name_, color_, fill_color_,
                        format_func = function(x) {x},
                        hoverformat_ = ",.0f",
                        goal_ = NULL) {
+
+    ax <- list(title = "", showticklabels = TRUE, showgrid = FALSE)
+    ay <- list(title = "", showticklabels = FALSE, showgrid = FALSE, zeroline = FALSE, hoverformat = hoverformat_)
 
     value_ <- as.name(value_)
     data_ <- dplyr::rename(data_, value = !!value_)
@@ -428,8 +417,6 @@ perf_plot_beta_ <- function(data_, value_, name_, color_, fill_color_,
                              b = 10)) %>%
         plotly::config(displayModeBar = F)
 }
-#perf_plot_beta <- memoise(perf_plot_beta_)
-perf_plot_beta <- cmpfun(perf_plot_beta_)
 
 ## ------------ With Goals and Fill Colors ---------------------------------------
 
@@ -2327,11 +2314,14 @@ filter_alerts_by_date <- function(alerts, dr) {
 }
 
 
-filter_alerts <- function(alerts, alert_type_, zone_group_, corridor_, phase_, id_filter_)  {
+
+filter_alerts <- function(alerts_by_date, alert_type_, zone_group_, corridor_, phase_, id_filter_, active_streak)  {
     
-    most_recent_date <- max(alerts$Date)
-    #df <- alerts
-    df <- filter(alerts, Alert == alert_type_)
+    most_recent_date <- alerts_by_date %>% 
+        group_by(Alert) %>% 
+        summarize(Date = max(Date)) %>% 
+        spread(Alert, Date) %>% as.list()
+    df <- filter(alerts_by_date, Alert == alert_type_)
     
     if (nrow(df)) {
         
@@ -2372,57 +2362,85 @@ filter_alerts <- function(alerts, alert_type_, zone_group_, corridor_, phase_, i
     if (nrow(df)) {
         
         table_df <- df %>%
-            group_by(Zone, Corridor, SignalID, CallPhase, Detector, Name, Alert) %>%
-            mutate(Streak = streak[Date == max(Date)]) %>%
+            # Streak is 0 unless it's the most recent date in the alerts_by_date data set
+            # So, if the streak is not current as of the last date, it's 0. Streak is "Current Streak"
+            mutate(Streak = if_else(Date == most_recent_date[[alert_type_]], streak, as.integer(0))) %>%
+            group_by(Zone, Corridor, SignalID, CallPhase, Detector, ApproachDesc, Name, Alert) %>%
             summarize(
                 Occurrences = n(), 
-                Streak = max(Streak)) %>% 
+                Streak = max(Streak) #, MaxDate = max(Date)
+            ) %>%
             ungroup() %>%
             arrange(desc(Streak), desc(Occurrences))
         
+        if (alert_type_ != "Bad Vehicle Detection") {
+            table_df <- table_df %>% select(-ApproachDesc)
+        }
+        
+        if (active_streak == "Active") {
+            table_df <- table_df %>% filter(Streak > 0)
+            df <- df %>% right_join(select(table_df, SignalID, Detector))
+        } else if (active_streak == "Active 3-days") {
+            table_df <- table_df %>% filter(Streak > 2)
+            df <- df %>% right_join(select(table_df, SignalID, Detector))
+        }
+        
         if (alert_type_ == "Missing Records") {
             
-            plot_df <- df %>%
-                mutate(SignalID2 = SignalID) %>%
-                unite(Name2, SignalID2, Name, sep = ": ") %>%
-                mutate(signal_phase = factor(Name2))
+            plot_df <- df %>% 
+                arrange(
+                    as.integer(as.character(SignalID)), Name) %>%
+                mutate(
+                    signal_phase = paste0(as.character(SignalID), ": ", Name)) %>%
+                select(-Name)
             
             table_df <- table_df %>% select(-c(CallPhase, Detector))
             
-        } else if (alert_type_ == "Bad Vehicle Detection" || alert_type_ == "Bad Ped Detection") {
+        } else if (alert_type_ == "Bad Vehicle Detection" || alert_type_ == "Bad Ped Pushbuttons") {
             
             plot_df <- df %>%
-                mutate(Detector = as.character(Detector)) %>%
-                unite(signal_phase2, Name, Detector, sep = " | det ") %>%
-                
-                mutate(SignalID2 = SignalID) %>%
-                unite(signal_phase, SignalID2, signal_phase2, sep = ": ") %>% 
-                mutate(signal_phase = factor(signal_phase))
+                arrange(
+                    as.integer(as.character(SignalID)), 
+                    Name,
+                    as.integer(as.character(Detector))) %>%
+                mutate(
+                    signal_phase = paste0(as.character(SignalID), ": ", Name, " | det ", Detector)) %>%
+                select(-c(Name, Detector))
             
         } else if (alert_type_ == "No Camera Image") {
             
-            plot_df <- df %>%
-                mutate(SignalID2 = SignalID) %>%
-                unite(signal_phase, SignalID2, Name, sep = ": ") %>% 
-                mutate(signal_phase = factor(signal_phase))
+            plot_df <- df %>% 
+                arrange(
+                    as.character(SignalID), Name) %>%
+                mutate(
+                    signal_phase = paste0(as.character(SignalID), ": ", Name)) %>%
+                select(-Name)
             
             table_df <- table_df %>% select(-c(CallPhase, Detector))
-            
-        # "Bad Ped Detection", "Pedestrian Activations", "Force Offs", "Max Outs", "Count"
+
         } else { 
             
-            plot_df <- df %>%
-                unite(signal_phase2, Name, CallPhase, sep = " | ph ") %>% # potential problem
-                
-                mutate(SignalID2 = SignalID) %>%
-                unite(signal_phase, SignalID2, signal_phase2, sep = ": ") %>% 
-                mutate(signal_phase = factor(signal_phase))
+            plot_df <- df %>% 
+                arrange(
+                    as.integer(as.character(SignalID)), 
+                    Name,
+                    as.integer(as.character(CallPhase))) %>%
+                mutate(
+                    signal_phase = paste0(as.character(SignalID), ": ", Name, " | ph ", CallPhase)) %>%
+                select(-Name)
             
             if (alert_type_ != "Count") {
-                table_df <- table_df %>% dplyr::select(-Detector)
+                table_df <- table_df %>% select(-Detector)
             }
         }
         
+        plot_df <- plot_df %>%
+            mutate(signal_phase = if_else(
+                Zone_Group == "Ramp Meters",
+                stringr::str_replace(signal_phase, " \\| ", glue(" | {ApproachDesc} | ")),
+                as.character(signal_phase))) %>%
+            mutate(signal_phase = ordered(signal_phase, levels = unique(signal_phase)))
+
         intersections <- length(unique(plot_df$signal_phase))
         
     } else { #df_is_empty
@@ -2446,16 +2464,24 @@ plot_alerts <- function(df, date_range) {
         start_date <- max(min(df$Date), date_range[1])
         end_date <- max(max(df$Date), date_range[2])
         
+        if (df$Zone_Group[[1]] == "Ramp Meters") {
+            scale_fill <- scale_fill_manual(values = colrs, name = "Phase")
+            fill_variable <- as.name("CallPhase")
+        } else {
+            scale_fill <- scale_fill_gradient(low = "#fc8d59", high = "#7f0000", limits = c(0,90))
+            fill_variable <- as.name("streak")
+        }
+
         p <- ggplot() + 
             
             # tile plot
             geom_tile(data = df, 
                       aes(x = Date, 
                           y = signal_phase,
-                          fill = streak), 
+                          fill = !!fill_variable), # streak),  # CallPhase), 
                       color = "white") + 
             
-            scale_fill_gradient(low = "#fc8d59", high = "#7f0000", limits = c(0,90)) +
+            scale_fill +
             
             # fonts, text size and labels and such
             theme(panel.grid.major = element_blank(),

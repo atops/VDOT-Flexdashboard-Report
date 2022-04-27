@@ -1,17 +1,14 @@
 ---
-# ------------------------------
-title: "SigOps Metrics (beta)"
-# ------------------------------
+title: "ATSPM Dashboard"
+runtime: shiny
 output:
   flexdashboard::flex_dashboard:
-    orientation: rows
-    vertical_layout: scroll
-    logo: GDOTLogo.svg
-    favicon: GDOTLogo.svg
     css: style.css
-    includes:
-      in_header: google-analytics.html
-runtime: shiny
+    favicon: VDOT_V_Logo.gif
+    logo: VDOT_48px.png
+    orientation: rows
+    self_contained: no
+    vertical_layout: scroll
 ---
 
 <style>
@@ -23,10 +20,8 @@ runtime: shiny
 </style>
 
 
-```{r global, include = FALSE, warning = FALSE}
+```{r global, include = FALSE, warning = TRUE}
 # FLEXDASHBOARD - RTOP_MONTHLY_REPORT
-
-conf_mode <- "beta"
 
 source("Monthly_Report_UI_Functions.R")
 
@@ -45,16 +40,7 @@ styl <- "font-family: Source Sans Pro; font-size: 14px; padding-top: 25px"
 Inputs {.sidebar}
 =====================================
 
-Performance Measures Dashboard for GDOT's SigOps Program.
-
-
-Past month reports can be viewed back to `r format(first_month, "%B %Y")`.
-
-
-Statewide Traffic Signal Concept of Operations can be found
-`r tags$a(href = glue("https://s3.amazonaws.com/{conf$bucket}/GDOT_STORM-COO.pdf"),
-           target = "_blank",
-           "here")`
+Text here.
 
 
 ```{r sidebar, warning = FALSE}
@@ -538,25 +524,6 @@ output$pau_valuebox1 <- output$pau_valuebox2 <- renderValueBox({
 valueBoxOutput("pau_valuebox1")
 ```
 
-### CCTV Availability {.value-box}
-
-```{r}
-cctv_valuebox <- reactive({
-    valueBox(
-        value = get_valuebox_value(
-            cctv_uptime,
-            zone_group = input$zone_group, corridor = corridor(), month = current_month(), line_break = FALSE
-        ),
-        icon = "glyphicon-facetime-video",
-        color = BLUE
-    )
-})
-output$cctv_valuebox1 <- output$cctv_valuebox2 <- renderValueBox({
-    cctv_valuebox()
-})
-valueBoxOutput("cctv_valuebox1")
-```
-
 ### Communications Uptime {.value-box}
 
 ```{r}
@@ -576,26 +543,6 @@ output$cu_valuebox1 <- output$cu_valuebox2 <- renderValueBox({
 valueBoxOutput("cu_valuebox1")
 ```
 
-
-```{r, eval = FALSE}
-### Roadside Unit (RSU) Uptime {.value-box}
-ru_valuebox <- reactive({
-    valueBox(
-        value = get_valuebox_value(
-            rsu_uptime,
-            zone_group = input$zone_group, corridor = corridor(), month = current_month(), line_break = FALSE
-        ),
-        icon = "fa-wifi", # "fa-user" #
-        color = BLUE
-    )
-})
-output$ru_valuebox1 <- output$ru_valuebox2 <- renderValueBox({
-    ru_valuebox()
-})
-valueBoxOutput("ru_valuebox1")
-```
-
-
 ### {.value-box}
 
 ```{r, eval = TRUE}
@@ -608,115 +555,9 @@ renderValueBox({
 })
 ```
 
-Row {data-height = 50}
--------------------------------------
-
-### Activity Measures
-
-Activity measures from TEAMS and as reported by Traffic Engineers (% change from previous month)
-
-Row
--------------------------------------
-
-### TEAMS Tasks Reported This Month {.value-box}
-
-```{r}
-tasks_valuebox <- reactive({
-    valueBox(
-        value = get_valuebox_value(
-            tasks_reported,
-            zone_group = input$zone_group, corridor = corridor(), month = current_month(), line_break = FALSE
-        ),
-        icon = "fa-area-chart",
-        color = BLUE
-    )
-})
-output$tasks_valuebox1 <- output$tasks_valuebox2 <- renderValueBox({
-    tasks_valuebox()
-})
-valueBoxOutput("tasks_valuebox1")
-```
-
-### TEAMS Tasks Resolved This Month {.value-box}
-
-```{r}
-res_valuebox <- reactive({
-    valueBox(
-        value = get_valuebox_value(
-            tasks_resolved,
-            zone_group = input$zone_group, corridor = corridor(), month = current_month(), line_break = FALSE
-        ),
-        icon = "fa-area-chart",
-        color = BLUE
-    )
-})
-output$res_valuebox1 <- output$res_valuebox2 <- renderValueBox({
-    res_valuebox()
-})
-valueBoxOutput("res_valuebox1")
-```
-
-### TEAMS Tasks Outstanding [Unresolved] {.value-box}
-
-```{r}
-unres_valuebox <- reactive({
-    valueBox(
-        value = get_valuebox_value(
-            tasks_outstanding,
-            zone_group = input$zone_group, corridor = corridor(), month = current_month(), line_break = FALSE
-        ),
-        icon = "fa-area-chart",
-        color = BLUE
-    )
-})
-output$unres_valuebox1 <- output$unres_valuebox2 <- renderValueBox({
-    unres_valuebox()
-})
-valueBoxOutput("unres_valuebox1")
-```
-
-### TEAMS Tasks Over 45 Days [Unresolved] {.value-box}
-
-```{r}
-over45_valuebox <- reactive({
-    valueBox(
-        value = get_valuebox_value(
-            tasks_over45,
-            zone_group = input$zone_group, corridor = corridor(), month = current_month(), line_break = FALSE
-        ),
-        icon = "fa-area-chart",
-        color = BLUE
-    )
-})
-output$over45_valuebox1 <- output$over45_valuebox2 <- renderValueBox({
-    over45_valuebox()
-})
-valueBoxOutput("over45_valuebox1")
-```
-
-### TEAMS Tasks Mean Time to Resolve [Days] {.value-box}
-
-```{r}
-mttr_valuebox <- reactive({
-    valueBox(
-        value = get_valuebox_value(
-            tasks_mttr,
-            zone_group = input$zone_group, corridor = corridor(), month = current_month(), line_break = FALSE
-        ),
-        icon = "fa-area-chart",
-        color = BLUE
-    )
-})
-output$mttr_valuebox1 <- output$mttr_valuebox2 <- renderValueBox({
-    mttr_valuebox()
-})
-valueBoxOutput("mttr_valuebox1")
-```
-
-
-
-```{r, eval = FALSE}
 ### {.value-box}
+
+```{r, eval = TRUE}
 renderValueBox({
     valueBox(
         value = NULL,
@@ -992,21 +833,6 @@ renderValueBox({
 })
 ```
 
-### CCTV Availability {.value-box}
-
-```{r}
-renderValueBox({
-    valueBox(
-        value = get_valuebox_value(
-            cctv_uptime,
-            zone_group = input$zone_group, corridor = corridor(), quarter = current_quarter(), line_break = FALSE
-        ),
-        icon = "glyphicon-facetime-video",
-        color = GDOT_BLUE
-    )
-})
-```
-
 ### Communications Uptime {.value-box}
 
 ```{r}
@@ -1022,21 +848,6 @@ renderValueBox({
 })
 ```
 
-
-```{r, eval = FALSE}
-### Roadside Unit (RSU) Uptime {.value-box}
-renderValueBox({
-    value = get_valuebox_value(
-        rsu_uptime,
-        zone_group = input$zone_group, corridor = corridor(), quarter = current_quarter(), line_break = FALSE
-        ),
-        icon = "fa-wifi",
-        color = GDOT_BLUE
-    )
-})
-```
-
-
 ### {.value-box}
 
 ```{r, eval = TRUE}
@@ -1049,91 +860,17 @@ renderValueBox({
 })
 ```
 
-Row {data-height = 50}
--------------------------------------
+### {.value-box}
 
-### Activity Measures
-
-Activity measures from TEAMS and as reported by Traffic Engineers (% change from previous quarter)
-
-Row
--------------------------------------
-
-### TEAMS Tasks Reported This Quarter {.value-box}
-
-```{r}
+```{r, eval = TRUE}
 renderValueBox({
     valueBox(
-        value = get_valuebox_value(
-            tasks_reported,
-            zone_group = input$zone_group, corridor = corridor(), quarter = current_quarter(), line_break = FALSE
-        ),
-        icon = "fa-area-chart",
-        color = GDOT_YELLOW
+        value = NULL,
+        icon = NULL,
+        color = "gray80"
     )
 })
 ```
-
-### TEAMS Tasks Resolved This Quarter {.value-box}
-
-```{r}
-renderValueBox({
-    valueBox(
-        value = get_valuebox_value(
-            tasks_resolved,
-            zone_group = input$zone_group, corridor = corridor(), quarter = current_quarter(), line_break = FALSE
-        ),
-        icon = "fa-area-chart",
-        color = GDOT_YELLOW_RGB
-    )
-})
-```
-
-### TEAMS Tasks Outstanding [Unresolved] {.value-box}
-
-```{r}
-renderValueBox({
-    valueBox(
-        value = get_valuebox_value(
-            tasks_outstanding,
-            zone_group = input$zone_group, corridor = corridor(), quarter = current_quarter(), line_break = FALSE
-        ),
-        icon = "fa-area-chart",
-        color = GDOT_YELLOW
-    )
-})
-```
-
-### TEAMS Tasks Over 45 Days [Unresolved] {.value-box}
-
-```{r}
-renderValueBox({
-    valueBox(
-        value = get_valuebox_value(
-            tasks_over45,
-            zone_group = input$zone_group, corridor = corridor(), quarter = current_quarter(), line_break = FALSE
-        ),
-        icon = "fa-area-chart",
-        color = GDOT_YELLOW_RGB
-    )
-})
-```
-
-### TEAMS Tasks Mean Time to Resolve [Days] {.value-box}
-
-```{r}
-renderValueBox({
-    valueBox(
-        value = get_valuebox_value(
-            tasks_mttr,
-            zone_group = input$zone_group, corridor = corridor(), quarter = current_quarter(), line_break = FALSE
-        ),
-        icon = "fa-area-chart",
-        color = GDOT_YELLOW
-    )
-})
-```
-
 
 
 
@@ -1295,16 +1032,6 @@ fillCol(
         flex = c(2, 10)
     ),
     fillRow(
-        div("CCTV Uptime", style = styl),
-        renderPlotly({
-            summary_plot(
-                cctv_uptime, 
-                zone_group = input$zone_group, corridor = corridor(), month = current_month()
-            )
-        }),
-        flex = c(2, 10)
-    ),
-    fillRow(
         div("Comm Uptime", style = styl),
         renderPlotly({
             summary_plot(
@@ -1314,16 +1041,6 @@ fillCol(
         }),
         flex = c(2, 10)
     ),
-    # fillRow(
-    #     div("RSU Uptime", style = styl),
-    #     renderPlotly    ({
-            # summary_plot(
-            #     rsu_uptime, 
-            #     zone_group = input$zone_group, corridor = corridor(), month = current_month()
-            # )
-    #     }),
-    #     flex = c(2, 10)
-    # ),
     height = 800
 )
 ```
@@ -1553,12 +1270,6 @@ Row
 valueBoxOutput("du_valuebox2")
 ```
 
-### CCTV Availability {.value-box}
-
-```{r, warning = FALSE}
-valueBoxOutput("cctv_valuebox2")
-```
-
 ### Pedestrian Pushbutton Availability {.value-box}
 
 ```{r, warning = FALSE}
@@ -1595,8 +1306,7 @@ Row {data-height=40}
 selectInput("equipment_metric",
     label = NULL,
     choices = c(
-        "Detector Uptime", "Pedestrian Pushbutton Uptime",
-        "CCTV Uptime", "Communications Uptime"
+        "Detector Uptime", "Pedestrian Pushbutton Uptime", "Communications Uptime"
     ),
     selected = "Detector Uptime"
 )
@@ -1652,15 +1362,6 @@ output$equipment <- renderPlotly({
                     level = level_, zone_group_, current_month_
                 )
             }
-        } else if (input_equipment_metric == "CCTV Uptime") {
-            if (corridor_ == "All Corridors" || input_subcorridors == "By Sub-corridor") {
-                get_trend_multiplot(
-                    cctv_uptime, 
-                    level = level_, zone_group_, current_month_
-                )
-            } else {
-                individual_cctvs_plot(zone_group_, current_month_)
-            }
         } else if (input_equipment_metric == "Communications Uptime") {
             if (zone_group_ == "All RTOP" || ntraces_ > 24) {
                 get_trend_multiplot(
@@ -1677,330 +1378,9 @@ output$equipment <- renderPlotly({
                     level = level_, zone_group_, current_month_
                 )
             }
-        } else if (input_equipment_metric == "RSU Uptime") {
-            if (zone_group_ == "All RTOP" || ntraces_ > 24) {
-                get_trend_multiplot(
-                    rsu_uptime, 
-                    level = level_, zone_group_, current_month_
-                )
-            } else if (corridor_ == "All Corridors" || input_subcorridors == "By Sub-corridor") {
-                uptime_multiplot(
-                    rsu_uptime, 
-                    level = level_, zone_group = zone_group_, month = current_month_)
-            } else {
-                get_trend_multiplot(
-                    rsu_uptime, 
-                    level = level_, zone_group_, current_month_
-                )
-            }
         }
     # })
 })
-```
-
-
-
-
-
-
-
-Reporting
-=====================================
-
-Row
--------------------------------------
-
-### TEAMS Tasks Reported This Month {.value-box}
-
-```{r, eval = TRUE, warning = TRUE}
-valueBoxOutput("tasks_valuebox2")
-```
-
-### TEAMS Tasks Resolved This Month {.value-box}
-
-```{r, eval = TRUE, warning = TRUE}
-valueBoxOutput("res_valuebox2")
-```
-
-### TEAMS Tasks Outstanding (Unresolved) {.value-box}
-
-```{r, eval = TRUE, warning = TRUE}
-valueBoxOutput("unres_valuebox2")
-```
-
-### TEAMS Tasks Over 45 Days [Unresolved] {.value-box}
-
-```{r}
-valueBoxOutput("over45_valuebox2")
-```
-
-### TEAMS Tasks Mean Time to Resolve [Days] {.value-box}
-
-```{r}
-valueBoxOutput("mttr_valuebox2")
-```
-
-Row {.tabset .tabset-fade data-height=800}
-------------------------------------------
-
-### TEAMS
-
-```{r TEAMS, warning = FALSE}
-
-fillRow(
-    fillCol(
-        renderPlotly({
-            debug(logger, glue("TEAMS Plots | {level()} | {zone_group()} | {current_month()}"))
-            data <- query_data(
-                tasks, 
-                level = "corridor", "monthly", zone_group = input$zone_group, month = current_month()
-                )
-            shiny::validate(need(nrow(data) > 0, "No Data"))
-            data <- data[data$Corridor == zone_group(),] %>%
-                gather_outstanding_events()
-            
-            shiny::validate(need(nrow(data) > 0, "No Data"))
-            cum_events_plot(data)
-        }),
-        renderPlotly({
-            data <- query_data(
-                tasks_by_type,
-                level = "corridor", "monthly", zone_group = input$zone_group, month = current_month(), upto = FALSE
-                )
-            shiny::validate(need(nrow(data) > 0, "No Data"))
-            data <- data[data$Corridor == zone_group(),]
-            data <- subset(data, Reported > 0 | Resolved > 0 | Outstanding > 0)
-            
-            shiny::validate(need(nrow(data) > 0, "No Data"))
-            plot_teams_tasks(data,
-                var_ = "Task_Type",
-                title_ = "Incidents This Month by Type (top), Source (bottom)",
-                height_ = 250
-            )
-        }),
-        renderPlotly({
-            data <- query_data(
-                tasks_by_source,
-                level = "corridor", "monthly", zone_group = input$zone_group, month = current_month(), upto = FALSE
-                )
-            shiny::validate(need(nrow(data) > 0, "No Data"))
-            data <- data[data$Corridor == zone_group(),]
-            data <- subset(data, Reported > 0 | Resolved > 0 | Outstanding > 0)
-
-            shiny::validate(need(nrow(data) > 0, "No Data"))
-            plot_teams_tasks(data,
-                var_ = "Task_Source",
-                height_ = 150
-            )
-        }),
-        height = 800, flex = c(NA, NA, 1)
-    ),
-
-    fillCol(
-        renderPlotly({
-            data <- query_data(
-                tasks_by_subtype,
-                level = "corridor", "monthly", zone_group = input$zone_group, month = current_month(), upto = FALSE
-                )
-            shiny::validate(need(nrow(data) > 0, "No Data"))
-            data <- data[data$Corridor == zone_group(),]
-            data <- subset(data, Reported > 0 | Resolved > 0 | Outstanding > 0)
-
-            shiny::validate(need(nrow(data) > 0, "No Data"))
-            plot_teams_tasks(data,
-                var_ = "Task_Subtype",
-                title = "Incidents This Month by Subtype",
-                textpos = "outside",
-                height_ = 700
-            )
-        }),
-        height = 800
-    )
-)
-```
-
-
-
-
-
-
-
-### Zone Performance Summaries
-
-```{r Summary Table, eval = TRUE}
-
-corridor_summary_table <- reactive({
-    if (startsWith(input$zone_group, "Zone")) {
-        get_corridor_summary_table(
-           tbl(aurora_connection_pool, "cor_summary_data") %>%
-                filter(Zone_Group == !!input$zone_group, Month == !!current_month()) %>%
-                collect()
-        )
-    } else {
-        data.frame()
-    }
-})
-
-# corridor_summary_table(),
-tags$div(
-    class = "corridor_summary_table",
-    fillRow(
-        renderFormattable({
-            debug(logger, "renderFormattable on input$zone_group: corridor_summary_table")
-            shiny::validate(
-                need(
-                    startsWith(input$zone_group, "Zone"),
-                    "Select a Zone for the Metrics Summary Table"
-                )
-            )
-            corridor_summary_table()
-        })
-    )
-)
-fillRow(
-    renderUI({
-        req(corridor_summary_table())
-        tags$div(
-            p(strong("Legend:")),
-            p(
-                "Green text indicates a metric meeting the monthly goal; ",
-                "red text indicates not meeting goal."
-            ),
-
-            p(
-                span(class = "glyphicon glyphicon-arrow-up", style = "color: green"),
-                span(class = "glyphicon glyphicon-arrow-down", style = "color: green"),
-                "A green arrow indicates an improvement from the previous month ",
-                "(The arrow's direction indicates an increase or decrease in value); ",
-                tags$br(),
-                span(class = "glyphicon glyphicon-arrow-up", style = "color: red"),
-                span(class = "glyphicon glyphicon-arrow-down", style = "color: red"),
-                "A red up arrow indicates a deterioration from the previous month ",
-                "(The arrow's direction indicates an increase or decrease in value); "
-            )
-        )
-    })
-)
-```
-
-
-
-### Zone Activity Reports
-
-```{r echo=FALSE, eval=FALSE}
-
-print("Checkout connection from pool...")
-conn <- pool::poolCheckout(aurora_connection_pool)
-print("Checked out.")
-
-
-zmdf <- read_from_db(conn) %>%
-    get_last_modified()
-
-
-renderUI({
-    div(
-        style = "overflow-y:scroll; max-height: 700px",
-        HTML(get_latest_comment(zmdf, zone_group(), current_month()))
-    )
-})
-```
-
-
-### User Delay Costs
-
-```{r User Delay Costs, echo=FALSE, eval = TRUE}
-
-# udc_plot_height <- reactive({
-#     ncorrs <- corridors %>%
-#         filter(grepl("^Zone", Zone)) %>%
-#         distinct(Zone, Corridor) %>%
-#         group_by(Zone) %>%
-#         summarize(n = ceiling(n() / 2)) %>%
-#         mutate(Zone = as.character(Zone))
-#     n <- ncorrs[ncorrs$Zone == "Zone 1", ]$n
-#     # n <- 3
-#     css_px <- as.character(200 * n)
-#     paste0(css_px, "px")
-# })
-
-output$udc_plot <- renderPlotly({
-    debug(logger, "renderPlotly on zone_group() and current_month(): udc_plot")
-    udcplot_plotly(
-        query_udc_hourly(input$zone_group, current_month())
-    )
-})
-
-output$udc_table <- renderFormattable({
-    debug(logger, "renderPlotly on zone_group() and current_month(): udc_table")
-    shiny::validate(
-        need(startsWith(input$zone_group, "Zone"), "")
-    )
-
-    month_str <- format(current_month(), "%F")
-    data <- query_udc_trend()
-
-    shiny::validate(
-        need(month_str %in% names(data), "No data")
-    )
-
-    data <- data[[month_str]] %>%
-        filter(Zone == input$zone_group) %>%
-        select(-Month) %>%
-        rename(
-            `Month Change` = `Month-over-Month`,
-            `Year Change` = `Year-over-Year`
-        )
-
-    shiny::validate(
-        need(nrow(data) > 0, "No data")
-    )
-
-    column_formats <- list(
-        formatter("span"),
-        formatter("span"),
-        formatter("span", x ~ as_currency(x)),
-        formatter("span",
-            style = x ~ formattable::style(color = ifelse(x < 0, "red", "black")),
-            x ~ as_pct(x)
-        ),
-        formatter("span", x ~ as_currency(x)),
-        formatter("span",
-            style = x ~ formattable::style(color = ifelse(x < 0, "red", "black")),
-            x ~ as_pct(x)
-        ),
-        formatter("span", x ~ as_currency(x))
-    )
-    names(column_formats) <- names(data)
-
-    formattable(
-        data,
-        align = c(rep("l", 2), rep("r", length(data) - 2)),
-        column_formats
-    )
-})
-
-fillCol(
-    fillRow(
-        renderUI({
-            shiny::validate(
-                need(
-                    startsWith(input$zone_group, "Zone"),
-                    "Select a Zone for User Delay Costs by Corridor"
-                )
-            )
-            plotlyOutput("udc_plot") # ,
-            # height = udc_plot_height())
-        })
-    ),
-    fillRow(
-        div(
-            style = "width: 80%",
-            formattableOutput("udc_table")
-        )
-    ),
-    height = 1200
-)
 ```
 
 
@@ -2224,42 +1604,20 @@ Map
 
 metrics_list <- list(
     "Vehicles Per Day" = vpd,
-    # "AM Peak Hour Volume" = am_peak_vph,
-    # "PM Peak Hour Volume" = pm_peak_vph,
     "Throughput" = throughput,
     "Arrivals on Green" = arrivals_on_green,
     "Progression Ratio" = progression_ratio,
     "Queue Spillback" = queue_spillback_rate,
     "Peak Split Failures" = peak_period_split_failures,
     "Off-Peak Split Failures" = off_peak_split_failures,
-    #"travel_time_index" = travel_time_index,
-    #"planning_time_index" = planning_time_index,
-    #"average_speed" = average_speed,
     "Pedestrian Actuations Per Day" = daily_pedestrian_pushbuttons,
     "Detector Uptime" = detector_uptime,
     "Pedestrian Pushbutton Uptime" = ped_button_uptime,
     "Cameras Uptime" = cctv_uptime,
     "Communications Uptime" = comm_uptime
-    #"Roadside Unit Uptime" = rsu_uptime,
-    # "tasks" = tasks,
-    # "tasks_by_type" = tasks_by_type,
-    # "tasks_by_subtype" = tasks_by_subtype,
-    # "tasks_by_source" = tasks_by_source,
-    # "tasks_reported" = tasks_reported,
-    # "tasks_resolved" = tasks_resolved,
-    # "tasks_outstanding" = tasks_outstanding,
-    # "tasks_over45" = tasks_over45,
-    # "tasks_mttr" = tasks_mttr
     # TODO: Need a class for this metric. Add to Classes.R (not used elsewhere on the site?)
     #"Pedestrian Delay" = NULL
 )
-
-
-rms_corridors <- reactive({
-    debug(logger, "reactive on corridors(): rms_corridors")
-    as.character(unique(corridors()[corridors()$Zone_Group == "Ramp Meters", "Corridor"]$Corridor))
-})
-
 
 
 map_month_options <- reactive({
@@ -2351,6 +1709,7 @@ shinyApp(
     server = function(input, output, session) {
 
         output$SigOpsMap <- renderLeaflet({
+            
             debug(logger, "renderLeaflet on []: output$SigOpsMap")
             isolate({
                 pal <- colorBin(
@@ -2370,9 +1729,9 @@ shinyApp(
                         options = layersControlOptions(collapsed = FALSE)
                     ) %>%
                     enableTileCaching() %>%
-                    setView(lat = 33.7995454,
-                            lng = -84.3729367,
-                            zoom = 12) %>%
+                    setView(lat = conf$map_center$`Central Region`[1],
+                            lng = conf$map_center$`Central Region`[2],
+                            zoom = conf$map_center$`Central Region`[3]) %>%
                     addCircleMarkers(
                         data = map_data(),
                         lng = ~ Longitude,
@@ -2409,10 +1768,9 @@ shinyApp(
             metrics_list[[input$metric_input]]
         })
 
-        
-        
+
         map_data <- reactive({
-            debug(logger, "reactive on zone_group(), corridors(), rms_corridors(): map_data")
+            debug(logger, "reactive on zone_group(), corridors(): map_data")
 
             query_data(
                 map_metric(), 
@@ -2422,23 +1780,19 @@ shinyApp(
                 month = current_month(), 
                 upto = FALSE
             ) %>%
-                subset(!Zone_Group %in% rms_corridors()) %>%
                 rename(SignalID = Corridor) %>%
                 left_join(
                     corridors()[c("SignalID", "Latitude", "Longitude")],
                     by = c("SignalID")
                 ) %>%
                 subset(!is.na(Latitude))
-            # From before. Not sure if still needed.
-            #data$Description <- iconv(data$Description, "latin1", "UTF-8")  
-            #data
         })
 
 
         
         table_data <- reactive({
             debug(logger, "reactive on map_metric(), filtered_corridors(), input$filter_input: table_data")
-
+            
             v <- as.name(map_metric()$variable)
             
             data_ <- if (map_metric()$variable == "uptime") {
@@ -2460,6 +1814,7 @@ shinyApp(
                 data_ <- data_ %>%
                     subset(as.character(Corridor) %in% unique(as.character(filtered_corridors()$Corridor)))
             }
+            
             data_ %>% head(10)
         })
 
@@ -2484,6 +1839,8 @@ shinyApp(
         
         observe({
             debug(logger, "observe on table_data(): top10_table proxy")
+            
+            print(table_data())
             
             dataTableProxy("top10_table") %>%
                 DT::reloadData(
@@ -2587,6 +1944,23 @@ shinyApp(
             # set new value to reactiveVal
             prev_row(data_selected)
         })
+        
+        
+        observe({
+            req(zone_group())
+            debug(logger, glue("Map center reactive on zone_group(): {zone_group()}"))
+            print(conf$map_center)
+            print(zone_group())
+            if (zone_group() %in% names(conf$map_center)) {
+                coords <- conf$map_center[[zone_group()]]
+                leafletProxy("SigOpsMap") %>%
+                    flyTo(
+                        lat = coords[1],
+                        lng = coords[2],
+                        zoom = coords[3])
+            }
+        })        
+
     },
 
     options = list(height = 800)
@@ -2655,530 +2029,12 @@ fillCol(
 
 
 
-Health Metrics
-=====================================
-
-Row {.tabset .tabset-fade data-height=850}
-------------------------------------------
-
-### Maintenance
-
-#### Maintenance Health Summary
-
-```{r Maintenance, warning = FALSE, eval = TRUE}
-
-checkboxGroupInput(
-    "maintenance_cols_checked",
-    label = NULL,
-    c(
-        "Show Scores" = "scores",
-        "Show Metrics" = "metrics"
-    ),
-    selected = c("scores", "metrics"),
-    inline = TRUE
-)
-
-maintenance_cols <- reactive({ # updated to reflect RSUs/RSU scores not being included
-    debug(logger, "reactive on input$zone_group, input$corridors_x, input$subcorridors: maintenance_cols")
-    if (!is.null(input$zone_group) & !is.null(input$corridor_x) & !is.null(input$subcorridors)) {
-        if (level() == "signal") {
-            list(
-                "all" = c(0:17),
-                "default" = c(0:7),
-                "scores" = c(8:12),
-                "metrics" = c(13:17)
-            )
-        } else {
-            list(
-                "all" = c(0:16),
-                "default" = c(0:6),
-                "scores" = c(7:11),
-                "metrics" = c(12:16)
-            )
+            }
         }
-    }
-})
-
-
-maint_hide_cols <- reactive({
-    debug(logger, "reactive on maintenance_cols(), input$maintenance_cols_checked: maint_hide_cols")
-    # columns to show = default (label columns) + columns selected in checkbox
-    maintenance_cols_to_show <- c(
-        maintenance_cols()$default,
-        maintenance_cols()[input$maintenance_cols_checked]
-    ) %>%
-        unlist() %>%
-        unname()
-
-    # columns to hide = inverse (setdiff) of all columns and columns to show
-    setdiff(maintenance_cols()$all, maintenance_cols_to_show)
-})
-
-
-maint_health_data <- reactive({
-    if (!is.null(input$zone_group) & !is.null(input$corridor_x) & !is.null(input$subcorridors)) {
-        data_ <- query_health_data(
-            "maint", level(), zone_group(), corridor = corridor(), month = current_month()) %>%
-
-            select(-Month, -Zone_Group) %>%
-            mutate(
-                Subcorridor = if_else(
-                    as.character(Subcorridor) == as.character(Corridor),
-                    "ALL",
-                    as.character(Subcorridor)
-                ),
-                Corridor = if_else(
-                    as.character(Corridor) == as.character(Zone),
-                    "ALL",
-                    as.character(Corridor)
-                )
-            )
-    } else {
-        data.frame()
-    }
-})
-
-
-output$maintenance_table <- renderDT({
-    debug(logger, "renderDT on maint_health_data(): maintenance_table")
-    get_monthly_maintenance_health_table(maint_health_data())
-})
-
-
-observe({
-    debug(logger, "observe on maint_health_data() and maint_hide_cols(): replace data and hide cols")
-    dataTableProxy("maintenance_table") %>%
-        replaceData(maint_health_data()) %>%
-        hideCols(isolate(maint_hide_cols()), reset = TRUE)
-})
-
-observe({
-    debug(logger, "observe on and maint_hide_cols(): hide cols")
-    dataTableProxy("maintenance_table") %>%
-        hideCols(maint_hide_cols(), reset = TRUE)
-})
-
-
-fillRow(
-    DTOutput("maintenance_table")
-)
-```
-
-### Maintenance Trend
-
-```{r Maintenance Trend, warning = FALSE}
-
-maint_metrics_list <- list(
-    "Percent Health" = maint_percent_health,
-    "Missing Data" = maint_missing_data,
-    
-    "Detection Uptime Score" = du_score,
-    "Ped Actuation Uptime Score" = pau_score,
-    "Comm Uptime Score" = cu_score,
-    "CCTV Uptime Score" = cctv_score,
-    "Flash Events Score" = flash_score,
-    
-    "Detection Uptime" = du_health,
-    "Ped Actuation Uptime" = pau_health,
-    "Comm Uptime" = cu_health,
-    "CCTV Uptime" = cctv_health,
-    "Flash Events" = flash_health
-)
-
-selectInput(
-    inputId = "maintenance_var",
-    label = "Maintenance Health Metric:",
-    choices = c("Percent Health"),
-    selected = "Percent Health"
-)
-
-
-observe({
-    debug(logger, "observe on input$zone_group: maint_metrics list choices")
-    if (!is.null(input$zone_group) & !is.null(input$corridor_x)) {
-        if (input$corridor_x == "All Corridors") {
-            choices_ <- c("Percent Health")
-        } else {
-            choices_ <- c(
-                names(maint_metrics_list)
-            )
-        }
-
-        updateSelectInput(session,
-            inputId = "maintenance_var", choices = choices_
-        )
-    }
-})
-
-
-hr()
-
-fillRow(
-    plotlyOutput("health_maint_plot"),
-    height = "85%"
-)
-
-
-output$health_maint_plot <- renderPlotly({
-    level_ <- level()
-    zone_group_ <- zone_group()
-    current_month_ <- current_month()
-    input_maintenance_var <- input$maintenance_var
-    
-    # future_promise({
-        debug(logger, "renderPlotly on level(), zone_group(), current_month(): health_maint_plot")
-        get_trend_multiplot(
-            maint_metrics_list[[input_maintenance_var]],
-            level = level_, zone_group_, current_month_, line_chart = "monthly", accent_average = FALSE
-        )
     # })
 })
 ```
 
-
-### Operations
-
-#### Operations Health Summary
-
-```{r Operations, warning = FALSE, eval = TRUE}
-
-checkboxGroupInput(
-    "operations_cols_checked",
-    label = NULL,
-    c(
-        "Show Scores" = "scores",
-        "Show Metrics" = "metrics"
-    ),
-    selected = c("scores", "metrics"),
-    inline = TRUE
-)
-
-operations_cols <- reactive({
-    if (!is.null(input$zone_group) & !is.null(input$corridor_x) & !is.null(input$subcorridors)) {
-        if (level() == "signal") {
-            list(
-                "all" = c(0:17),
-                "default" = c(0:7),
-                "scores" = c(8:12),
-                "metrics" = c(13:17)
-            )
-        } else {
-            list(
-                "all" = c(0:16),
-                "default" = c(0:6),
-                "scores" = c(7:11),
-                "metrics" = c(12:16)
-            )
-        }
-    }
-})
-
-
-ops_hide_cols <- reactive({
-    # columns to show = default (label columns) + columns selected in checkbox
-    operations_cols_to_show <- c(
-        operations_cols()$default,
-        operations_cols()[input$operations_cols_checked]
-    ) %>%
-        unlist() %>%
-        unname()
-
-    # columns to hide = inverse (setdiff) of all columns and columns to show
-    setdiff(operations_cols()$all, operations_cols_to_show)
-})
-
-
-ops_health_data <- reactive({
-    if (!is.null(input$zone_group) & !is.null(input$corridor_x) & !is.null(input$subcorridors)) {
-        data_ <- query_health_data(
-            "ops", level(), zone_group(), corridor = corridor(), month = current_month()) %>%
-
-            select(-Month, -Zone_Group) %>%
-            mutate(
-                Subcorridor = if_else(
-                    as.character(Subcorridor) == as.character(Corridor),
-                    "ALL",
-                    as.character(Subcorridor)
-                ),
-                Corridor = if_else(
-                    as.character(Corridor) == as.character(Zone),
-                    "ALL",
-                    as.character(Corridor)
-                )
-            )
-    } else {
-        data.frame()
-    }
-})
-
-
-output$operations_table <- renderDT({
-    get_monthly_operations_health_table(ops_health_data())
-})
-
-
-observe({
-    dataTableProxy("operations_table") %>%
-        replaceData(ops_health_data()) %>%
-        hideCols(isolate(ops_hide_cols()), reset = TRUE)
-})
-
-
-observe({
-    dataTableProxy("operations_table") %>%
-        hideCols(ops_hide_cols(), reset = TRUE)
-})
-
-
-fillRow(
-    DTOutput("operations_table")
-)
-```
-
-### Operations Trend
-
-```{r Operations Trend, warning = FALSE}
-
-ops_metrics_list <- list(
-    "Percent Health" = ops_percent_health,
-    "Missing Data" = ops_missing_data,
-
-    "Platoon Ratio Score" = pr_score,
-    "Ped Delay Score" = pd_score,
-    "Split Failures Score" = sf_score,
-    "Travel Time Index Score" = tti_score,
-    "Buffer Index Score" = bi_score,
-    
-    "Platoon Ratio" = pr_health,
-    "Ped Delay" = pd_health,
-    "Split Failures" = sf_health,
-    "Travel Time Index" = tti_health,
-    "Buffer Index" = bi_health
-)
-
-selectInput(
-    inputId = "operations_var",
-    label = "Operations Health Metric:",
-    choices = c("Percent Health"),
-    selected = "Percent Health"
-)
-
-
-observe({
-    if (!is.null(input$zone_group) & !is.null(input$corridor_x)) {
-        if (input$corridor_x == "All Corridors") {
-            choices_ <- c("Percent Health")
-        } else {
-            choices_ <- c(
-                names(ops_metrics_list)
-            )
-        }
-
-        updateSelectInput(session,
-            inputId = "operations_var", choices = choices_
-        )
-    }
-})
-
-
-hr()
-
-fillRow(
-    plotlyOutput("health_ops_plot"),
-    height = "85%"
-)
-
-output$health_ops_plot <- renderPlotly({
-    level_ <- level()
-    zone_group_ <- zone_group()
-    current_month_ <- current_month()
-    input_operations_var <- input$operations_var
-
-    # future_promise({
-        debug(logger, "renderPlotly on level(), zone_group(), current_month(): health_ops_plot")
-        get_trend_multiplot(
-            ops_metrics_list[[input_operations_var]],
-            level = level_, zone_group_, current_month_, line_chart = "monthly", accent_average = FALSE
-        )
-    # })
-})
-```
-
-
-
-### Safety
-
-#### Safety Health Summary
-
-```{r Safety, warning = FALSE, eval = TRUE}
-
-checkboxGroupInput(
-    "safety_cols_checked",
-    label = NULL,
-    c(
-        "Show Scores" = "scores",
-        "Show Metrics" = "metrics"
-    ),
-    selected = c("scores", "metrics"),
-    inline = TRUE
-)
-
-safety_cols <- reactive({
-    debug(logger, "reactive on input$zone_group, input$corridors_x, input$subcorridors: safety_cols")
-    if (!is.null(input$zone_group) & !is.null(input$corridor_x) & !is.null(input$subcorridors)) {
-        if (level() == "signal") {
-            list(
-                "all" = c(0:15),
-                "default" = c(0:7),
-                "scores" = c(8:11),
-                "metrics" = c(12:15)
-            )
-        } else {
-            list(
-                "all" = c(0:14),
-                "default" = c(0:6),
-                "scores" = c(7:10),
-                "metrics" = c(11:14)
-            )  # "corridor", "subcorridor" or other
-        }
-    }
-})
-
-
-safety_hide_cols <- reactive({
-    debug(logger, "reactive on safety_cols(), input$safety_cols_checked: safety_hide_cols")
-    # columns to show = default (label columns) + columns selected in checkbox
-    safety_cols_to_show <- c(
-        safety_cols()$default,
-        safety_cols()[input$safety_cols_checked]
-    ) %>%
-        unlist() %>%
-        unname()
-    
-    # columns to hide = inverse (setdiff) of all columns and columns to show
-    setdiff(safety_cols()$all, safety_cols_to_show)
-})
-
-
-safety_health_data <- reactive({
-    debug(logger, "reactive on safety_health_data: input$zone_group, input$corridor_x, input$subcorridors")
-    if (!is.null(input$zone_group) & !is.null(input$corridor_x) & !is.null(input$subcorridors)) {
-        data_ <- query_health_data(
-            "safety", level(), zone_group(), corridor = corridor(), month = current_month()) %>%
-            
-            select(-Month, -Zone_Group) %>%
-            mutate(
-                Subcorridor = if_else(
-                    as.character(Subcorridor) == as.character(Corridor),
-                    "ALL",
-                    as.character(Subcorridor)
-                ),
-                Corridor = if_else(
-                    as.character(Corridor) == as.character(Zone),
-                    "ALL",
-                    as.character(Corridor)
-                )
-            )
-    } else {
-        data.frame()
-    }
-})
-
-
-output$safety_table <- renderDT({
-    debug(logger, "renderDT on safety_health_data(): safety_table")
-    get_monthly_safety_health_table(safety_health_data())
-})
-
-
-observe({
-    debug(logger, "observe on safety_health_data() and safety_hide_cols(): replace data and hide cols")
-    dataTableProxy("safety_table") %>%
-        replaceData(safety_health_data()) %>%
-        hideCols(isolate(safety_hide_cols()), reset = TRUE)
-})
-
-observe({
-    debug(logger, "observe on and safety_hide_cols(): hide cols")
-    dataTableProxy("safety_table") %>%
-        hideCols(safety_hide_cols(), reset = TRUE)
-})
-
-
-fillRow(
-    DTOutput("safety_table")
-)
-```
-
-### Safety Trend
-
-```{r Safety Trend, warning = FALSE, eval = TRUE}
-
-safety_metrics_list <- list(
-    "Percent Health" = safety_percent_health,
-    "Missing Data" = safety_missing_data,
-    
-    "Ped Injury Exposure Index Score" = bpsi_score,
-    "High Speed Index Score" = rsi_score,
-    "Crash Rate Index Score" = cri_score,
-    "KABCO Crash Severity Index Score" = kabco_score,
-    
-    "Ped Injury Exposure Index" = bpsi_health,
-    "High Speed Index" = rsi_health,
-    "Crash Rate Index" = cri_health,
-    "KABCO Crash Severity Index" = kabco_health
-    
-)
-
-selectInput(
-    inputId = "safety_var",
-    label = "Safety Health Metric:",
-    choices = c("Percent Health"),
-    selected = "Percent Health"
-)
-
-
-observe({
-    debug(logger, "observe on input$zone_group: safety_metrics list choices")
-    if (!is.null(input$zone_group) & !is.null(input$corridor_x)) {
-        if (input$corridor_x == "All Corridors") {
-            choices_ <- c("Percent Health")
-        } else {
-            choices_ <- c(
-                names(safety_metrics_list)
-            )
-        }
-        
-        updateSelectInput(session,
-                          inputId = "safety_var", choices = choices_
-        )
-    }
-})
-
-
-hr()
-
-fillRow(
-    plotlyOutput("health_safety_plot"),
-    height = "85%"
-)
-
-
-output$health_safety_plot <- renderPlotly({
-    level_ <- level()
-    zone_group_ <- zone_group()
-    current_month_ <- current_month()
-    input_safety_var <- input$safety_var
-    
-    # future_promise({
-        debug(logger, "renderPlotly on level(), zone_group(), current_month(): health_safety_plot")
-        get_trend_multiplot(
-            safety_metrics_list[[input_safety_var]],
-            level = level_, zone_group_, current_month_, line_chart = "monthly", accent_average = FALSE
-        )
-    # })
-})
-```
 
 
 
@@ -3304,26 +2160,6 @@ Currently, when the number of consecutive days without an input yields a probabi
 of failure based on the historical distribution for that input, it is flagged as failed.
 This measure is still experimental and the distributions and thresholds are a work in progress.
 
-In the past, this measure was based on manual testing of pedestrian push buttons and
-was self-reported by the engineers responsible for the corridor. While labor-intensive,
-This had some benefits over the current automated approach. The first is that
-multiple push buttons are often physically wired into the same detector input,
-making it impossible from the controller inputs to determine whether both push
-buttons are working, or just one. The second is due to the relatively infrequent calls,
-we have to rely upon a probabilistic approach to determining whether an input is failed
-because for some push buttons, there is so little demand it can be difficult to say with
-certainty from the data whether that the push button is indeed failed.
-
-#### **CCTV Uptime**
-
-Through December 2017, CCTV Uptime was reported by Corridor Managers in their
-monthly reports. In January, 2018, it came from TSOS based on a manual check
-of each camera during the month and reporting whether it returns an
-image and whether it can be controlled (pan-tilt-zoom).
-
-As of February 2018, CCTV Uptime is calculated based on the image returned from
-the Georgia 511 website. If there is a live image, it will considered
-working as of its "last modified" timestamp from the website.
 
 #### **Communications Uptime**
 
@@ -3333,18 +2169,3 @@ communication loss. The sum of these gaps converted to a percent is the
 daily communication uptime for that controller. If comms are lost for all
 intersections, it is considered a system failure and that time is excluded
 from the uptime calculation.
-
-#### **Events Reported, Resolved, Outstanding**
-
-Activity measures come from TEAMS reports from data as entered by corridor managers.
-TEAMS is GDOT's ticketing and tracking system for signal equipment and
-incident-related activity.
-
-All events reported in the month are counted, as are the number of
-events resolved in the month. The number of outstanding events is the
-cumulative sum of reported events less the cumulative sum of resolved
-events.
-
-#### **RTOP Activity Logs**
-
-These are the monthly reports produced monthly by RTOP Corridor Managers detailing key activities, maintenance tasks and action items for the month.

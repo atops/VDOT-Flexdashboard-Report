@@ -361,6 +361,7 @@ tryCatch(
             bad_det,
             FUN = write_parquet,
             object = "mark/watchdog/bad_detectors.parquet",
+
             bucket = conf$bucket,
             opts = list(multipart = TRUE)
         )
@@ -530,7 +531,7 @@ tryCatch(
 
 print(glue("{Sys.time()} Pedestrian Delay [6 of 23]"))
 
-# if (FALSE) {
+if (FALSE) {
 tryCatch(
     {
         cb <- function(x) {
@@ -538,6 +539,7 @@ tryCatch(
                 x <- x %>%
                     rename(pd = Avg.Max.Ped.Delay) %>%
                     mutate(CallPhase = factor(0))
+
             }
             x %>%
                 mutate(
@@ -594,7 +596,7 @@ tryCatch(
         print(e)
     }
 )
-# }
+}
 
 
 # GET COMMUNICATIONS UPTIME ###################################################
@@ -1526,7 +1528,7 @@ tryCatch(
             "pau" = get_quarterly(cor$mo$pau, "uptime")
         )
 
-        cor$summary_data <- get_corridor_summary_data(cor)
+        # cor$summary_data <- get_corridor_summary_data(cor)
     },
     error = function(e) {
         print("ENCOUNTERED AN ERROR:")
@@ -1708,6 +1710,7 @@ tryCatch(
             "pti" = data.frame(),
             "bi" = data.frame(),
             "spd" = data.frame(),
+
             "du" = sigify(readRDS("monthly_detector_uptime.rds"), cor$mo$du, corridors) %>%
                 select(Zone_Group, Corridor, Month, uptime, uptime.sb, uptime.pr, delta),
             "cu" = sigify(readRDS("monthly_comm_uptime.rds"), cor$mo$cu, corridors) %>%
@@ -1731,9 +1734,9 @@ descs <- corridors %>%
     ungroup()
 
 for (tab in c(
-    "vpd","papd","pd",
-    "tp","aog","aogd","aogh","pr","prd","prh","qs","qsd","qsh","sf","sfd","sfh","sfo",
-    "du","cu","pau"
+    "vpd", "vphpa", "vphpp", "papd", "pd", "bpsi", "rsi", "cri", "kabco",
+    "tp", "aog", "aogd", "aogh", "prd", "prh", "qsd", "qsh", "sfd", "sfh", "sfo",
+    "du", "cu", "pau", "cctv", "maint_plot", "ops_plot", "safety_plot"
 )) {
     if (tab %in% names(sig$mo) & tab != "cctv") {
         sig$mo[[tab]] <- sig$mo[[tab]] %>%
@@ -1788,25 +1791,25 @@ qsave(cor, "cor.qs")
 qsave(sig, "sig.qs")
 qsave(sub, "sub.qs")
 
-aws.s3::put_object(
-    file = "cor.qs",
-    object = "cor_ec2.qs",
-    bucket = conf$bucket,
-    multipart = TRUE
-)
-aws.s3::put_object(
-    file = "sig.qs",
-    object = "sig_ec2.qs",
-    bucket = conf$bucket,
-    multipart = TRUE
-)
-aws.s3::put_object(
-    file = "sub.qs",
-    object = "sub_ec2.qs",
-    bucket = conf$bucket,
-    multipart = TRUE
-)
-
+# TODO: Temporary while testing on local PC
+# aws.s3::put_object(
+#     file = "cor.qs",
+#     object = "cor_ec2.qs",
+#     bucket = conf$bucket,
+#     multipart = TRUE
+# )
+# aws.s3::put_object(
+#     file = "sig.qs",
+#     object = "sig_ec2.qs",
+#     bucket = conf$bucket,
+#     multipart = TRUE
+# )
+# aws.s3::put_object(
+#     file = "sub.qs",
+#     object = "sub_ec2.qs",
+#     bucket = conf$bucket,
+#     multipart = TRUE
+# )
 
 
 print(glue("{Sys.time()} Write to Database [29 of 29]"))
@@ -1815,7 +1818,14 @@ source("write_sigops_to_db.R")
 
 # Update Aurora Nightly
 conn <- keep_trying(get_aurora_connection, n_tries = 5)
-# recreate_database(conn)
+# recreate_database(conn, cor, "cor")
+# recreate_database(conn, sub, "sub")
+# recreate_database(conn, sub, "sub")
+
+# append_to_database(
+#    conn, cor, sub, sig, 
+#    calcs_start_date = report_start_date, 
+#    report_start_date = report_start_date)
 
 append_to_database(
     conn, cor, "cor",
@@ -1826,3 +1836,4 @@ append_to_database(
 append_to_database(
     conn, sig, "sig",
     calcs_start_date, report_start_date, report_end_date = NULL)
+

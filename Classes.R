@@ -207,13 +207,6 @@ get_valuebox_value <- function(metric, zone_group, corridor, month, quarter = NU
 
 summary_plot <- function(metric, zone_group, corridor, month) {
     
-    ax <- list(
-        title = "", showticklabels = TRUE, showgrid = FALSE)
-    ay <- list(
-        title = "", showticklabels = FALSE, showgrid = FALSE, 
-        zeroline = FALSE, hoverformat = tick_format(metric$data_type))
-    
-    
     if (!is.null(corridor)) {
         if (corridor == "All Corridors") {
             corridor <- NULL
@@ -229,18 +222,25 @@ summary_plot <- function(metric, zone_group, corridor, month) {
         month = month, 
         upto = TRUE
     )
-
+    
     if (is.null(corridor)) {
-        if (zone_group %in% c("All RTOP", "RTOP1", "RTOP2", "Zone 7")) {
-            data <- subset(data, Zone_Group == zone_group)
-        } else {
-            data <- subset(data, Zone_Group == Corridor)
-        }
+        data <- subset(data, Zone_Group == Corridor)
     } 
     shiny::validate(need(nrow(data) > 0, "No Data"))
-
+    
     first <- data[which.min(data$Month), ]
     last <- data[which.max(data$Month), ]
+    
+    first_last <- c(first$Month, last$Month)
+    
+    arrow <- if_else(last$delta >= 0, "\u25b2", "\u25bc")
+    
+    ax <- list(
+        title = "", showticklabels = TRUE, showgrid = FALSE, 
+        ticktext = format(first_last, "%b %Y"), tickvals = first_last)
+    ay <- list(
+        title = "", showticklabels = FALSE, showgrid = FALSE, 
+        zeroline = FALSE, hoverformat = tick_format(metric$data_type))
     
     p <- plot_ly(type = "scatter", mode = "markers")
     
@@ -288,24 +288,23 @@ summary_plot <- function(metric, zone_group, corridor, month) {
                         borderpad = 5) %>%
         add_annotations(x = 1,
                         y = last[[metric$variable]],
-                        text = data_format(metric$data_type)(last[[metric$variable]]),
-                        font = list(size = 16),
+                        text = glue("{data_format(metric$data_type)(last[[metric$variable]])} ({arrow}{as_pct(last$delta)})"),
+                        font = list(size = 14),
                         showarrow = FALSE,
                         xanchor = "left",
                         xref = "paper",
-                        width = 60,
+                        width = 120,
                         align = "left",
                         borderpad = 5) %>%
         layout(xaxis = ax,
                yaxis = ay,
                showlegend = FALSE,
                margin = list(l = 50, #120
-                             r = 60,
+                             r = 120,
                              t = 10,
                              b = 10)) %>%
         plotly::config(displayModeBar = F)
 }
-
 
 
 get_trend_multiplot <- function(metric, level, zone_group, month, line_chart = "weekly", accent_average = TRUE) {

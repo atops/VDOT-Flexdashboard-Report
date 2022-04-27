@@ -43,14 +43,6 @@ corridors <- s3read_using(
     object = conf$corridors_filename_s3,
     bucket = conf$bucket
 )
-feather_filename <- sub("\\..*", ".feather", conf$corridors_filename_s3)
-write_feather(corridors, feather_filename)
-aws.s3::put_object(
-    file = feather_filename,
-    object = feather_filename,
-    bucket = conf$bucket,
-    multipart = TRUE
-)
 qs_filename <- sub("\\..*", ".qs", conf$corridors_filename_s3)
 qsave(corridors, qs_filename)
 aws.s3::put_object(
@@ -64,14 +56,6 @@ all_corridors <- s3read_using(
     function(x) get_corridors(x, filter_signals = FALSE),
     object = conf$corridors_filename_s3,
     bucket = conf$bucket
-)
-feather_filename <- sub("\\..*", ".feather", paste0("all_", conf$corridors_filename_s3))
-write_feather(all_corridors, feather_filename)
-aws.s3::put_object(
-    file = feather_filename,
-    object = feather_filename,
-    bucket = conf$bucket,
-    multipart = TRUE
 )
 qs_filename <- sub("\\..*", ".qs", paste0("all_", conf$corridors_filename_s3))
 qsave(all_corridors, qs_filename)

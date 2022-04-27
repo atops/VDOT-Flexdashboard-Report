@@ -350,7 +350,7 @@ get_monthly_avg_by_day <- function(df, var_, wt_ = NULL, peak_only = FALSE) {
     current_month <- max(df$Month)
     
     gdf <- df %>%
-        group_by(SignalID, CallPhase) %>%
+        # group_by(SignalID, CallPhase) %>%
         complete(nesting(SignalID, CallPhase),
                  Month = seq(min(Month), current_month, by = "1 month")) %>%
         group_by(SignalID, Month, CallPhase)
