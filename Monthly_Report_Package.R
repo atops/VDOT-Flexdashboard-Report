@@ -1731,9 +1731,9 @@ descs <- corridors %>%
     ungroup()
 
 for (tab in c(
-    "vpd", "vphpa", "vphpp", "papd", "pd", "bpsi", "rsi", "cri", "kabco",
-    "tp", "aog", "aogd", "aogh", "prd", "prh", "qsd", "qsh", "sfd", "sfh", "sfo",
-    "du", "cu", "pau", "cctv", "maint_plot", "ops_plot", "safety_plot"
+    "vpd","papd","pd",
+    "tp","aog","aogd","aogh","pr","prd","prh","qs","qsd","qsh","sf","sfd","sfh","sfo",
+    "du","cu","pau"
 )) {
     if (tab %in% names(sig$mo) & tab != "cctv") {
         sig$mo[[tab]] <- sig$mo[[tab]] %>%
