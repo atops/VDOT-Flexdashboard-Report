@@ -70,6 +70,12 @@ detector_uptime <- structure(
 ped_button_uptime <- structure(
     inherit(metrics[["uptime"]], metrics[["ped_button_uptime"]]), class = "metric"
 )
+cctv_uptime <- structure(
+    inherit(metrics[["uptime"]], metrics[["cctv_uptime"]]), class = "metric"
+)
+comm_uptime <- structure(
+    inherit(metrics[["uptime"]], metrics[["comm_uptime"]]), class = "metric"
+)
 
 
 
