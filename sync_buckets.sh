@@ -1,0 +1,1 @@
+aws s3 sync s3://vdot-spm/ s3://vdot-spm2/ --profile KH_VDOT --exclude "*" --include "atspm/*" --include "atspm_det_config/*" --include "atspm_det_config_good/*" --include "atspm_ped_config/*" --include "*.xlsx" --include="*.qs"
