@@ -7,6 +7,7 @@ load_bulk_data <- function(conn, table_name, df_) {
     
     if (class(conn) == "MySQLConnection" | class(conn)[[1]] == "MariaDBConnection") { # Aurora
         filename <- tempfile(pattern = table_name, fileext = ".csv")
+        filename <- gsub("\\\\", "/", filename)
         data.table::fwrite(df_, filename)
         dbExecute(conn, glue("LOAD DATA LOCAL INFILE '{filename}' INTO TABLE {table_name} FIELDS TERMINATED BY ',' IGNORE 1 LINES"))
     } else if (class(conn) == "duckdb_connection") {
@@ -272,7 +273,7 @@ recreate_database <- function(conn, df, dfname) {
             c( "delta` [^ ,]+", "delta` DOUBLE"),
             c("`ones` [^ ,]+", "`ones` DOUBLE"),
             c("`data` [^ ,]+", "`data` mediumtext"),
-            c("`Description` [^ ,]+", "`Description` VARCHAR(128)"), 
+            c("`Description` [^ ,)]+", "`Description` VARCHAR(128)"), 
             c( "Score` [^ ,]+", "Score` DOUBLE")
         )
         ) {

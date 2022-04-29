@@ -185,12 +185,14 @@ poll_interval <- 1000*3600 # 3600 seconds = 1 hour
 
 s3checkFunc <- function(bucket, object, aws_conf) {
     function() {
-	cat(file="dash.log", "checking\n", append=TRUE)
-    aws.s3::get_bucket(
-	    bucket = bucket,
-	    prefix = object,
-	    key = aws_conf$AWS_ACCESS_KEY_ID,
-        secret = aws_conf$AWS_SECRET_ACCESS_KEY)$Contents$LastModified
+    	cat(file="dash.log", "checking\n", append=TRUE)
+        bucket_attr <- aws.s3::get_bucket(
+    	    bucket = bucket,
+    	    prefix = object,
+    	    key = aws_conf$AWS_ACCESS_KEY_ID,
+            secret = aws_conf$AWS_SECRET_ACCESS_KEY,
+    	    region = aws_conf$AWS_DEFAULT_REGION)
+        bucket_attr$Contents$LastModified
     }
 }
 
@@ -211,7 +213,8 @@ s3valueFunc <- function(bucket, object, aws_conf) {
             bucket = bucket,
             opts = list(
 		key = aws_conf$AWS_ACCESS_KEY_ID,
-        secret = aws_conf$AWS_SECRET_ACCESS_KEY))
+        secret = aws_conf$AWS_SECRET_ACCESS_KEY,
+		region = aws_conf$AWS_DEFAULT_REGION))
         cat(file="dash.log", "values passed\n", append=TRUE)
 	x
     }
