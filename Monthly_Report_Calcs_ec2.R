@@ -19,6 +19,14 @@ usable_cores <- get_usable_cores(4)
 doParallel::registerDoParallel(cores = usable_cores)
 
 
+# Set credentials from ~/.aws/credentials file
+aws.signature::use_credentials(profile = conf$profile)
+
+# Need to set the default region as well. use_credentials doesn't do this.
+cred <- aws.signature::read_credentials()[[conf$profile]]
+Sys.setenv(AWS_DEFAULT_REGION = cred$DEFAULT_REGION)
+
+
 # aurora_pool <- get_aurora_connection_pool()
 # aurora <- get_aurora_connection()
 
@@ -148,6 +156,31 @@ signals_list <- unique(as.character(signals_list[signals_list > 0]))
 #   filtered_counts_1hr
 #   adjusted_counts_1hr
 #   BadDetectors
+
+
+print(glue("{Sys.time()} Detection Levels by Signal [5.1 of 11]"))
+
+if (TRUE) {
+    date_range <- seq(ymd(start_date), ymd(end_date), by = "1 day")
+    
+    lapply(date_range, function(date_) {
+        
+        signals_df <- select(corridors, SignalID) %>% mutate(Date = date_)
+        detection_levels_df <- get_detection_levels_by_signal(date_)
+        
+        det_levels <- left_join(signals_df, detection_levels_df, by = "SignalID") %>%
+            replace_na(list(Level = 0))
+        s3_upload_parquet_date_split(
+            det_levels,
+            bucket = conf$bucket,
+            prefix = "detection_levels",
+            table_name = "detection_levels",
+            conf_athena = conf$athena, parallel = FALSE
+        )
+    })
+}
+
+
 
 print(glue("{Sys.time()} counts-based measures [6 of 11]"))
 
