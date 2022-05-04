@@ -1613,10 +1613,11 @@ metrics_list <- list(
     "Pedestrian Actuations Per Day" = daily_pedestrian_pushbuttons,
     "Detector Uptime" = detector_uptime,
     "Pedestrian Pushbutton Uptime" = ped_button_uptime,
-    "Cameras Uptime" = cctv_uptime,
-    "Communications Uptime" = comm_uptime
+    # "Cameras Uptime" = cctv_uptime,
+    "Communications Uptime" = comm_uptime,
     # TODO: Need a class for this metric. Add to Classes.R (not used elsewhere on the site?)
     #"Pedestrian Delay" = NULL
+    "Detection Level" = detection_level
 )
 
 
@@ -1718,7 +1719,7 @@ shinyApp(
                     bins = 5,
                     pretty = TRUE
                 )
-                
+
                 leaflet() %>%
                     addProviderTiles(providers$CartoDB.Positron, group = "Light") %>%
                     addProviderTiles(providers$CartoDB.DarkMatter, group = "Dark") %>%
@@ -1748,7 +1749,9 @@ shinyApp(
                         ),
                         radius = 5,
                         fillColor = pal(map_data()[[map_metric()$variable]]),
-                        stroke = FALSE,
+                        stroke = "#0C2C84", # FALSE,
+                        weight = 1,
+                        opacity = 1,
                         fillOpacity = 1,
                         group = "the_group"
                     ) %>%
@@ -1839,9 +1842,6 @@ shinyApp(
         
         observe({
             debug(logger, "observe on table_data(): top10_table proxy")
-            
-            print(table_data())
-            
             dataTableProxy("top10_table") %>%
                 DT::reloadData(
                     subset(table_data(), select = -c(SignalID)) %>%
@@ -1862,7 +1862,7 @@ shinyApp(
                     bins = 5,
                     pretty = TRUE
                 )
-                
+
                 leafletProxy("SigOpsMap") %>%
                     clearGroup(group = "the_group") %>%
                     clearControls()
@@ -1881,7 +1881,9 @@ shinyApp(
                         ),
                         radius = 5,
                         fillColor = pal(map_data()[[map_metric()$variable]]),
-                        stroke = FALSE,
+                        stroke = "#0C2C84", # FALSE,
+                        weight = 1,
+                        opacity = 1,
                         fillOpacity = 1,
                         group = "the_group"
                     ) %>%
@@ -1946,16 +1948,19 @@ shinyApp(
         })
         
         
-        observe({
+        observeEvent(zone_group(), {
             req(zone_group())
             debug(logger, glue("Map center reactive on zone_group(): {zone_group()}"))
-            print(conf$map_center)
-            print(zone_group())
             if (zone_group() %in% names(conf$map_center)) {
                 coords <- conf$map_center[[zone_group()]]
                 leafletProxy("SigOpsMap") %>%
-                    flyTo(
-                        lat = coords[1],
+                    # Would prefer to do this, but after flying, using the scrollwheel 
+                    # to zoom in/out zooms all the way in for some reason.
+                    # flyTo(
+                    #     lat = coords[1],
+                    #     lng = coords[2],
+                    #     zoom = coords[3]) #%>%
+                    setView(lat = coords[1],
                         lng = coords[2],
                         zoom = coords[3])
             }

@@ -219,6 +219,23 @@ rsu_uptime:
     table: ru
 
 
+# --- Configuration Metrics ---------------------
+detection_level:
+    label: Detection Level [#]
+    table: detection_levels
+    variable: Level
+    weight: NULL
+    data_type: integer
+    highlight_color: #998200
+    fill_color: #e6c300
+    goal: NULL
+    hourly_table: FALSE
+    daily_table: dl
+    daily_variable: Level
+    has_weekly: False
+
+
+
     
 # -----------------------------------------------
 template:

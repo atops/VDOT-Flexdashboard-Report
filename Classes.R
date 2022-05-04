@@ -77,6 +77,10 @@ comm_uptime <- structure(
     inherit(metrics[["uptime"]], metrics[["comm_uptime"]]), class = "metric"
 )
 
+detection_level <- structure(
+    metrics[["detection_level"]], class = "metric"
+)
+
 
 
 get_descriptionBlock <- function(x, zone_group, month, quarter = NULL) {

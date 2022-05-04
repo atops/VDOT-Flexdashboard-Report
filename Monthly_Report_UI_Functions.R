@@ -50,6 +50,15 @@ source("Classes.R")
 usable_cores <- get_usable_cores()
 doParallel::registerDoParallel(cores = usable_cores)
 
+
+# Set credentials from ~/.aws/credentials file
+aws.signature::use_credentials(profile = conf$profile)
+
+# Need to set the default region as well. use_credentials doesn't do this.
+cred <- aws.signature::read_credentials()[[conf$profile]]
+Sys.setenv(AWS_DEFAULT_REGION = cred$DEFAULT_REGION)
+
+
 logger <- log4r::logger(threshold = "DEBUG")
 
 options(dplyr.summarise.inform = FALSE)

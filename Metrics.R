@@ -809,7 +809,7 @@ get_detection_levels_by_signal <- function(date_) {
     dc[((llc & adv) | adv) & dc$CallPhase %in% c(2,6), "Level"] <- 1
     
     dc %>% 
-        group_by(SignalID, PrimaryName, SecondaryName) %>% 
-        summarize(Level = max(Level))
+        group_by(SignalID) %>% 
+        summarize(Level = max(Level), .groups = "drop")
 }
 
