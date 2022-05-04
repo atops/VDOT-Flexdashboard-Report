@@ -9,9 +9,9 @@ import pandas as pd
 import sqlalchemy as sq
 import os
 from datetime import datetime
-import boto3
 import yaml
 
+from s3io import *
 from get_atspm_detectors import get_atspm_detectors, get_atspm_ped_detectors
 from get_included_detectors import get_included_detectors
 from pull_atspm_data import get_atspm_engine
@@ -68,38 +68,27 @@ def get_det_config(ad, engine, date_string):
     return det_config
 
 
-def nightly_config(engine, date_, BUCKET, REGION):
-    date_string = date_.strftime('%Y-%m-%d')
+def nightly_config(engine, date_, conf):
 
+    BUCKET = conf['bucket']
+    REGION = conf['region']
+
+    date_string = date_.strftime('%Y-%m-%d')
+    
     print("ATSPM Vehicle Detectors [1 of 3]")
     ad = get_atspm_detectors(engine, date_)
-    ad_csv_filename = 'ATSPM_Det_Config_{}.csv'.format(date_string)
-    ad.to_csv(ad_csv_filename)
-
-    # upload to s3
-    key = 'atspm_det_config/date={}/ATSPM_Det_Config_{}.csv'.format(date_string, REGION)
-    s3.upload_file(Filename=ad_csv_filename, Bucket=BUCKET, Key=key)
-    os.remove(ad_csv_filename)
+    key = f'atspm_det_config/date={date_string}/ATSPM_Det_Config_{REGION}.csv'
+    write_csv(ad, BUCKET, key)
 
     print("ATSPM Vehicle Detector Config [2 of 3]")
     det_config = get_det_config(ad, engine, date_string)
-    dc_filename = 'ATSPM_Det_Config_Good_{}.feather'.format(date_string)
-    det_config.to_feather(dc_filename)
-
-    # upload to s3
-    key = 'atspm_det_config_good/date={}/ATSPM_Det_Config_Good_{}.feather'.format(date_string, REGION)
-    s3.upload_file(Filename=dc_filename, Bucket=BUCKET, Key=key)
-    os.remove(dc_filename)
+    key = f'atspm_det_config_good/date={date_string}/ATSPM_Det_Config_Good_{REGION}.feather'
+    write_feather(det_config, BUCKET, key)
     
     print("ATSPM Pedestrian Detectors [3 of 3]")
     ped_config = get_atspm_ped_detectors(engine, date_)
-    pc_filename = 'ATSPM_Ped_Config_{}.feather'.format(date_string)
-    ped_config.to_feather(pc_filename)
-
-    # upload to s3
-    key = 'atspm_ped_config/date={}/ATSPM_Ped_Config_{}.feather'.format(date_string, REGION)
-    s3.upload_file(Filename=pc_filename, Bucket=BUCKET, Key=key)
-    os.remove(pc_filename)
+    key = f'atspm_ped_config/date={date_string}/ATSPM_Ped_Config_{REGION}.feather'
+    write_feather(ped_config, BUCKET, key)
     
 
 if __name__=='__main__':
@@ -110,22 +99,16 @@ if __name__=='__main__':
     with open('Monthly_Report_AWS.yaml') as yaml_file:
         cred = yaml.load(yaml_file, Loader=yaml.Loader)
     
-    BUCKET = conf['bucket']
-    REGION = conf['region']
-
-    s3 = boto3.client('s3', verify=conf['ssl_cert'])
-        
-    
     engine = get_atspm_engine(
         username=cred['ATSPM_UID'], 
         password=cred['ATSPM_PWD'], 
         hostname=cred['ATSPM_HOST'], 
         database=cred['ATSPM_DB'],
         dsn=cred['ATSPM_DSN'])
-        
+
     #"""
     date_ = datetime.today()
-    nightly_config(engine, date_, BUCKET, REGION)
+    nightly_config(engine, date_, conf)
 
 
     # Code to go back and calculate past days
@@ -134,6 +117,6 @@ if __name__=='__main__':
 
     for date_ in dates:
         print(date_)
-        nightly_config(engine, date_, BUCKET, REGION)
+        nightly_config(engine, date_, conf)
     """
     #"""

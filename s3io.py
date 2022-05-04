@@ -9,7 +9,7 @@ import yaml
 with open('Monthly_Report.yaml') as yaml_file:
     conf = yaml.load(yaml_file, Loader=yaml.Loader)
 
-session = boto3.Session(profile_name=conf['profile'], region_name=conf['region'])
+session = boto3.Session(profile_name=conf['profile'], region_name=conf['aws_region'])
 s3 = session.client('s3', verify=conf['ssl_cert'])
 athena = session.client('athena', verify=conf['ssl_cert'])
 
@@ -17,7 +17,7 @@ athena = session.client('athena', verify=conf['ssl_cert'])
 credentials = session.get_credentials()
 os.environ['AWS_ACCESS_KEY_ID'] = credentials.access_key
 os.environ['AWS_SECRET_ACCESS_KEY'] = credentials.secret_key
-os.environ['AWS_AWS_DEFAULT_REGION'] = conf['region']
+os.environ['AWS_AWS_DEFAULT_REGION'] = conf['aws_region']
 
 # ---------------------------
 
@@ -39,6 +39,12 @@ def write_parquet(df, Bucket, Key, **kwargs):
 def write_excel(df, Bucket, Key, **kwargs):
     with io.BytesIO() as f:
         df.to_excel(f, **kwargs)
+        s3.put_object(Bucket=Bucket, Key=Key, Body=f.getvalue())
+
+
+def write_feather(df, Bucket, Key, **kwargs):
+    with io.BytesIO() as f:
+        df.to_feather(f, **kwargs)
         s3.put_object(Bucket=Bucket, Key=Key, Body=f.getvalue())
 
 

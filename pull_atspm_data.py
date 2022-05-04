@@ -104,7 +104,7 @@ def pull_raw_atspm_data(s, date_, engine, conf):
 
         t0 = time.time()
         date_str = date_.strftime('%Y-%m-%d')
-        print('{} | {} Starting...'.format(s, date_str))
+        print(f'{s} | {date_str} Starting...')
 
         try:
             with engine.connect() as conn:
@@ -116,22 +116,22 @@ def pull_raw_atspm_data(s, date_, engine, conf):
                     con=conn)
 
             if len(df) == 0:
-                print('|{} no event data for this signal on {}.'.format(s, date_str))
+                print(f'|{s} no event data for this signal on {date_str}.')
 
             else:
                 bucket = conf['bucket']
 
                 df = add_barriers(df)
-                df.SignalID = df.SignalID.astype('int'),
-                df.EventCode = df.EventCode.astype('int'),
-                df.EventParam = df.EventParam.astype('int'))
+                df.SignalID = df.SignalID.astype('int')
+                df.EventCode = df.EventCode.astype('int')
+                df.EventParam = df.EventParam.astype('int')
                 df = df.sort_values(['SignalID', 'Timestamp', 'EventCode', 'EventParam'])
 
-                print('writing to files...{} records'.format(len(df)))
+                print(f'writing to files...{len(df)} records')
                 
                 df.to_parquet(f's3://{bucket}/atspm/date={date_str}/atspm_{s}_{date_str}.parquet')
                 
-                print('{}: {} seconds'.format(s, round(time.time()-t0, 1)))
+                print(f'{s}: {round(time.time()-t0, 1)} seconds')
 
         except Exception as e:
             print(s, e)
@@ -166,9 +166,6 @@ if __name__ == '__main__':
         athena_bucket = x[1] # first path element that's not s3:
         athena_prefix = '/'.join(x[2:])
 
-        s3 = boto3.client('s3', verify=conf['ssl_cert'])
-        ath = boto3.client('athena', verify=conf['ssl_cert'])
-
 
         if len(sys.argv) == 3:
             start_date = sys.argv[1]
@@ -183,12 +180,12 @@ if __name__ == '__main__':
             if start_date == 'yesterday':
                 start_date = datetime.today().date() - timedelta(days=1)
                 while True:
-                    response = s3.list_objects_v2(Bucket=BUCKET,
-                                                  Prefix="atspm/date={}".format(start_date.strftime('%Y-%m-%d')))
-                    if response['KeyCount'] > 0:
-                        start_date = (start_date + timedelta(days=1))
+                    keys = get_keys(s3, bucket, prefix="atspm/date={}".format(start_date.strftime('%Y-%m-%d')))
+                    try:
+                        next(keys)
+                        start_date = start_date + timedelta(days=1)
                         break
-                    else:
+                    except StopIteration:
                         start_date = start_date - timedelta(days=1)
                 start_date = min(start_date, datetime.today().date() - timedelta(days=1))
             end_date = conf['end_date']
@@ -211,23 +208,26 @@ if __name__ == '__main__':
 
         t0 = time.time()
         for date_ in dates:
+            # Workaround. Pool is failing silently. Can't troubleshoot.
+            for s in signalids:
+                pull_raw_atspm_data(s, date_, engine, conf)
+            # with get_context('spawn').Pool(2) as pool:
+            #     pool.starmap_async(pull_raw_atspm_data, list(itertools.product(signalids, [date_], [engine], [conf])))
+            #     pool.close()
+            #     pool.join()
+
             date_str = date_.strftime('%Y-%m-%d')
-            procs = 2 # min(os.cpu_count()*2, 16)
-            with Pool(processes=procs) as pool: #18
-                pool.starmap_async(pull_raw_atspm_data, list(itertools.product(signalids, [date_], [engine])))
-                pool.close()
-                pool.join()
 
             partition_query = f'''ALTER TABLE {atspm_table} ADD PARTITION (date="{date_str}")
                                   location "s3://{bucket}/atspm/date={date_str}"'''
 
             print('Update Athena partitions:')
-            response = ath.start_query_execution(
+            response = athena.start_query_execution(
                     QueryString = partition_query,
                     QueryExecutionContext={'Database': athena_database},
                     ResultConfiguration={'OutputLocation': staging_dir})
             pp.pprint(response)
 
-        print('\n{} signals in {} days. Done in {} minutes'.format(len(signalids), len(dates), int((time.time()-t0)/60)))
+        print(f'\n{len(signalids)} signals in {len(dates)} days. Done in {int((time.time()-t0)/60)} minutes')
     except Exception as e:
         print(str(e))

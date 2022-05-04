@@ -103,9 +103,9 @@ def get_atspm_detectors(engine, date=None):
 def get_atspm_ped_detectors(engine, date=None):
 
     if date is not None:
-        start_date = (date - timedelta(days=180)).strftime('%Y-%m-%d')
+        start_date = (date - timedelta(days=90)).strftime('%Y-%m-%d')
     else:
-        start_date = (datetime.today() - timedelta(days=180)).strftime('%Y-%m-%d')
+        start_date = (datetime.today() - timedelta(days=90)).strftime('%Y-%m-%d')
 
     with engine.connect() as conn:
 
