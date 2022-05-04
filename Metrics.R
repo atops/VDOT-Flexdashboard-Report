@@ -794,3 +794,24 @@ get_ped_delay <- function(date_, conf, signals_list) {
 
     pe.summary.overall
 }
+
+
+
+get_detection_levels_by_signal <- function(date_) {
+    
+    dc <- get_det_config(date_)
+    
+    llc <- grepl('Lane-by-lane Count', dc$DetectionTypeDesc)
+    adv <- grepl('Advanced Count', dc$DetectionTypeDesc)
+    sbp <- grepl('Stop Bar Presence', dc$DetectionTypeDesc)
+    
+    dc[llc, "Level"] <- 3
+    dc[((llc & sbp) | sbp) & dc$CallPhase %in% c(2,6), "Level"] <- 2
+    dc[((llc & sbp) | sbp) & !dc$CallPhase %in% c(2,6), "Level"] <- 1
+    dc[((llc & adv) | adv) & dc$CallPhase %in% c(2,6), "Level"] <- 1
+    
+    dc %>% 
+        group_by(SignalID, PrimaryName, SecondaryName) %>% 
+        summarize(Level = max(Level))
+}
+
