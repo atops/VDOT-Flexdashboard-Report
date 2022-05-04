@@ -8,8 +8,7 @@ Created on Fri Nov 22 13:37:39 2019
 # -*- coding: utf-8 -*-
 
 from datetime import datetime, timedelta
-from multiprocessing.dummy import Pool
-#from multiprocessing import Pool
+from multiprocessing import get_context, Pool
 import pandas as pd
 import sqlalchemy as sq
 import pyodbc
@@ -23,9 +22,9 @@ import boto3
 import yaml
 import pprint
 import urllib.parse
-
 import urllib3
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+from s3io import *
 
 pp = pprint.PrettyPrinter()
 
@@ -92,14 +91,13 @@ def add_barriers(df):
     return df
 
 
-def pull_raw_atspm_data(s, date_, engine):
+def pull_raw_atspm_data(s, date_, engine, conf):
 
     try:
         query = """SELECT * FROM [Controller_Event_Log]
                    WHERE SignalID = '{}'
                    AND (Timestamp BETWEEN '{}' AND '{}');
                    """
-        #                   AND EventCode in (1,4,5,6,8,9,31,21,45,81,82,89,90)
 
         start_date = date_
         end_date = date_ + pd.DateOffset(days=1) - pd.DateOffset(seconds=0.1)
@@ -121,24 +119,18 @@ def pull_raw_atspm_data(s, date_, engine):
                 print('|{} no event data for this signal on {}.'.format(s, date_str))
 
             else:
+                bucket = conf['bucket']
 
                 df = add_barriers(df)
-                df = (df.assign(
-                            SignalID = lambda x: x.SignalID.astype('int'),
-                            EventCode = lambda x: x.EventCode.astype('int'),
-                            EventParam = lambda x: x.EventParam.astype('int'))
-                        .sort_values(
-                    ['SignalID', 'Timestamp', 'EventCode', 'EventParam']))
+                df.SignalID = df.SignalID.astype('int'),
+                df.EventCode = df.EventCode.astype('int'),
+                df.EventParam = df.EventParam.astype('int'))
+                df = df.sort_values(['SignalID', 'Timestamp', 'EventCode', 'EventParam'])
 
                 print('writing to files...{} records'.format(len(df)))
-                # df.to_parquet('s3://{}/atspm/date={}/atspm_{}_{}.parquet'.format(BUCKET, date_str, s, date_str))
-                # df.to_parquet(f'atspm_{s}_{date_str}.parquet')
                 
-                s3object = f'atspm/date={date_str}/atspm_{s}_{date_str}.parquet'
-                with io.BytesIO() as data:
-                    df.to_parquet(data)
-                    data.seek(0)
-                    s3.upload_fileobj(data, BUCKET, s3object)
+                df.to_parquet(f's3://{bucket}/atspm/date={date_str}/atspm_{s}_{date_str}.parquet')
+                
                 print('{}: {} seconds'.format(s, round(time.time()-t0, 1)))
 
         except Exception as e:
@@ -166,10 +158,13 @@ if __name__ == '__main__':
         with open('Monthly_Report.yaml') as yaml_file:
             conf = yaml.load(yaml_file, Loader=yaml.FullLoader)
 
-        BUCKET=conf['bucket']
-        DATABASE=conf['athena']['database']
-        ATHENA_OUTPUT_BUCKET=conf['athena']['staging_dir']
-
+        bucket = conf['bucket']
+        atspm_table = conf['athena']['atspm_table']
+        athena_database = conf['athena']['database']
+        staging_dir = conf['athena']['staging_dir']
+        x = re.split('/+', staging_dir) # split path elements into a list
+        athena_bucket = x[1] # first path element that's not s3:
+        athena_prefix = '/'.join(x[2:])
 
         s3 = boto3.client('s3', verify=conf['ssl_cert'])
         ath = boto3.client('athena', verify=conf['ssl_cert'])
@@ -216,20 +211,21 @@ if __name__ == '__main__':
 
         t0 = time.time()
         for date_ in dates:
+            date_str = date_.strftime('%Y-%m-%d')
             procs = 2 # min(os.cpu_count()*2, 16)
             with Pool(processes=procs) as pool: #18
                 pool.starmap_async(pull_raw_atspm_data, list(itertools.product(signalids, [date_], [engine])))
                 pool.close()
                 pool.join()
 
-            partition_query = '''ALTER TABLE atspm ADD PARTITION (date="{d}")
-                                 location "s3://{b}/atspm/date={d}/"'''.format(b=BUCKET, d=date_.date())
+            partition_query = f'''ALTER TABLE {atspm_table} ADD PARTITION (date="{date_str}")
+                                  location "s3://{bucket}/atspm/date={date_str}"'''
 
             print('Update Athena partitions:')
             response = ath.start_query_execution(
                     QueryString = partition_query,
-                    QueryExecutionContext={'Database': DATABASE},
-                    ResultConfiguration={'OutputLocation': ATHENA_OUTPUT_BUCKET})
+                    QueryExecutionContext={'Database': athena_database},
+                    ResultConfiguration={'OutputLocation': staging_dir})
             pp.pprint(response)
 
         print('\n{} signals in {} days. Done in {} minutes'.format(len(signalids), len(dates), int((time.time()-t0)/60)))
