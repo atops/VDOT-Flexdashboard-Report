@@ -164,7 +164,7 @@ query_data <- function(
         zones <- c("Zone 7", "Zone 7m", "Zone 7d")
         zones <- paste(glue("'{zones}'"), collapse = ",")
         where_clause <- glue("WHERE Zone_Group in ({zones})")
-    } else if (level == "signal" & zone_group == "All") {
+    } else if (zone_group == "All") {
         # Special case used by the map which currently shows signal-level data
         # for all signals all the time.
         where_clause <- "WHERE True"

@@ -222,7 +222,7 @@ rsu_uptime:
 # --- Configuration Metrics ---------------------
 detection_level:
     label: Detection Level [#]
-    table: detection_levels
+    table: dl
     variable: Level
     weight: NULL
     data_type: integer
