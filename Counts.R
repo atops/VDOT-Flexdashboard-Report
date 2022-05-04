@@ -124,7 +124,8 @@ get_counts2 <- function(date_, bucket, conf_athena, uptime = TRUE, counts = TRUE
         
         counts_1hr_fn <- glue("counts_1hr_{date_}")
         counts_ped_1hr_fn <- glue("counts_ped_1hr_{date_}")
-        counts_15min_fn <- glue("counts_15min_TWR_{date_}")
+        counts_15min_fn <- glue("counts_15min_{date_}")
+        counts_ped_15min_fn <- glue("counts_ped_15min_{date_}")
         
         filtered_counts_1hr_fn <- glue("filtered_counts_1hr_{date_}")
         filtered_counts_15min_fn <- glue("filtered_counts_15min_{date_}")

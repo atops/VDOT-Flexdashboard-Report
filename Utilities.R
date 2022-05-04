@@ -109,7 +109,7 @@ read_zipped_feather <- function(x) {
 
 keep_trying <- function(func, n_tries, ...){
     
-    possibly_func = purrr::possibly(func, otherwise = NULL)
+    possibly_func = purrr::possibly(func, otherwise = NULL, quiet = FALSE)
     
     result = NULL
     try_number = 1
@@ -117,7 +117,7 @@ keep_trying <- function(func, n_tries, ...){
     
     while(is.null(result) && try_number <= n_tries){
         if (try_number > 1) {
-            print(paste("Attempt:", try_number))
+            print(paste(substitute(func), "Attempt:", try_number))
         }
         try_number = try_number + 1
         result = possibly_func(...)

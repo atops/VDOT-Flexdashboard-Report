@@ -4,6 +4,7 @@
 agency: VDOT
 bucket: vdot-spm2
 profile: KH_VDOT
+region: us-east-2
 athena:
     staging_dir: s3://vdot-spm2/athena
     database: vdot_spm
@@ -30,7 +31,7 @@ run:
     split_failures: TRUE
 
 
-start_date: 2022-03-15  # 4 days ago
+start_date: 2 days ago
 end_date: yesterday
 
 report_end_date: yesterday

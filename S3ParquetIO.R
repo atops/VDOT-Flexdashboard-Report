@@ -26,7 +26,7 @@ s3_upload_parquet <- function(df, date_, fn, bucket, table_name, conf_athena) {
         use_deprecated_int96_timestamps = TRUE,
         bucket = bucket,
         object = glue("mark/{table_name}/date={date_}/{fn}.parquet"),
-        opts = list(multipart = TRUE, body_as_string = TRUE)
+        opts = list(multipart = TRUE)
     )
     
     add_partition(conf_athena, table_name, date_)

@@ -5,11 +5,8 @@ library(yaml)
 library(glue)
 library(future)
 
-plan(multisession)
 
 print(glue("{Sys.time()} Starting Package Script"))
-
-conf <- read_yaml("Monthly_Report.yaml")
 
 source("Monthly_Report_Functions.R")
 

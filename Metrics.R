@@ -214,8 +214,10 @@ get_daily_pr <- function(aog) {
 
 
 get_occupancy <- function(de_dt, int_dt) {
-    occdf <- foverlaps(de_dt, int_dt, type = "any") %>%
-        filter(!is.na(IntervalStart)) %>%
+    occ_df <- foverlaps(de_dt, int_dt, type = "any") %>%
+        filter(!is.na(IntervalStart), !is.na(IntervalEnd)) %>%
+
+        as_tibble() %>%
 
         transmute(
             SignalID = factor(SignalID),
@@ -224,21 +226,21 @@ get_occupancy <- function(de_dt, int_dt) {
             CycleStart,
             IntervalStart,
             IntervalEnd,
-            int_int = lubridate::interval(IntervalStart, IntervalEnd),
-            occ_int = lubridate::interval(DetOn, DetOff),
-            occ_duration = as.duration(intersect(occ_int, int_int)),
-            int_duration = as.duration(int_int))
+            int_interval = lubridate::interval(IntervalStart, IntervalEnd),
+            occ_interval = lubridate::interval(DetOn, DetOff),
+            occ_duration = as.numeric(intersect(occ_interval, int_interval)),
+            int_duration = as.numeric(int_interval))
 
-    occdf <- full_join(int_dt,
-                       occdf,
-                       by = c("SignalID", "Phase",
-                              "CycleStart", "IntervalStart", "IntervalEnd")) %>%
+    int_df <- as_tibble(int_dt)
+
+    occ_df <- full_join(
+            int_df, occ_df,
+            by = c("SignalID", "Phase", "CycleStart", "IntervalStart", "IntervalEnd")
+        ) %>%
         tidyr::replace_na(
             list(Detector = 0, occ_duration = 0, int_duration = 1)) %>%
         mutate(SignalID = factor(SignalID),
-               Detector = factor(Detector),
-               occ_duration = as.numeric(occ_duration),
-               int_duration = as.numeric(int_duration)) %>%
+               Detector = factor(Detector)) %>%
 
         group_by(SignalID, Phase, CycleStart, Detector) %>%
         summarize(occ = sum(occ_duration)/max(int_duration),
@@ -250,7 +252,7 @@ get_occupancy <- function(de_dt, int_dt) {
         mutate(SignalID = factor(SignalID),
                Phase = factor(Phase))
 
-    occdf
+    occ_df
 }
 
 
@@ -596,7 +598,7 @@ get_pau_gamma <- function(papd, paph, corridors, wk_calcs_start_date, pau_start_
 
     # too_high <- get_pau_high(paph, 200, wk_calcs_start_date)
     too_high <- get_pau_high_(paph, wk_calcs_start_date)
-    
+
 
     begin_date <- min(papd$Date)
 
@@ -796,18 +798,18 @@ get_ped_delay <- function(date_, conf, signals_list) {
 
 
 get_detection_levels_by_signal <- function(date_) {
-    
+
     dc <- get_det_config(date_)
-    
+
     llc <- grepl('Lane-by-lane Count', dc$DetectionTypeDesc)
     adv <- grepl('Advanced Count', dc$DetectionTypeDesc)
     sbp <- grepl('Stop Bar Presence', dc$DetectionTypeDesc)
-    
+
     dc[llc, "Level"] <- 3
     dc[((llc & sbp) | sbp) & dc$CallPhase %in% c(2,6), "Level"] <- 2
     dc[((llc & sbp) | sbp) & !dc$CallPhase %in% c(2,6), "Level"] <- 1
     dc[((llc & adv) | adv) & dc$CallPhase %in% c(2,6), "Level"] <- 1
-    
+
     dc %>% 
         group_by(SignalID) %>% 
         summarize(Level = max(Level), .groups = "drop")

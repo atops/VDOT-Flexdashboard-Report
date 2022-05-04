@@ -4,6 +4,7 @@ import boto3
 import os
 import re
 import io
+import yaml
 from pandas.tseries.offsets import Day
 from datetime import datetime, timedelta
 from glob import glob
@@ -11,15 +12,13 @@ import random
 import string
 from retrying import retry
 from multiprocessing import Pool
+import s3io
+
 
 
 def random_string(length):
     x = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(length)]) 
     return x +  datetime.now().strftime('%H%M%S%f')
-
-
-ath = boto3.client('athena')
-s3 = boto3.client('s3')
 
 
 @retry(wait_random_min=5000, wait_random_max=10000, stop_max_attempt_number=10)
@@ -145,13 +144,13 @@ def read_parquet_local(table_name, start_date, end_date, signals_list = None):
     return feather_filename
 
 
-def read_parquet_file(bucket, key):
+def read_parquet_hive(bucket, key):
 
     if 'Contents' in s3.list_objects(Bucket = bucket, Prefix = key):
         
         date_ = re.search('\d{4}-\d{2}-\d{2}', key).group(0)
         
-        df = (pd.read_parquet('s3://{b}/{k}'.format(b=bucket, k=key))
+        df = (s3io.read_parquet(Bucket=bucket, Key=key)
                 .assign(Date = lambda x: pd.to_datetime(date_, format='%Y-%m-%d'))
                 .rename(columns = {'Timestamp': 'TimeStamp'}))
 
@@ -159,6 +158,10 @@ def read_parquet_file(bucket, key):
         df = pd.DataFrame()
         
     return df
+
+
+def upload_parquet_object(df, bucket, key, **kwargs):
+    s3io.write_parquet(df, Bucket=bucket, Key=key, **kwargs)
 
 
 def get_s3data_dask(bucket, prefix):
