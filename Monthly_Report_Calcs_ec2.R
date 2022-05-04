@@ -32,8 +32,8 @@ Sys.setenv(AWS_DEFAULT_REGION = cred$DEFAULT_REGION)
 
 #----- DEFINE DATE RANGE FOR CALCULATIONS ------------------------------------#
 
-start_date <- get_date_from_string(conf$start_date) 
-end_date <- get_date_from_string(conf$end_date) 
+start_date <- get_date_from_string(conf$start_date)
+end_date <- get_date_from_string(conf$end_date)
 
 # Manual overrides
 # start_date <- "2020-01-04"
@@ -162,12 +162,12 @@ print(glue("{Sys.time()} Detection Levels by Signal [5.1 of 11]"))
 
 if (TRUE) {
     date_range <- seq(ymd(start_date), ymd(end_date), by = "1 day")
-    
+
     lapply(date_range, function(date_) {
-        
+
         signals_df <- select(corridors, SignalID) %>% mutate(Date = date_)
         detection_levels_df <- get_detection_levels_by_signal(date_)
-        
+
         det_levels <- left_join(signals_df, detection_levels_df, by = "SignalID") %>%
             replace_na(list(Level = 0))
         s3_upload_parquet_date_split(
@@ -197,20 +197,20 @@ get_counts_based_measures <- function(month_abbrs) {
         ed <- sd + months(1) - days(1)
         ed <- min(ed, ymd(end_date))
         date_range <- seq(sd, ed, by = "1 day")
-        
-        
+
+
         print("1-hour adjusted counts")
         prep_db_for_adjusted_counts_arrow("filtered_counts_1hr", conf, date_range)
         get_adjusted_counts_arrow("filtered_counts_1hr", "adjusted_counts_1hr", conf)
-        
+
         fc_ds <- arrow::open_dataset(sources = "filtered_counts_1hr/")
         ac_ds <- arrow::open_dataset(sources = "adjusted_counts_1hr/")
-        
+
         lapply(date_range, function(date_) {
             # print(date_)
-            adjusted_counts_1hr <- ac_ds %>% 
-                filter(Date == date_) %>% 
-                select(-c(Date, date)) %>% 
+            adjusted_counts_1hr <- ac_ds %>%
+                filter(Date == date_) %>%
+                select(-c(Date, date)) %>%
                 collect()
             s3_upload_parquet_date_split(
                 adjusted_counts_1hr,
@@ -220,7 +220,7 @@ get_counts_based_measures <- function(month_abbrs) {
                 conf_athena = conf$athena, parallel = FALSE
             )
         })
-        
+
         mclapply(date_range, mc.cores = usable_cores, mc.preschedule = FALSE, FUN = function(x) {
             write_signal_details(x, conf$athena, signals_list)
         })
@@ -270,11 +270,11 @@ get_counts_based_measures <- function(month_abbrs) {
             }
 
             print(glue("reading adjusted_counts_1hr: {date_str}"))
-            adjusted_counts_1hr <- ac_ds %>% 
-                filter(date == date_str) %>% 
-                select(-date) %>% 
+            adjusted_counts_1hr <- ac_ds %>%
+                filter(date == date_str) %>%
+                select(-date) %>%
                 collect()
-            
+
             if (!is.null(adjusted_counts_1hr) && nrow(adjusted_counts_1hr)) {
                 adjusted_counts_1hr <- adjusted_counts_1hr %>%
                     mutate(
@@ -324,15 +324,15 @@ get_counts_based_measures <- function(month_abbrs) {
         print("15-minute adjusted counts")
         prep_db_for_adjusted_counts_arrow("filtered_counts_15min", conf, date_range)
         get_adjusted_counts_arrow("filtered_counts_15min", "adjusted_counts_15min", conf)
-        
+
         fc_ds <- arrow::open_dataset(sources = "filtered_counts_15min/")
         ac_ds <- arrow::open_dataset(sources = "adjusted_counts_15min/")
-        
+
         lapply(date_range, function(date_) {
             print(date_)
-            adjusted_counts_15min <- ac_ds %>% 
-                filter(Date == date_) %>% 
-                select(-c(Date, date)) %>% 
+            adjusted_counts_15min <- ac_ds %>%
+                filter(Date == date_) %>%
+                select(-c(Date, date)) %>%
                 collect()
             s3_upload_parquet_date_split(
                 adjusted_counts_15min,
@@ -350,7 +350,7 @@ get_counts_based_measures <- function(month_abbrs) {
                 table_name = "throughput",
                 conf_athena = conf$athena, parallel = FALSE
             )
-            
+
             # Vehicles per 15-minute timeperiod
             print(glue("vp15: {date_}"))
             vp15 <- get_vph(adjusted_counts_15min, interval = "15 min")
@@ -362,7 +362,7 @@ get_counts_based_measures <- function(month_abbrs) {
                 conf_athena = conf$athena
             )
         })
-        
+
         if (dir.exists("filtered_counts_15min")) {
             unlink("filtered_counts_15min", recursive = TRUE)
         }
@@ -370,8 +370,8 @@ get_counts_based_measures <- function(month_abbrs) {
             unlink("adjusted_counts_15min", recursive = TRUE)
         }
 
-        
-        
+
+
         #-----------------------------------------------
         # 1-hour pedestrian activation counts
         print("1-hour pedestrian activation counts")
@@ -545,9 +545,9 @@ get_sf_date_range <- function(start_date, end_date) {
 
     lapply(date_range, function(date_) {
         print(date_)
-        
+
         sf <- get_sf_utah(date_, conf, signals_list, intervals = c("hour", "15min"))
-        
+
         s3_upload_parquet_date_split(
             sf$hour,
             bucket = conf$bucket,

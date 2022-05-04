@@ -232,7 +232,7 @@ get_occupancy <- function(de_dt, int_dt) {
             int_duration = as.numeric(int_interval))
 
     int_df <- as_tibble(int_dt)
-    
+
     occ_df <- full_join(
             int_df, occ_df,
             by = c("SignalID", "Phase", "CycleStart", "IntervalStart", "IntervalEnd")
@@ -598,7 +598,7 @@ get_pau_gamma <- function(papd, paph, corridors, wk_calcs_start_date, pau_start_
 
     # too_high <- get_pau_high(paph, 200, wk_calcs_start_date)
     too_high <- get_pau_high_(paph, wk_calcs_start_date)
-    
+
 
     begin_date <- min(papd$Date)
 
@@ -798,20 +798,20 @@ get_ped_delay <- function(date_, conf, signals_list) {
 
 
 get_detection_levels_by_signal <- function(date_) {
-    
+
     dc <- get_det_config(date_)
-    
+
     llc <- grepl('Lane-by-lane Count', dc$DetectionTypeDesc)
     adv <- grepl('Advanced Count', dc$DetectionTypeDesc)
     sbp <- grepl('Stop Bar Presence', dc$DetectionTypeDesc)
-    
+
     dc[llc, "Level"] <- 3
     dc[((llc & sbp) | sbp) & dc$CallPhase %in% c(2,6), "Level"] <- 2
     dc[((llc & sbp) | sbp) & !dc$CallPhase %in% c(2,6), "Level"] <- 1
     dc[((llc & adv) | adv) & dc$CallPhase %in% c(2,6), "Level"] <- 1
-    
-    dc %>% 
-        group_by(SignalID, PrimaryName, SecondaryName) %>% 
+
+    dc %>%
+        group_by(SignalID, PrimaryName, SecondaryName) %>%
         summarize(Level = max(Level))
 }
 
