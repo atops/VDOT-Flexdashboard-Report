@@ -22,7 +22,7 @@ from retrying import retry
 import yaml
 
 from s3io import *
-from databases import get_atspm_engine, get_maxv_engine, get_mvel_engine
+from pull_atspm_data import get_atspm_engine
 from mark1_logger import mark1_logger
 
 base_path = '.'
@@ -31,10 +31,6 @@ logs_path = os.path.join(base_path, 'logs')
 if not os.path.exists(logs_path):
     os.mkdir(logs_path)
 logger = mark1_logger(os.path.join(logs_path, f'get_watchdog_alerts_{datetime.today().strftime("%F")}.log'))
-
-pd.options.display.max_columns = 10
-s3 = boto3.client('s3')
-s3r = boto3.resource('s3')
 
 
 # Read Corridors File from S3
@@ -51,12 +47,15 @@ def get_corridors(bucket, filename):
 # Upload watchdog alerts to predetermined location in S3
 @retry(wait_random_min=1000, wait_random_max=2000, stop_max_attempt_number=10)
 def s3_upload_watchdog_alerts(df, conf, asof_date=None):
-  
-    s3key = 'mark/interim/watchdog/SPMWatchDogErrorEvents.parquet'
+
+    bucket = conf['bucket']
+    region = conf['region']
+
+    s3key = f'mark/watchdog/SPMWatchDogErrorEvents_{region}.parquet'
     if asof_date:
         s3key = s3key.replace('.parquet', f'_{asof_date}.parquet')
 
-    write_parquet(df, Bucket=conf['bucket'], Key=s3key)
+    write_parquet(df, Bucket=bucket, Key=s3key)
 
 
 @retry(wait_random_min=1000, wait_random_max=2000, stop_max_attempt_number=10)
@@ -71,7 +70,7 @@ def get_watchdog_alerts(engine, corridors, asof_date=None):
         SPMWatchDogErrorEvents = pd.read_sql_query(query, con=conn)\
             .drop(columns=['ID'])\
             .drop_duplicates()
-    
+
     # Join Watchdog Alerts with Corridors
     wd = SPMWatchDogErrorEvents.loc[SPMWatchDogErrorEvents.SignalID != 'null', ]
     wd = wd.loc[wd.TimeStamp > datetime.today() - timedelta(days=100)]
@@ -81,14 +80,14 @@ def get_watchdog_alerts(engine, corridors, asof_date=None):
     wd = wd.drop(columns=['DetectorID'])
     wd = wd.loc[wd.SignalID.isin(corridors.SignalID.astype('str'))]
     wd.SignalID = wd.SignalID.astype('int')
-    
+
     wd = (wd.set_index(['SignalID']).join(corridors.set_index(['SignalID']), how = 'left')
             .reset_index())
     wd = wd[~wd.Corridor.isna()]
     wd = wd.rename(columns = {'Phase': 'CallPhase',
                               'TimeStamp': 'Date'})
-    
-    # Clearn up the Message into a new field: Alert
+
+    # Clean up the Message into a new field: Alert
     wd.loc[wd.Message.str.contains('Force Offs'), 'Alert'] = 'Force Offs'
     wd.loc[wd.Message.str.contains('Count'), 'Alert'] = 'Count'
     wd.loc[wd.Message.str.contains('Max Outs'), 'Alert'] = 'Max Outs'
@@ -118,13 +117,22 @@ def get_watchdog_alerts(engine, corridors, asof_date=None):
 
 def main():
    
-    with open('Monthly_Report_interim.yaml') as yaml_file:
+    with open('Monthly_Report.yaml') as yaml_file:
         conf = yaml.load(yaml_file, Loader=yaml.Loader)
  
+    with open('Monthly_Report_AWS.yaml') as yaml_file:
+        cred = yaml.load(yaml_file, Loader=yaml.Loader)
+
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     try:    
-        atspm_engine = get_atspm_engine()
+        atspm_engine = get_atspm_engine(
+            username=cred['ATSPM_UID'], 
+            password=cred['ATSPM_PWD'], 
+            hostname=cred['ATSPM_HOST'], 
+            database=cred['ATSPM_DB'],
+            dsn=cred['ATSPM_DSN'])
+
         corridors = get_corridors(conf['bucket'], conf['corridors_filename_s3'])
     
         asof_date = (pd.Timestamp.today() - pd.Timedelta(7, unit='days')) - pd.offsets.MonthBegin(4)
