@@ -1,11 +1,13 @@
 
 # Database Functions
-library(odbc)
-library(RMariaDB)
-library(yaml)
-library(duckdb)
-library(tictoc)
-
+suppressMessages({
+    library(odbc)
+    library(RMariaDB)
+    library(yaml)
+    library(duckdb)
+    library(tictoc)
+    library(stringr)
+})
 
 cred <- read_yaml("Monthly_Report_AWS.yaml")
 

@@ -45,18 +45,23 @@ if (interactive()) {
 
 source("Utilities.R")
 source("Classes.R")
-# source("zone_manager_reports_editor.R")
+source("Database_Functions.R")
 
 usable_cores <- get_usable_cores()
 doParallel::registerDoParallel(cores = usable_cores)
 
+conf <- read_yaml("Monthly_Report.yaml")
+
+aws_conf <- read_yaml("Monthly_Report_AWS.yaml")
+conf$athena$uid <- aws_conf$AWS_ACCESS_KEY_ID
+conf$athena$pwd <- aws_conf$AWS_SECRET_ACCESS_KEY
 
 # Set credentials from ~/.aws/credentials file
 aws.signature::use_credentials(profile = conf$profile)
 
 # Need to set the default region as well. use_credentials doesn't do this.
-cred <- aws.signature::read_credentials()[[conf$profile]]
-Sys.setenv(AWS_DEFAULT_REGION = cred$DEFAULT_REGION)
+credentials <- aws.signature::read_credentials()[[conf$profile]]
+Sys.setenv(AWS_DEFAULT_REGION = conf$aws_region)
 
 
 logger <- log4r::logger(threshold = "DEBUG")
@@ -167,14 +172,7 @@ goal <- list("tp" = NULL,
              "pau" = 0.95)
 
 
-conf <- read_yaml("Monthly_Report.yaml")
 
-
-aws_conf <- read_yaml("Monthly_Report_AWS.yaml")
-conf$athena$uid <- aws_conf$AWS_ACCESS_KEY_ID
-conf$athena$pwd <- aws_conf$AWS_SECRET_ACCESS_KEY
-
-source("Database_Functions.R")
 
 athena_connection_pool <- get_athena_connection_pool(conf$athena)
 

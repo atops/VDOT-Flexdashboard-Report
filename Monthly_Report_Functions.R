@@ -48,7 +48,8 @@ options(future.rng.onMisue = "ignore")
 
 conf <- read_yaml("Monthly_Report.yaml")
 aws.signature::use_credentials(profile = conf$profile)
-Sys.setenv(AWS_DEFAULT_REGION = conf$region) # credentials file doesn't store region
+Sys.setenv(AWS_DEFAULT_REGION = conf$aws_region) # credentials file doesn't store region
+
 cred <- aws.signature::read_credentials()[[conf$profile]]
 conf$athena$uid <- cred$AWS_ACCESS_KEY_ID
 conf$athena$pwd <- cred$AWS_SECRET_ACCESS_KEY
