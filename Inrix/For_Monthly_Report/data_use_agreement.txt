@@ -1,8 +1,0 @@
-﻿This file is Copyright © 2015 INRIX, Inc. All rights reserved. This file is 
-available to you because your agency executed an agreement entitled "The I-95 
-Corridor Coalition Traffic Flow Data Program, Agreement for Use of Data, 
-University of Maryland  Contract N136906 (Data Use Agreement)". Use of all 
-files included in this zip archive is subject to the terms of the Data Use 
-Agreement. Further, the location referencing information provided in this zip 
-archive can only be used in conjunction with the data file provided and for no 
-other purpose.
