@@ -105,12 +105,6 @@ alerts <- get_alerts(conf)
 
 # Upload to S3 Bucket: mark/watchdog/
 tryCatch({
-    s3write_using(
-        alerts,
-        qsave,
-        bucket = conf$bucket,
-        object = "mark/watchdog/alerts.qs",
-        opts = list(multipart = TRUE))
 
     s3write_using(
         alerts,
@@ -122,10 +116,10 @@ tryCatch({
     write(
         glue(paste0(
             "{format(now(), '%F %H:%M:%S')}|SUCCESS|get_alerts.R|get_alerts|Line 173|",
-            "Uploaded {conf$bucket}/mark/watchdog/alerts.qs")),
+            "Uploaded {conf$bucket}/mark/watchdog/alerts.parquet")),
         file.path(base_path, glue("logs/get_alerts_{today()}.log")),
         append = TRUE
-                              )
+    )
 }, error = function(e) {
     write(
         glue("{format(now(), '%F %H:%M:%S')}|ERROR|get_alerts.R|get_alerts|Line 173|Failed to upload to S3 - {e}"),
@@ -142,9 +136,9 @@ tryCatch({
     DBI::dbWriteTable(conn, "WatchdogAlerts", alerts, row.names = FALSE, append = TRUE, overwrite = FALSE)
 
     write(
-        paste0(
-            glue("{format(now(), '%F %H:%M:%S')}|SUCCESS|get_alerts.R|get_alerts|Line 217|"),
-                 "Wrote to Aurora Database: WatchdogAlerts table"),
+        glue(paste0(
+            "{format(now(), '%F %H:%M:%S')}|SUCCESS|get_alerts.R|get_alerts|Line 217|"),
+            "Wrote to Aurora Database: WatchdogAlerts table"),
         file.path(base_path, glue("logs/get_alerts_{today()}.log")),
         append = TRUE
     )
