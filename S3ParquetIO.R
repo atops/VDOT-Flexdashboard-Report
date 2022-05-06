@@ -1,5 +1,5 @@
 
-s3_upload_parquet <- function(df, date_, fn, bucket, table_name, conf_athena) {
+s3_upload_parquet <- function(df, date_, fn, bucket, table_name, conf) {
     
     df <- ungroup(df)
     
@@ -29,12 +29,12 @@ s3_upload_parquet <- function(df, date_, fn, bucket, table_name, conf_athena) {
         opts = list(multipart = TRUE)
     )
     
-    add_partition(conf_athena, table_name, date_)
+    add_partition(conf, table_name, date_)
 }
 
 
 
-s3_upload_parquet_date_split <- function(df, prefix, bucket, table_name, conf_athena, parallel = TRUE) {
+s3_upload_parquet_date_split <- function(df, prefix, bucket, table_name, conf, parallel = TRUE) {
     
     if (!("Date" %in% names(df))) {
         if ("Timeperiod" %in% names(df)) {
@@ -51,7 +51,7 @@ s3_upload_parquet_date_split <- function(df, prefix, bucket, table_name, conf_at
                           fn = glue("{prefix}_{date_}"),
                           bucket = bucket,
                           table_name = table_name,
-                          conf_athena = conf_athena)
+                          conf = conf)
     } else { # loop through dates
         if (parallel & Sys.info()["sysname"] != "Windows") {
             df %>%
@@ -62,7 +62,7 @@ s3_upload_parquet_date_split <- function(df, prefix, bucket, table_name, conf_at
                                       fn = glue("{prefix}_{date_}"),
                                       bucket = bucket,
                                       table_name = table_name,
-                                      conf_athena = conf_athena)
+                                      conf = conf)
                     Sys.sleep(1)
                 })
         } else {
@@ -74,7 +74,7 @@ s3_upload_parquet_date_split <- function(df, prefix, bucket, table_name, conf_at
                                       fn = glue("{prefix}_{date_}"),
                                       bucket = bucket,
                                       table_name = table_name,
-                                      conf_athena = conf_athena)
+                                      conf = conf)
                 })
         }
     }

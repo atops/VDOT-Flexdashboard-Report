@@ -46,10 +46,9 @@ get_counts <- function(df, det_config, units = "hours", date_, event_code = 82, 
 }
 
 
-get_counts2 <- function(date_, bucket, conf_athena, uptime = TRUE, counts = TRUE) {
+get_counts2 <- function(date_, bucket, conf, uptime = TRUE, counts = TRUE) {
     
-    # conn <- get_atspm_connection(aws_conf)
-    conn <- get_athena_connection(conf_athena)
+    conn <- get_athena_connection(conf)
     
     end_time <- format(date(date_) + days(1) - seconds(0.1), "%Y-%m-%d %H:%M:%S.9")
     
@@ -67,7 +66,7 @@ get_counts2 <- function(date_, bucket, conf_athena, uptime = TRUE, counts = TRUE
     
     atspm_query <- sql(glue(paste(
         "select distinct timestamp, signalid, eventcode, eventparam", 
-        "from {conf_athena$database}.{conf_athena$atspm_table}", 
+        "from {conf$athena$database}.{conf$athena$atspm_table}", 
         "where date = '{date_}'")))
     
     df <- tbl(conn, atspm_query) %>%
@@ -111,13 +110,12 @@ get_counts2 <- function(date_, bucket, conf_athena, uptime = TRUE, counts = TRUE
                    DOW = wday(start_date),
                    Week = week(start_date)) %>%
             dplyr::select(SignalID, CallPhase, Date, Date_Hour, DOW, Week, uptime)
-        #tz(cu$Date_Hour) <- "America/New_York"
         
         s3_upload_parquet(cu, date_,
                           fn = glue("cu_{date_}"),
                           bucket = bucket,
                           table_name = "comm_uptime",
-                          conf_athena) #athena_db = conf_athena$database)
+                          conf = conf)
     }
     
     if (counts == TRUE) {
@@ -146,7 +144,7 @@ get_counts2 <- function(date_, bucket, conf_athena, uptime = TRUE, counts = TRUE
                           fn = counts_1hr_fn,
                           bucket = bucket,
                           table_name = "counts_1hr",
-                          conf_athena = conf_athena)
+                          conf = conf)
         
         print("1-hr filtered counts")
         if (nrow(counts_1hr) > 0) {
@@ -157,7 +155,7 @@ get_counts2 <- function(date_, bucket, conf_athena, uptime = TRUE, counts = TRUE
                               fn = filtered_counts_1hr_fn,
                               bucket = bucket,
                               table_name = "filtered_counts_1hr",
-                              conf_athena = conf_athena)
+                              conf = conf)
         }
         
         
@@ -178,7 +176,7 @@ get_counts2 <- function(date_, bucket, conf_athena, uptime = TRUE, counts = TRUE
                           fn = counts_ped_1hr_fn,
                           bucket = bucket,
                           table_name = "counts_ped_1hr",
-                          conf_athena = conf_athena)
+                          conf = conf)
         
         
         # get 15min counts
@@ -197,7 +195,7 @@ get_counts2 <- function(date_, bucket, conf_athena, uptime = TRUE, counts = TRUE
                           fn = counts_15min_fn,
                           bucket = bucket,
                           table_name = "counts_15min",
-                          conf_athena = conf_athena)
+                          conf = conf)
         
         # get 15min filtered counts
         print("15-minute filtered counts")
@@ -211,10 +209,10 @@ get_counts2 <- function(date_, bucket, conf_athena, uptime = TRUE, counts = TRUE
                 fn = filtered_counts_15min_fn,
                 bucket = bucket,
                 table_name = "filtered_counts_15min",
-                conf_athena)
+                conf = conf)
         }
         
-        conn <- get_athena_connection(conf_athena)
+        conn <- get_athena_connection(conf)
 
 	# get 15min ped counts
         print("15-minute pedestrian counts")
@@ -234,7 +232,7 @@ get_counts2 <- function(date_, bucket, conf_athena, uptime = TRUE, counts = TRUE
                           fn = counts_ped_15min_fn, 
                           bucket = bucket,
                           table_name = "counts_ped_15min", 
-                          conf_athena = conf_athena)
+                          conf = conf)
         rm(counts_ped_15min)
         
         

@@ -66,9 +66,9 @@ get_spm_data_atspm <- function(start_date, end_date, signals_list, conf_atspm, t
 
 
 
-get_spm_data_athena <- function(start_date, end_date, signals_list = NULL, conf_athena, table, TWR_only=TRUE) {
+get_spm_data_athena <- function(start_date, end_date, signals_list = NULL, conf, table, TWR_only=TRUE) {
 
-    conn <- get_athena_connection(conf_athena)
+    conn <- get_athena_connection(conf)
 
     if (TWR_only == TRUE) {
         query_where <- "WHERE date_format(date_parse(date, '%Y-%m-%d'), '%W') in ('Tuesday','Wednesday','Thursday')"
@@ -76,7 +76,7 @@ get_spm_data_athena <- function(start_date, end_date, signals_list = NULL, conf_
         query_where <- ""
     }
 
-    query <- glue("SELECT DISTINCT * FROM {conf_athena$database}.{tolower(table)} {query_where}")
+    query <- glue("SELECT DISTINCT * FROM {conf$athena$database}.{tolower(table)} {query_where}")
 
     df <- tbl(conn, sql(query))
 
@@ -98,24 +98,24 @@ get_spm_data_athena <- function(start_date, end_date, signals_list = NULL, conf_
 get_spm_data <- get_spm_data_athena
 
 # Query Cycle Data
-get_cycle_data <- function(start_date, end_date, conf_athena, signals_list = NULL) {
+get_cycle_data <- function(start_date, end_date, conf, signals_list = NULL) {
     get_spm_data(
         start_date,
         end_date,
         signals_list,
-        conf_athena,
+        conf,
         table = "CycleData",
         TWR_only = FALSE)
 }
 
 
 # Query Detection Events
-get_detection_events <- function(start_date, end_date, conf_athena, signals_list = NULL) {
+get_detection_events <- function(start_date, end_date, conf, signals_list = NULL) {
     get_spm_data(
         start_date,
         end_date,
         signals_list,
-        conf_athena,
+        conf,
         table = "DetectionEvents",
         TWR_only = FALSE)
 }

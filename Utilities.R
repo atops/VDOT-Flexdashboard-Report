@@ -422,7 +422,7 @@ get_corridor_summary_data <- function(cor) {
 }
 
 
-write_signal_details <- function(plot_date, conf_athena, signals_list = NULL) {
+write_signal_details <- function(plot_date, conf, signals_list = NULL) {
     print(plot_date)
     #--- This takes approx one minute per day -----------------------
     rc <- s3_read_parquet(
@@ -489,12 +489,12 @@ write_signal_details <- function(plot_date, conf_athena, signals_list = NULL) {
     
     table_name <- "signal_details"
     
-    athena <- get_athena_connection(conf_athena)
+    athena <- get_athena_connection(conf)
     tryCatch({
         response <- dbGetQuery(athena,
-                               sql(glue(paste("ALTER TABLE {conf_athena$database}.{table_name}",
+                               sql(glue(paste("ALTER TABLE {conf$athena$database}.{table_name}",
                                               "ADD PARTITION (date='{plot_date}')"))))
-        print(glue("Successfully created partition (date='{plot_date}') for {conf_athena$database}.{table_name}"))
+        print(glue("Successfully created partition (date='{plot_date}') for {conf$athena$database}.{table_name}"))
     }, error = function(e) {
         message <- e
     })

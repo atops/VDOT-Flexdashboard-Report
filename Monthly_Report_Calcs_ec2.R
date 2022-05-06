@@ -23,8 +23,8 @@ doParallel::registerDoParallel(cores = usable_cores)
 aws.signature::use_credentials(profile = conf$profile)
 
 # Need to set the default region as well. use_credentials doesn't do this.
-cred <- aws.signature::read_credentials()[[conf$profile]]
-Sys.setenv(AWS_DEFAULT_REGION = cred$DEFAULT_REGION)
+credentials <- aws.signature::read_credentials()[[conf$profile]]
+Sys.setenv(AWS_DEFAULT_REGION = conf$aws_region)
 
 
 # aurora_pool <- get_aurora_connection_pool()
@@ -120,7 +120,7 @@ if (conf$run$counts == TRUE) {
         get_counts2(
             date_,
             bucket = conf$bucket,
-            conf_athena = conf$athena,
+            conf = conf,
             uptime = TRUE,
             counts = TRUE
         )
@@ -129,7 +129,7 @@ if (conf$run$counts == TRUE) {
             get_counts2(
                 date_,
                 bucket = conf$bucket,
-                conf_athena = conf$athena,
+                conf = conf,
                 uptime = TRUE,
                 counts = TRUE
             )
@@ -175,7 +175,7 @@ if (TRUE) {
             bucket = conf$bucket,
             prefix = "detection_levels",
             table_name = "detection_levels",
-            conf_athena = conf$athena, parallel = FALSE
+            conf = conf, parallel = FALSE
         )
     })
 }
@@ -217,12 +217,12 @@ get_counts_based_measures <- function(month_abbrs) {
                 bucket = conf$bucket,
                 prefix = "adjusted_counts_1hr",
                 table_name = "adjusted_counts_1hr",
-                conf_athena = conf$athena, parallel = FALSE
+                conf = conf, parallel = FALSE
             )
         })
 
         mclapply(date_range, mc.cores = usable_cores, mc.preschedule = FALSE, FUN = function(x) {
-            write_signal_details(x, conf$athena, signals_list)
+            write_signal_details(x, conf, signals_list)
         })
 
 
@@ -252,7 +252,7 @@ get_counts_based_measures <- function(month_abbrs) {
                         bucket = conf$bucket,
                         prefix = "bad_detectors",
                         table_name = "bad_detectors",
-                        conf_athena = conf$athena
+                        conf = conf
                     )
 
                     # # DAILY DETECTOR UPTIME
@@ -264,7 +264,7 @@ get_counts_based_measures <- function(month_abbrs) {
                         bucket = conf$bucket,
                         prefix = "ddu",
                         table_name = "detector_uptime_pd",
-                        conf_athena = conf$athena
+                        conf = conf
                     )
                 }
             }
@@ -292,7 +292,7 @@ get_counts_based_measures <- function(month_abbrs) {
                     bucket = conf$bucket,
                     prefix = "vpd",
                     table_name = "vehicles_pd",
-                    conf_athena = conf$athena
+                    conf = conf
                 )
 
                 # VPH
@@ -303,7 +303,7 @@ get_counts_based_measures <- function(month_abbrs) {
                     bucket = conf$bucket,
                     prefix = "vph",
                     table_name = "vehicles_ph",
-                    conf_athena = conf$athena
+                    conf = conf
                 )
             }
         })
@@ -339,7 +339,7 @@ get_counts_based_measures <- function(month_abbrs) {
                 bucket = conf$bucket,
                 prefix = "adjusted_counts_15min",
                 table_name = "adjusted_counts_15min",
-                conf_athena = conf$athena, parallel = FALSE
+                conf = conf, parallel = FALSE
             )
 
             throughput <- get_thruput(adjusted_counts_15min)
@@ -348,7 +348,7 @@ get_counts_based_measures <- function(month_abbrs) {
                 bucket = conf$bucket,
                 prefix = "tp",
                 table_name = "throughput",
-                conf_athena = conf$athena, parallel = FALSE
+                conf = conf, parallel = FALSE
             )
 
             # Vehicles per 15-minute timeperiod
@@ -359,7 +359,7 @@ get_counts_based_measures <- function(month_abbrs) {
                 bucket = conf$bucket,
                 prefix = "vp15",
                 table_name = "vehicles_15min",
-                conf_athena = conf$athena
+                conf = conf
             )
         })
 
@@ -395,7 +395,7 @@ get_counts_based_measures <- function(month_abbrs) {
                 bucket = conf$bucket,
                 prefix = "papd",
                 table_name = "ped_actuations_pd",
-                conf_athena = conf$athena
+                conf = conf
             )
 
             # PAPH - pedestrian activations per hour
@@ -407,7 +407,7 @@ get_counts_based_measures <- function(month_abbrs) {
                 bucket = conf$bucket,
                 prefix = "paph",
                 table_name = "ped_actuations_ph",
-                conf_athena = conf$athena
+                conf = conf
             )
 	}
 
@@ -432,7 +432,7 @@ get_counts_based_measures <- function(month_abbrs) {
                 bucket = conf$bucket,
                 prefix = "pa15",
                 table_name = "ped_actuations_15min",
-                conf_athena = conf$athena
+                conf = conf
             )
         }
     })
@@ -476,7 +476,7 @@ get_queue_spillback_date_range <- function(start_date, end_date) {
     lapply(date_range, function(date_) {
         print(date_)
 
-        detection_events <- get_detection_events(date_, date_, conf$athena, signals_list)
+        detection_events <- get_detection_events(date_, date_, conf, signals_list)
         if (nrow(collect(head(detection_events))) > 0) {
 
             qs <- get_qs(detection_events, intervals = c("hour", "15min"))
@@ -486,14 +486,14 @@ get_queue_spillback_date_range <- function(start_date, end_date) {
                 bucket = conf$bucket,
                 prefix = "qs",
                 table_name = "queue_spillback",
-                conf_athena = conf$athena
+                conf = conf
             )
             s3_upload_parquet_date_split(
                 qs$`15min`,
                 bucket = conf$bucket,
                 prefix = "qs",
                 table_name = "queue_spillback_15min",
-                conf_athena = conf$athena
+                conf = conf
             )
         }
     })
@@ -524,7 +524,7 @@ get_pd_date_range <- function(start_date, end_date) {
                 bucket = conf$bucket,
                 prefix = "pd",
                 table_name = "ped_delay",
-                conf_athena = conf$athena
+                conf = conf
             )
         }
     })
@@ -553,14 +553,14 @@ get_sf_date_range <- function(start_date, end_date) {
             bucket = conf$bucket,
             prefix = "sf",
             table_name = "split_failures",
-            conf_athena = conf$athena
+            conf = conf
         )
         s3_upload_parquet_date_split(
             sf$`15min`,
             bucket = conf$bucket,
             prefix = "sf",
             table_name = "split_failures_15min",
-            conf_athena = conf$athena
+            conf = conf
         )
     })
 }
