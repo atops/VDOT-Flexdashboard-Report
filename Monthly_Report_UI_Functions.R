@@ -13,7 +13,6 @@ suppressMessages({
     library(stringr)
     library(readr)
     library(glue)
-    library(arrow)
     library(fst)
     library(forcats)
     library(plotly)
@@ -167,7 +166,7 @@ goal <- list("tp" = NULL,
 
 
 
-athena_connection_pool <- get_athena_connection_pool(conf$athena)
+athena_connection_pool <- get_athena_connection_pool(conf)
 
 
 last_month <- floor_date(today() - days(6), unit = "months")   # Beta
@@ -179,67 +178,14 @@ month_options <- report_months %>% format("%B %Y")
 
 zone_group_options <- conf$zone_groups
 
-poll_interval <- 1000*3600 # 3600 seconds = 1 hour
-
-
-
-s3checkFunc <- function(bucket, object, aws_conf) {
-    function() {
-    	cat(file="dash.log", "checking\n", append=TRUE)
-        bucket_attr <- aws.s3::get_bucket(
-    	    bucket = bucket,
-    	    prefix = object,
-    	    key = aws_conf$AWS_ACCESS_KEY_ID,
-            secret = aws_conf$AWS_SECRET_ACCESS_KEY,
-    	    region = aws_conf$AWS_DEFAULT_REGION)
-        bucket_attr$Contents$LastModified
-    }
-}
-
-s3valueFunc <- function(bucket, object, aws_conf) {
-    cat(file="dash.log", "values\n", append=TRUE)
-    cat(file="dash.log", object, append=TRUE)
-    cat(file="dash.log", "\n", append=TRUE)
-    read_function <- if (endsWith(object, ".qs")) {
-        qs::qread
-    } else if (endsWith(object, ".feather")) {
-        read_feather
-    }
-    
-    function() {
-        x <- aws.s3::s3read_using(
-            read_function,
-            object = object,
-            bucket = bucket,
-            opts = list(
-		key = aws_conf$AWS_ACCESS_KEY_ID,
-        secret = aws_conf$AWS_SECRET_ACCESS_KEY,
-		region = aws_conf$AWS_DEFAULT_REGION))
-        cat(file="dash.log", "values passed\n", append=TRUE)
-	x
-    }
-}
-
-
-
-s3reactivePoll <- function(intervalMillis, bucket, object, aws_s3) {
-    reactivePoll(intervalMillis, session = NULL,
-                 checkFunc = s3checkFunc(bucket = bucket, object = object, aws_s3),
-                 valueFunc = s3valueFunc(bucket = bucket, object = object, aws_s3))
-}
-
-poll_interval <- 1000*3600 # 3600 seconds = 1 hour
-
-corridors_key <- sub("\\..*", ".qs", paste0("all_", conf$corridors_filename_s3))
-corridors <- s3reactivePoll(poll_interval, bucket = conf$bucket, object = corridors_key, aws_conf)
 
 sigops_connection_pool <<- get_aurora_connection_pool()
 aurora_connection_pool <<- sigops_connection_pool
 
 # alerts <- dbReadTable(aurora_connection_pool, "WatchdogAlerts")
-alerts <- s3reactivePoll(poll_interval, bucket = conf$bucket, object = "mark/watchdog/alerts.qs", aws_conf) 
+# alerts <- s3reactivePoll(poll_interval, bucket = conf$bucket, object = "mark/watchdog/alerts.qs") 
 
-
+corridors <- dbReadTable(aurora_connection_pool, "AllCorridors")
 
 read_zipped_feather <- function(x) {
     read_feather(unzip(x))
@@ -1545,54 +1491,11 @@ get_uptime_plot_ <- function(daily_df,
 get_uptime_plot <- cmpfun(get_uptime_plot_)
 
 
-volplot_plotly <- function(df, title = "title", ymax = 1000) {
-    
-    if (is.null(ymax)) {
-        yax <- list(rangemode = "tozero", tickformat = ",.0")
-    } else {
-        yax <- list(range = c(0, ymax), tickformat = ",.0")
-    } 
-    
-    # Works but colors and labeling are not fully complete.
-    pl <- function(dfi) {
-        plot_ly(data = dfi) %>% 
-            add_ribbons(x = ~Timeperiod, 
-                        ymin = 0,
-                        ymax = ~vol,
-                        color = ~CallPhase,
-                        colors = colrs,
-                        name = paste('Phase', dfi$CallPhase[1])) %>%
-            layout(yaxis = yax,
-                   annotations = list(x = -.05,
-                                      y = 0.5,
-                                      xref = "paper",
-                                      yref = "paper",
-                                      xanchor = "right",
-                                      text = paste0("[", dfi$Detector[1], "]"),
-                                      font = list(size = 12),
-                                      showarrow = FALSE)
-            )
-    }
-    
-    dfs <- split(df, df$Detector)
-    
-    plts <- lapply(dfs[lapply(dfs, nrow)>0], pl)
-    subplot(plts, nrows = length(plts), shareX = TRUE) %>%
-        layout(annotations = list(text = title,
-                                  xref = "paper",
-                                  yref = "paper",
-                                  yanchor = "bottom",
-                                  xanchor = "center",
-                                  align = "center",
-                                  x = 0.5,
-                                  y = 1,
-                                  showarrow = FALSE))
-}
+volplot_plotly <- function(
+    dbpool_, 
+    signalid, plot_start_date, plot_end_date, 
+    title = "title", ymax = 1000) {
 
-
-volplot_plotly2 <- function(db, signalid, plot_start_date, plot_end_date, title = "title", ymax = 1000) {
-    # db is either conf$athena (list) or aurora (Pool)
-    
     if (is.null(ymax)) {
         yax <- list(rangemode = "tozero", tickformat = ",.0")
     } else {
@@ -1604,7 +1507,8 @@ volplot_plotly2 <- function(db, signalid, plot_start_date, plot_end_date, title 
         
         dfi <- dfi %>% 
             mutate(
-                maxy = if_else(bad_day==1, as.integer(max(1, max(vol_rc, na.rm = TRUE))), as.integer(0)),
+                #CallPhase = last(dfi$CallPhase), # Plotly gets confused with multiple colors
+                maxy = if_else(bad_day==1, as.integer(max(1, vol_rc, na.rm = TRUE)), as.integer(0)),
                 colr = colrs[as.character(CallPhase)], 
                 fill_colr = "")
         
@@ -1631,23 +1535,24 @@ volplot_plotly2 <- function(db, signalid, plot_start_date, plot_end_date, title 
                 hoverlabel = list(font = list(family = "Source Sans Pro")),
                 showlegend = FALSE)
         }
+        
         p %>% add_trace(
-                data = dfi,
-                x = ~Timeperiod, 
-                y = ~vol_ac, 
-                type = "scatter", 
-                mode = "lines", 
-                #fill = "tozeroy",
-                line = list(color = DARK_GRAY),
-                name = "Adjusted Count",
-                customdata = ~glue(paste(
-                    "<b>Detector: {Detector}</b>",
-                    "<br>{format(ymd_hms(Timeperiod), '%a %d %B %I:%M %p')}",
-                    "<br>Volume: <b>{as_int(vol_ac)}</b>")),
-                hovertemplate = "%{customdata}",
-                hoverlabel = list(font = list(family = "Source Sans Pro")),
-                showlegend = (i==1)) %>%
+            data = dfi,
+            x = ~Timeperiod, 
+            y = ~vol_ac, 
+            type = "scatter", 
+            mode = "lines", 
+            line = list(color = DARK_GRAY),
+            name = "Adjusted Count",
+            customdata = ~glue(paste(
+                "<b>Detector: {Detector}</b>",
+                "<br>{format(ymd_hms(Timeperiod), '%a %d %B %I:%M %p')}",
+                "<br>Volume: <b>{as_int(vol_ac)}</b>")),
+            hovertemplate = "%{customdata}",
+            hoverlabel = list(font = list(family = "Source Sans Pro")),
+            showlegend = (i==1)) %>%
             add_trace(
+                data = dfi,
                 x = ~Timeperiod,
                 y = ~maxy,
                 type = "scatter",
@@ -1676,73 +1581,245 @@ volplot_plotly2 <- function(db, signalid, plot_start_date, plot_end_date, title 
                                       font = list(size = 12),
                                       showarrow = FALSE))
     }
-    # db = conf$athena
+    
     withProgress(message = "Loading chart", value = 0, {
-        athena <- get_athena_connection(db)
         incProgress(amount = 0.1)
-        rc <- tbl(athena, sql(glue(paste(
-            "SELECT signalid, date, timeperiod, detector, callphase, vol",
-            "FROM {db$database}.counts_1hr",
-            "WHERE signalid = '{signalid}'",
-            "AND date BETWEEN '{plot_start_date}' AND '{plot_end_date}'"))))
-        incProgress(amount = 0.1)
-        fc <- tbl(athena, sql(glue(paste(
-            "SELECT signalid, date, timeperiod, detector, callphase, vol",
-            "FROM {db$database}.filtered_counts_1hr",
-            "WHERE signalid = '{signalid}'",
-            "AND date BETWEEN '{plot_start_date}' AND '{plot_end_date}'"))))
-        incProgress(amount = 0.1)
-        ac <- tbl(athena, sql(glue(paste(
-            "SELECT signalid, date, timeperiod, detector, callphase, vol",
-            "FROM {db$database}.adjusted_counts_1hr",
-            "WHERE signalid = '{signalid}'",
-            "AND date BETWEEN '{plot_start_date}' AND '{plot_end_date}'"))))
-        incProgress(amount = 0.2)
-        df <- list(
-            rename(rc, vol_rc = vol),
-            rename(fc, vol_fc = vol),
-            rename(ac, vol_ac = vol)) %>%
-            reduce(full_join, by = c("signalid", "date", "timeperiod", "detector", "callphase")
-            ) %>%
-            mutate(bad_day = if_else(is.na(vol_fc), TRUE, FALSE)) %>% 
-            #select(-date, -vol_fc) %>% 
-            collect() %>%
-            transmute(
-                SignalID = factor(signalid), 
-                Timeperiod = timeperiod, 
-                Detector = factor(as.integer(detector)), 
-                CallPhase = factor(callphase),
-                vol_rc = as.integer(vol_rc),
-                vol_ac = ifelse(is.na(vol_fc), as.integer(vol_ac), NA),
-                bad_day) %>%
-            arrange(SignalID, Detector, Timeperiod)
-        incProgress(amount = 0.4)
-    })
         
+        conn <- poolCheckout(dbpool_)
+        df <- read_signal_data(conn, signalid, plot_start_date, plot_end_date)
+        poolReturn(conn)      
 
+        incProgress(amount = 0.5)
+        
+        if (nrow(df)) {
+            dfs <- split(df, df$Detector)
+            dfs <- dfs[lapply(dfs, nrow)>0]
+            names(dfs) <- NULL
+            
+            plts <- purrr::imap(dfs, ~pl(.x, .y))
+            incProgress(amount = 0.3)
+            
+            subplot(plts, nrows = length(plts), shareX = TRUE) %>%
+                layout(annotations = list(text = title,
+                                          xref = "paper",
+                                          yref = "paper",
+                                          yanchor = "bottom",
+                                          xanchor = "center",
+                                          align = "center",
+                                          x = 0.5,
+                                          y = 1,
+                                          showarrow = FALSE),
+                       showlegend = TRUE,
+                       margin = list(l = 120),
+                       xaxis = list(
+                           type = 'date'))
+        } else {
+            no_data_plot("")
+        }
+    })
     
-    dfs <- split(df, df$Detector)
-    dfs <- dfs[lapply(dfs, nrow)>0]
-    names(dfs) <- NULL
-    
-    plts <- purrr::imap(dfs, ~pl(.x, .y))
-    
-    #plts <- lapply(dfs[lapply(dfs, nrow)>0], pl)
-    subplot(plts, nrows = length(plts), shareX = TRUE) %>%
-        layout(annotations = list(text = title,
-                                  xref = "paper",
-                                  yref = "paper",
-                                  yanchor = "bottom",
-                                  xanchor = "center",
-                                  align = "center",
-                                  x = 0.5,
-                                  y = 1,
-                                  showarrow = FALSE),
-               showlegend = TRUE,
-               margin = list(l = 120),
-               xaxis = list(
-                   type = 'date'))
 }
+
+
+# TODO: Work in Progress. Trying to migrate to Aurora but Athena uses nested JSON natively.
+# volplot_plotly <- function(df, title = "title", ymax = 1000) {
+#     
+#     if (is.null(ymax)) {
+#         yax <- list(rangemode = "tozero", tickformat = ",.0")
+#     } else {
+#         yax <- list(range = c(0, ymax), tickformat = ",.0")
+#     } 
+#     
+#     # Works but colors and labeling are not fully complete.
+#     pl <- function(dfi) {
+#         plot_ly(data = dfi) %>% 
+#             add_ribbons(x = ~Timeperiod, 
+#                         ymin = 0,
+#                         ymax = ~vol,
+#                         color = ~CallPhase,
+#                         colors = colrs,
+#                         name = paste('Phase', dfi$CallPhase[1])) %>%
+#             layout(yaxis = yax,
+#                    annotations = list(x = -.05,
+#                                       y = 0.5,
+#                                       xref = "paper",
+#                                       yref = "paper",
+#                                       xanchor = "right",
+#                                       text = paste0("[", dfi$Detector[1], "]"),
+#                                       font = list(size = 12),
+#                                       showarrow = FALSE)
+#             )
+#     }
+#     
+#     dfs <- split(df, df$Detector)
+#     
+#     plts <- lapply(dfs[lapply(dfs, nrow)>0], pl)
+#     subplot(plts, nrows = length(plts), shareX = TRUE) %>%
+#         layout(annotations = list(text = title,
+#                                   xref = "paper",
+#                                   yref = "paper",
+#                                   yanchor = "bottom",
+#                                   xanchor = "center",
+#                                   align = "center",
+#                                   x = 0.5,
+#                                   y = 1,
+#                                   showarrow = FALSE))
+# }
+# 
+# 
+# volplot_plotly2 <- function(db, signalid, plot_start_date, plot_end_date, title = "title", ymax = 1000) {
+#     # db is either conf$athena (list) or aurora (Pool)
+#     
+#     if (is.null(ymax)) {
+#         yax <- list(rangemode = "tozero", tickformat = ",.0")
+#     } else {
+#         yax <- list(range = c(0, ymax), tickformat = ",.0")
+#     } 
+#     
+#     # Works. fill_colr is still an enigma, but it works as is.
+#     pl <- function(dfi, i) {
+#         
+#         dfi <- dfi %>% 
+#             mutate(
+#                 maxy = if_else(bad_day==1, as.integer(max(1, max(vol_rc, na.rm = TRUE))), as.integer(0)),
+#                 colr = colrs[as.character(CallPhase)], 
+#                 fill_colr = "")
+#         
+#         dfis <- split(dfi, dfi$CallPhase)
+#         dfis <- dfis[unlist(purrr::map(dfis, function(x) nrow(x)>0))]
+#         
+#         p <- plot_ly()
+#         for (df in dfis) {
+#             p <- p %>% add_trace(
+#                 data = df,
+#                 x = ~Timeperiod, 
+#                 y = ~vol_rc, 
+#                 type = "scatter", 
+#                 mode = "lines", 
+#                 fill = "tozeroy",
+#                 line = list(color = ~colr),
+#                 fillcolor = ~fill_colr,
+#                 name = paste('Phase', dfi$CallPhase[1]),
+#                 customdata = ~glue(paste(
+#                     "<b>Detector: {Detector}</b>",
+#                     "<br>{format(ymd_hms(Timeperiod), '%a %d %B %I:%M %p')}",
+#                     "<br>Volume: <b>{as_int(vol_rc)}</b>")),
+#                 hovertemplate = "%{customdata}",
+#                 hoverlabel = list(font = list(family = "Source Sans Pro")),
+#                 showlegend = FALSE)
+#         }
+#         p %>% add_trace(
+#                 data = dfi,
+#                 x = ~Timeperiod, 
+#                 y = ~vol_ac, 
+#                 type = "scatter", 
+#                 mode = "lines", 
+#                 #fill = "tozeroy",
+#                 line = list(color = DARK_GRAY),
+#                 name = "Adjusted Count",
+#                 customdata = ~glue(paste(
+#                     "<b>Detector: {Detector}</b>",
+#                     "<br>{format(ymd_hms(Timeperiod), '%a %d %B %I:%M %p')}",
+#                     "<br>Volume: <b>{as_int(vol_ac)}</b>")),
+#                 hovertemplate = "%{customdata}",
+#                 hoverlabel = list(font = list(family = "Source Sans Pro")),
+#                 showlegend = (i==1)) %>%
+#             add_trace(
+#                 x = ~Timeperiod,
+#                 y = ~maxy,
+#                 type = "scatter",
+#                 mode = "lines",
+#                 fill = "tozeroy",
+#                 line = list(
+#                     color = "rgba(0,0,0,0.1)",
+#                     shape = "vh"),
+#                 fillcolor = "rgba(0,0,0,0.2)",
+#                 name = "Bad Days",
+#                 
+#                 customdata = ~glue(paste(
+#                     "<b>Detector: {Detector}</b>",
+#                     "<br>{format(date(Timeperiod), '%a %d %B %Y')}",
+#                     "<br><b>{if_else(bad_day==1, 'Bad Day', 'Good Day')}</b>")),
+#                 hovertemplate = "%{customdata}",
+#                 hoverlabel = list(font = list(family = "Source Sans Pro")),
+#                 showlegend = (i==1)) %>%
+#             layout(yaxis = yax,
+#                    annotations = list(x = -.03,
+#                                       y = 0.5,
+#                                       xref = "paper",
+#                                       yref = "paper",
+#                                       xanchor = "right",
+#                                       text = paste0("Det #", dfi$Detector[1]),
+#                                       font = list(size = 12),
+#                                       showarrow = FALSE))
+#     }
+#     # db = conf$athena
+#     withProgress(message = "Loading chart", value = 0, {
+#         athena <- get_athena_connection(db)
+#         incProgress(amount = 0.1)
+#         rc <- tbl(athena, sql(glue(paste(
+#             "SELECT signalid, date, timeperiod, detector, callphase, vol",
+#             "FROM {db$database}.counts_1hr",
+#             "WHERE signalid = '{signalid}'",
+#             "AND date BETWEEN '{plot_start_date}' AND '{plot_end_date}'"))))
+#         incProgress(amount = 0.1)
+#         fc <- tbl(athena, sql(glue(paste(
+#             "SELECT signalid, date, timeperiod, detector, callphase, vol",
+#             "FROM {db$database}.filtered_counts_1hr",
+#             "WHERE signalid = '{signalid}'",
+#             "AND date BETWEEN '{plot_start_date}' AND '{plot_end_date}'"))))
+#         incProgress(amount = 0.1)
+#         ac <- tbl(athena, sql(glue(paste(
+#             "SELECT signalid, date, timeperiod, detector, callphase, vol",
+#             "FROM {db$database}.adjusted_counts_1hr",
+#             "WHERE signalid = '{signalid}'",
+#             "AND date BETWEEN '{plot_start_date}' AND '{plot_end_date}'"))))
+#         incProgress(amount = 0.2)
+#         df <- list(
+#             rename(rc, vol_rc = vol),
+#             rename(fc, vol_fc = vol),
+#             rename(ac, vol_ac = vol)) %>%
+#             reduce(full_join, by = c("signalid", "date", "timeperiod", "detector", "callphase")
+#             ) %>%
+#             mutate(bad_day = if_else(is.na(vol_fc), TRUE, FALSE)) %>% 
+#             #select(-date, -vol_fc) %>% 
+#             collect() %>%
+#             transmute(
+#                 SignalID = factor(signalid), 
+#                 Timeperiod = timeperiod, 
+#                 Detector = factor(as.integer(detector)), 
+#                 CallPhase = factor(callphase),
+#                 vol_rc = as.integer(vol_rc),
+#                 vol_ac = ifelse(is.na(vol_fc), as.integer(vol_ac), NA),
+#                 bad_day) %>%
+#             arrange(SignalID, Detector, Timeperiod)
+#         incProgress(amount = 0.4)
+#     })
+#         
+# 
+#     
+#     dfs <- split(df, df$Detector)
+#     dfs <- dfs[lapply(dfs, nrow)>0]
+#     names(dfs) <- NULL
+#     
+#     plts <- purrr::imap(dfs, ~pl(.x, .y))
+#     
+#     #plts <- lapply(dfs[lapply(dfs, nrow)>0], pl)
+#     subplot(plts, nrows = length(plts), shareX = TRUE) %>%
+#         layout(annotations = list(text = title,
+#                                   xref = "paper",
+#                                   yref = "paper",
+#                                   yanchor = "bottom",
+#                                   xanchor = "center",
+#                                   align = "center",
+#                                   x = 0.5,
+#                                   y = 1,
+#                                   showarrow = FALSE),
+#                showlegend = TRUE,
+#                margin = list(l = 120),
+#                xaxis = list(
+#                    type = 'date'))
+# }
 
 
 udcplot_plotly <- function(hourly_udc) {
@@ -1923,7 +2000,6 @@ perf_plotly_by_phase <- function(df, per_, var_, range_max = 1.1, number_format 
 
 signal_dashboard_athena <- function(sigid, start_date, conf, pth = "s3") {
     
-    #conn <- get_athena_connection_pool(conf)
     
     #tryCatch({
     if (is.na(sigid) || sigid == "Select") {
