@@ -20,22 +20,23 @@ usable_cores <- get_usable_cores()
 doParallel::registerDoParallel(cores = usable_cores)
 
 
+qs_filename <- sub("\\..*", ".qs", conf$corridors_filename_s3)
 corridors <- s3read_using(
-    function(x) get_corridors(x, filter_signals = TRUE),
-    object = conf$corridors_filename_s3,
+    qs::qread,
+    object = qs_filename,
     bucket = conf$bucket
 )
 
+qs_all_filename <- sub("\\..*", ".qs", paste0("all_", conf$corridors_filename_s3))
 all_corridors <- s3read_using(
-    function(x) get_corridors(x, filter_signals = FALSE),
-    object = conf$corridors_filename_s3,
+    qs::qread,
+    object = qs_all_filename,
     bucket = conf$bucket
 )
 
 
 signals_list <- unique(corridors$SignalID)
 
-# This is in testing as of 8/26
 subcorridors <- corridors %>% 
     filter(!is.na(Subcorridor)) %>%
     select(-Zone_Group) %>% 

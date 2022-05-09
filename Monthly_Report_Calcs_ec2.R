@@ -28,7 +28,7 @@ Sys.setenv(AWS_DEFAULT_REGION = conf$aws_region)
 
 
 # aurora_pool <- get_aurora_connection_pool()
-# aurora <- get_aurora_connection()
+aurora <- get_aurora_connection()
 
 #----- DEFINE DATE RANGE FOR CALCULATIONS ------------------------------------#
 
@@ -46,33 +46,47 @@ month_abbrs <- get_month_abbrs(start_date, end_date)
 
 # -- Code to update corridors file/table from Excel file
 
-corridors <- s3read_using(
-    function(x) get_corridors(x, filter_signals = TRUE),
-    object = conf$corridors_filename_s3,
-    bucket = conf$bucket
-)
-qs_filename <- sub("\\..*", ".qs", conf$corridors_filename_s3)
-qsave(corridors, qs_filename)
-aws.s3::put_object(
-    file = qs_filename,
-    object = qs_filename,
-    bucket = conf$bucket,
-    multipart = TRUE
-)
 
-all_corridors <- s3read_using(
-    function(x) get_corridors(x, filter_signals = FALSE),
-    object = conf$corridors_filename_s3,
-    bucket = conf$bucket
-)
-qs_filename <- sub("\\..*", ".qs", paste0("all_", conf$corridors_filename_s3))
-qsave(all_corridors, qs_filename)
-aws.s3::put_object(
-    file = qs_filename,
-    object = qs_filename,
-    bucket = conf$bucket,
-    multipart = TRUE
-)
+xlsx_last_modified <- get_bucket(bucket = conf$bucket, prefix = conf$corridors_filename_s3)$Contents$LastModified
+qs_filename <- sub("\\..*", ".qs", conf$corridors_filename_s3)
+qs_last_modified <- get_bucket(bucket = conf$bucket, prefix = qs_filename)$Contents$LastModified
+
+if (as_datetime(xlsx_last_modified) > as_datetime(qs_last_modified)) {
+    corridors <- s3read_using(
+        function(x) get_corridors(x, filter_signals = TRUE),
+        object = conf$corridors_filename_s3,
+        bucket = conf$bucket
+    )
+    qsave(corridors, qs_filename)
+    aws.s3::put_object(
+        file = qs_filename,
+        object = qs_filename,
+        bucket = conf$bucket,
+        multipart = TRUE
+    )
+    dbExecute(aurora, "TRUNCATE TABLE Corridors")
+    dbWriteTable(aurora, "Corridors", corridors, overwrite = FALSE, append = TRUE, row.names = FALSE)
+    
+    all_corridors <- s3read_using(
+        function(x) get_corridors(x, filter_signals = FALSE),
+        object = conf$corridors_filename_s3,
+        bucket = conf$bucket
+    )
+    qs_all_filename <- sub("\\..*", ".qs", paste0("all_", conf$corridors_filename_s3))
+    qsave(all_corridors, qs_filename)
+    aws.s3::put_object(
+        file = qs_all_filename,
+        object = qs_all_filename,
+        bucket = conf$bucket,
+        multipart = TRUE
+    )
+    dbExecute(aurora, "TRUNCATE TABLE AllCorridors")
+    dbWriteTable(aurora, "AllCorridors", all_corridors, overwrite = FALSE, append = TRUE, row.names = FALSE)
+}
+
+corridors <- dbReadTable(aurora, "Corridors")
+dbDisconnect(aurora) 
+
 
 signals_list <- unique(corridors$SignalID)
 
@@ -140,6 +154,8 @@ if (conf$run$counts == TRUE) {
 
 print("\n---------------------- Finished counts ---------------------------\n")
 
+
+
 print(glue("{Sys.time()} monthly cu [5 of 11]"))
 
 
@@ -157,6 +173,10 @@ signals_list <- unique(as.character(signals_list[signals_list > 0]))
 #   adjusted_counts_1hr
 #   BadDetectors
 
+# COMMUNICATIONS QUALITY (FROM KITS) as proxy for communications uptime
+
+# df <- s3read_using(read_parquet, bucket = conf$bucket, object = "mark/comm_quality/date=2022-04-28/2022-04-28_cq.parquet") %>% convert_to_utc()
+# df %>% transmute(SignalID = INTID, CallPhase = 0, uptime = AvgQuality/100, ones = 1, Date = as_date(CSDATE))
 
 print(glue("{Sys.time()} Detection Levels by Signal [5.1 of 11]"))
 
