@@ -186,8 +186,8 @@ tryCatch(
                 bucket = conf$bucket,
                 prefix = "bad_ped_detectors",
                 table_name = "bad_ped_detectors",
-                conf_athena = conf$athena,
-                    parallel = FALSE
+                conf = conf,
+                parallel = FALSE
             )
         }
 
@@ -409,8 +409,8 @@ tryCatch(
 
             s3write_using(
                 bad_ped,
-                FUN = write_fst,
-                object = "mark/watchdog/bad_ped_detectors.fst",
+                FUN = write_parquet,
+                object = "mark/watchdog/bad_ped_pushbuttons.parquet",
                 bucket = conf$bucket)
         }
         rm(bad_ped)
@@ -531,7 +531,6 @@ tryCatch(
 
 print(glue("{Sys.time()} Pedestrian Delay [6 of 23]"))
 
-if (FALSE) {
 tryCatch(
     {
         cb <- function(x) {
@@ -596,7 +595,6 @@ tryCatch(
         print(e)
     }
 )
-}
 
 
 # GET COMMUNICATIONS UPTIME ###################################################

@@ -1,11 +1,13 @@
 
 # Database Functions
-library(odbc)
-library(RMariaDB)
-library(yaml)
-library(duckdb)
-library(tictoc)
-
+suppressMessages({
+    library(odbc)
+    library(RMariaDB)
+    library(yaml)
+    library(duckdb)
+    library(tictoc)
+    library(stringr)
+})
 
 cred <- read_yaml("Monthly_Report_AWS.yaml")
 
@@ -79,23 +81,29 @@ get_duckdb_connection_pool <- function(dbdir, read_only = FALSE) {
 }
 
 
-get_athena_connection <- function(conf_athena, f = dbConnect) {
-    f(odbc::odbc(), dsn = "vdot_spm")
+get_athena_connection <- function(conf, f = dbConnect) {
+    f(
+        odbc::odbc(), 
+        dsn = paste("athena", conf$profile),
+        AwsRegion = conf$aws_region,
+        S3OutputLocation=conf$athena$staging_dir,
+        Schema = conf$athena$database 
+    )
 }
 
 
-get_athena_connection_pool <- function(conf_athena) {
-    get_athena_connection(conf_athena, pool::dbPool)
+get_athena_connection_pool <- function(conf) {
+    get_athena_connection(conf, pool::dbPool)
 }
 
 
-add_partition <- function(conf_athena, table_name, date_) {
+add_partition <- function(conf, table_name, date_) {
     tryCatch({
-        conn_ <- get_athena_connection(conf_athena)
+        conn_ <- get_athena_connection(conf)
         dbExecute(conn_,
-                  sql(glue(paste("ALTER TABLE {conf_athena$database}.{table_name}",
+                  sql(glue(paste("ALTER TABLE {conf$athena$database}.{table_name}",
                                  "ADD PARTITION (date='{date_}')"))))
-        print(glue("Successfully created partition (date='{date_}') for {conf_athena$database}.{table_name}"))
+        print(glue("Successfully created partition (date='{date_}') for {conf$athena$database}.{table_name}"))
     }, error = function(e) {
         print(stringr::str_extract(as.character(e), "message:.*?\\."))
     }, finally = {
@@ -233,16 +241,6 @@ dbWriteTable <- function(conn, name, value, ...) {
         DBI::dbWriteTable(conn, name, value, ...)
     }
     toc()
-}
-
-
-get_athena_connection <- function(conf_athena, f = dbConnect) {
-    f(odbc::odbc(), dsn = "athena")
-}
-
-
-get_athena_connection_pool <- function(conf_athena) {
-    get_athena_connection(conf_athena, pool::dbPool)
 }
 
 

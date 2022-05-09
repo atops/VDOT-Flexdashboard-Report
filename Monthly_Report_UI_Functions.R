@@ -46,7 +46,6 @@ if (interactive()) {
 source("Utilities.R")
 source("Classes.R")
 source("Database_Functions.R")
-# source("zone_manager_reports_editor.R")
 
 usable_cores <- get_usable_cores()
 doParallel::registerDoParallel(cores = usable_cores)
@@ -166,11 +165,6 @@ goal <- list("tp" = NULL,
              "pau" = 0.95)
 
 
-
-
-aws_conf <- read_yaml("Monthly_Report_AWS.yaml")
-conf$athena$uid <- aws_conf$AWS_ACCESS_KEY_ID
-conf$athena$pwd <- aws_conf$AWS_SECRET_ACCESS_KEY
 
 
 athena_connection_pool <- get_athena_connection_pool(conf$athena)
@@ -1927,9 +1921,9 @@ perf_plotly_by_phase <- function(df, per_, var_, range_max = 1.1, number_format 
 
 
 
-signal_dashboard_athena <- function(sigid, start_date, conf_athena, pth = "s3") {
+signal_dashboard_athena <- function(sigid, start_date, conf, pth = "s3") {
     
-    #conn <- get_athena_connection_pool(conf_athena)
+    #conn <- get_athena_connection_pool(conf)
     
     #tryCatch({
     if (is.na(sigid) || sigid == "Select") {
@@ -1944,7 +1938,7 @@ signal_dashboard_athena <- function(sigid, start_date, conf_athena, pth = "s3") 
         withProgress(message = "Loading chart", value = 0, {
             
             p_rc %<-% tryCatch({sigid; start_date; end_date;
-                conn <- get_athena_connection(conf_athena)
+                conn <- get_athena_connection(conf)
                 #------------------------
                 df <- tbl(conn, sql(glue(paste(
                     "select signalid, detector, callphase, timeperiod, vol",
@@ -1971,7 +1965,7 @@ signal_dashboard_athena <- function(sigid, start_date, conf_athena, pth = "s3") 
             incProgress(amount = 0.01)
             
             p_fc %<-% tryCatch({sigid; start_date; end_date;
-                conn <- get_athena_connection(conf_athena)
+                conn <- get_athena_connection(conf)
                 #------------------------
                 df <- tbl(conn, sql(glue(paste(
                     "select signalid, detector, callphase, timeperiod, vol", 
@@ -1996,7 +1990,7 @@ signal_dashboard_athena <- function(sigid, start_date, conf_athena, pth = "s3") 
             incProgress(amount = 0.01)
             
             p_vpd %<-% tryCatch({sigid; start_date; end_date;
-                conn <- get_athena_connection(conf_athena)
+                conn <- get_athena_connection(conf)
                 #------------------------
                 df <- tbl(conn, sql(glue(paste(
                     "select signalid, callphase, date, vpd", 
@@ -2030,7 +2024,7 @@ signal_dashboard_athena <- function(sigid, start_date, conf_athena, pth = "s3") 
             incProgress(amount = 0.01)
             
             p_ddu %<-% tryCatch({sigid; start_date; end_date;
-                conn <- get_athena_connection(conf_athena)
+                conn <- get_athena_connection(conf)
                 #------------------------
                 df <- tbl(conn, sql(glue(paste(
                     "select signalid, detector, callphase, timeperiod, good_day", 
@@ -2055,7 +2049,7 @@ signal_dashboard_athena <- function(sigid, start_date, conf_athena, pth = "s3") 
             incProgress(amount = 0.01)
             
             p_com %<-% tryCatch({sigid; start_date; end_date;
-                conn <- get_athena_connection(conf_athena)
+                conn <- get_athena_connection(conf)
                 #------------------------
                 df <- tbl(conn, sql(glue(paste(
                     "select signalid, callphase, date, date_hour, uptime", 
@@ -2082,7 +2076,7 @@ signal_dashboard_athena <- function(sigid, start_date, conf_athena, pth = "s3") 
             incProgress(amount = 0.015)
             
             p_aog %<-% tryCatch({sigid; start_date; end_date;
-                conn <- get_athena_connection(conf_athena)
+                conn <- get_athena_connection(conf)
                 #------------------------
                 df <- tbl(conn, sql(glue(paste(
                     "select signalid, callphase, date, date_hour, aog", 
@@ -2112,7 +2106,7 @@ signal_dashboard_athena <- function(sigid, start_date, conf_athena, pth = "s3") 
             incProgress(amount = 0.015)
             
             p_qs %<-% tryCatch({sigid; start_date; end_date;
-                conn <- get_athena_connection(conf_athena)
+                conn <- get_athena_connection(conf)
                 #------------------------
                 df <- tbl(conn, sql(glue(paste(
                     "select signalid, callphase, date, date_hour, qs_freq", 
@@ -2144,7 +2138,7 @@ signal_dashboard_athena <- function(sigid, start_date, conf_athena, pth = "s3") 
             incProgress(amount = 0.015)
             
             p_sf %<-% tryCatch({sigid; start_date; end_date;
-                conn <- get_athena_connection(conf_athena)
+                conn <- get_athena_connection(conf)
                 #------------------------
                 df <- tbl(conn, sql(glue(paste(
                     "select signalid, callphase, date, date_hour, sf_freq", 
@@ -2211,7 +2205,7 @@ signal_dashboard_athena <- function(sigid, start_date, conf_athena, pth = "s3") 
 }
 
 
-detector_dashboard_athena <- function(sigid, start_date, conf_athena, pth = "s3") {
+detector_dashboard_athena <- function(sigid, start_date, conf, pth = "s3") {
     
     if (is.na(sigid) || sigid == "Select") {
         no_data_plot("")
@@ -2225,7 +2219,7 @@ detector_dashboard_athena <- function(sigid, start_date, conf_athena, pth = "s3"
         withProgress(message = "Loading chart", value = 0, {
         
             p_rc %<-% tryCatch({sigid; start_date; end_date;
-                conn <- get_athena_connection(conf_athena)
+                conn <- get_athena_connection(conf)
                 #------------------------
                 df <- tbl(conn, sql(glue(paste(
                     "select signalid, detector, callphase, timeperiod, vol", 
@@ -2256,7 +2250,7 @@ detector_dashboard_athena <- function(sigid, start_date, conf_athena, pth = "s3"
             incProgress(amount = 0.3)
             
             p_fc %<-% tryCatch({sigid; start_date; end_date;
-                conn <- get_athena_connection(conf_athena)
+                conn <- get_athena_connection(conf)
                 #------------------------
                 df <- tbl(conn, sql(glue(paste(
                     "select signalid, detector, callphase, timeperiod, vol", 
@@ -2281,7 +2275,7 @@ detector_dashboard_athena <- function(sigid, start_date, conf_athena, pth = "s3"
             incProgress(amount = 0.3)
             
             p_ddu %<-% tryCatch({sigid; start_date; end_date;
-                conn <- get_athena_connection(conf_athena)
+                conn <- get_athena_connection(conf)
                 #------------------------
                 df <- tbl(conn, sql(glue(paste(
                     "select signalid, detector, callphase, timeperiod, good_day", 
@@ -2598,14 +2592,14 @@ rds_pp_query <- memoise(rds_pp_query_)
 
 
 
-get_counts_plot <- function(sigid, start_date, end_date, conf_athena, pth = "s3", table_name) {
+get_counts_plot <- function(sigid, start_date, end_date, conf, pth = "s3", table_name) {
     #------------------------
     start_date <- ymd(start_date)
     end_date <- ymd(end_date)
     
-    conn <- get_athena_connection(conf_athena)
+    conn <- get_athena_connection(conf)
     #------------------------
-    df <- tbl(conn, sql(glue("select * from {conf_athena$database}.{table_name}"))) %>%
+    df <- tbl(conn, sql(glue("select * from {conf$athena$database}.{table_name}"))) %>%
         filter(signalid == sigid,
                between(date, start_date, end_date)) %>%
         select(signalid, detector, callphase, timeperiod, vol) %>%
@@ -2623,14 +2617,14 @@ get_counts_plot <- function(sigid, start_date, end_date, conf_athena, pth = "s3"
         layout(showlegend = TRUE)
 }
 
-get_raw_counts_plot <- function(sigid, start_date, end_date, conf_athena, pth = "s3") {
-    get_counts_plot(sigid, start_date, end_date, conf_athena, pth = "s3", table_name = "counts_1hr")
+get_raw_counts_plot <- function(sigid, start_date, end_date, conf, pth = "s3") {
+    get_counts_plot(sigid, start_date, end_date, conf, pth = "s3", table_name = "counts_1hr")
 }
-get_filtered_counts_plot <- function(sigid, start_date, end_date, conf_athena, pth = "s3") {
-    get_counts_plot(sigid, start_date, end_date, conf_athena, pth = "s3", table_name = "filtered_counts_1hr")
+get_filtered_counts_plot <- function(sigid, start_date, end_date, conf, pth = "s3") {
+    get_counts_plot(sigid, start_date, end_date, conf, pth = "s3", table_name = "filtered_counts_1hr")
 }
-get_adjusted_counts_plot <- function(sigid, start_date, end_date, conf_athena, pth = "s3") {
-    get_counts_plot(sigid, start_date, end_date, conf_athena, pth = "s3", table_name = "adjusted_counts_1hr")
+get_adjusted_counts_plot <- function(sigid, start_date, end_date, conf, pth = "s3") {
+    get_counts_plot(sigid, start_date, end_date, conf, pth = "s3", table_name = "adjusted_counts_1hr")
 }
 
 

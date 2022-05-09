@@ -21,6 +21,7 @@ import psutil
 from spm_events import etl_main
 from parquet_lib import read_parquet_hive
 from s3io import *
+from config import get_date_from_string
 
 '''
     df:
@@ -94,8 +95,10 @@ def main(start_date, end_date, conf):
 
     dates = pd.date_range(start_date, end_date, freq='1D')
 
+    bucket = conf['bucket']
+   
     corridors_filename = re.sub('\..*', '.feather', conf['corridors_filename_s3'])
-    corridors = pd.read_feather(corridors_filename)
+    corridors = pd.read_feather(f's3://{bucket}/{corridors_filename}')
     corridors = corridors[~corridors.SignalID.isna()]
 
     signalids = list(corridors.SignalID.astype('int').values)
@@ -130,7 +133,8 @@ def main(start_date, end_date, conf):
             nthreads = round(psutil.virtual_memory().total/1e9)  # ensure 1 MB memory per thread
 
             #-----------------------------------------------------------------------------------------
-            with Pool(processes=nthreads) as pool:
+            # with Pool(processes=nthreads) as pool:
+            with get_context('spawn').Pool(processes=nthreads) as pool:
                 result = pool.starmap_async(
                     etl2, list(itertools.product(signalids, [date_], [det_config], [conf])), chunksize=(nthreads-1)*4)
                 pool.close()
@@ -189,8 +193,6 @@ if __name__=='__main__':
     with open('Monthly_Report.yaml') as yaml_file:
         conf = yaml.load(yaml_file, Loader=yaml.Loader)
 
-
-
     if len(sys.argv) > 1:
         start_date = sys.argv[1]
         end_date = sys.argv[2]
@@ -198,10 +200,11 @@ if __name__=='__main__':
         start_date = conf['start_date']
         end_date = conf['end_date']
 
-    if start_date == 'yesterday':
-        start_date = (datetime.today() - timedelta(days=1)).strftime('%Y-%m-%d')
-    if end_date == 'yesterday':
-        end_date = (datetime.today() - timedelta(days=1)).strftime('%Y-%m-%d')
-
+    start_date = conf['start_date']
+    end_date = conf['end_date']
+    
+    start_date = get_date_from_string(start_date)
+    end_date = get_date_from_string(end_date)
+    
     main(start_date, end_date, conf)
 
