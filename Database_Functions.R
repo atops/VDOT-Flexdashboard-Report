@@ -53,7 +53,6 @@ get_cel_connection <- get_maxview_eventlog_connection
 
 get_aurora_connection <- function(f = RMariaDB::dbConnect, driver = RMariaDB::MariaDB()) {
     
-    # f(drv = RMariaDB::MariaDB(), # RMySQL::MySQL(), # 
     f(drv = driver,
       host = cred$RDS_HOST,
       port = 3306,
