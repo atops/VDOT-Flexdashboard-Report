@@ -78,17 +78,17 @@ observe({
         } else if (input$zone_group %in% c("RTOP1", "RTOP2")) {
             c(
                 "All Corridors",
-                # as.character(unique(corridors()[corridors()$Zone_Group == input$zone_group,]$Corridor))
+                # as.character(unique(corridors[corridors$Zone_Group == input$zone_group,]$Corridor))
                 as.character(unique(filter(
-                    corridors(), Zone_Group == input$zone_group
+                    corridors, Zone_Group == input$zone_group
                 )$Corridor))
             )
         } else {
             c(
                 "All Corridors",
-                # as.character(unique(corridors()[corridors()$Zone == input$zone_group,]$Corridor))
+                # as.character(unique(corridors[corridors$Zone == input$zone_group,]$Corridor))
                 as.character(unique(filter(
-                    corridors(), Zone == input$zone_group
+                    corridors, Zone == input$zone_group
                 )$Corridor))
             )
         }
@@ -157,24 +157,8 @@ level <- reactive(
 
 filtered_corridors <- reactive({
     debug(logger, "reactive on input$zone_group: filtered_corridors()")
-    # All RTOP is the union of RTOP1, RTOP2
-    if (input$zone_group == "All RTOP") {
-        corr <- corridors() %>%
-            filter(Zone_Group %in% c("RTOP1", "RTOP2"))
-
-        # Zone 7 is the union of Zone 7m, 7d
-    } else if (input$zone_group == "Zone 7") {
-        corr <- corridors() %>%
-            filter(grepl("^Zone 7", Zone))
-
-        # Zones filter by Zone rather than Zone_Group
-    } else if (startsWith(input$zone_group, "Zone")) {
-        corr <- corridors() %>%
-            filter(Zone %in% input$zone_group)
-    } else {
-        corr <- corridors() %>%
-            filter(Zone_Group %in% input$zone_group)
-    }
+    corr <- corridors %>%
+        filter(Zone_Group %in% input$zone_group)
 
     # if a specific corridor is selected, filter on that
     if (corridor() != "All Corridors") {
@@ -192,9 +176,10 @@ ntraces <- reactive({
         nrow()
 })
 
+TODO: This is no longer reactive. Put in MR_UI.R
 filtered_signalids <- reactive({
-    debug(logger, "reactive on corridors(): filtered_signalids()")
-    x <- corridors() %>% # filtered_corridors() %>%
+    debug(logger, "reactive on corridors: filtered_signalids()")
+    x <- corridors %>% # filtered_corridors() %>%
         filter(as.integer(as.character(SignalID)) > 0) %>%
         arrange(as.integer(as.character(SignalID)))
     paste0(x$SignalID, ": ", x$Name)
@@ -1404,8 +1389,6 @@ plot_height <- reactive({
 })
 
 filtered_alerts <- reactive({
-    alerts_by_date <- filter_alerts_by_date(alerts(), input$date_range)
-
     phase_ <- if (input$phase.eight != "All") {
         input$phase.eight
     } else {
@@ -1413,7 +1396,8 @@ filtered_alerts <- reactive({
     }
 
     filter_alerts(
-        alerts_by_date,
+        aurora_connection_pool,
+        input$date_range,
         input$alert_type,
         zone_group(),
         corridor(),
@@ -1461,7 +1445,6 @@ div(
     selectInput(
         "alert_type", "Alert:",
         choices = c(
-            "No Camera Image",
             "Bad Vehicle Detection",
             "Bad Ped Pushbuttons",
             "Pedestrian Activations",
@@ -1470,7 +1453,7 @@ div(
             "Count",
             "Missing Records"
         ),
-        selected = "No Camera Image"
+        selected = "Bad Vehicle Detection"
     ),
 
     conditionalPanel(
@@ -1773,7 +1756,7 @@ shinyApp(
 
 
         map_data <- reactive({
-            debug(logger, "reactive on zone_group(), corridors(): map_data")
+            debug(logger, "reactive on zone_group(), corridors: map_data")
 
             query_data(
                 map_metric(), 
@@ -1785,7 +1768,7 @@ shinyApp(
             ) %>%
                 rename(SignalID = Corridor) %>%
                 left_join(
-                    corridors()[c("SignalID", "Latitude", "Longitude")],
+                    corridors[c("SignalID", "Latitude", "Longitude")],
                     by = c("SignalID")
                 ) %>%
                 subset(!is.na(Latitude))

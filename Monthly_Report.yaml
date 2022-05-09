@@ -32,7 +32,7 @@ run:
     split_failures: TRUE
 
 
-start_date: 2 days ago
+start_date: yesterday
 end_date: yesterday
 
 report_end_date: yesterday
