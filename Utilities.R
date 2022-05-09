@@ -463,52 +463,33 @@ write_signal_details <- function(plot_date, conf, signals_list = NULL) {
         ) %>%
         mutate(bad_day = if_else(Good_Day==0, TRUE, FALSE)) %>% 
         transmute(
-            SignalID = factor(SignalID), 
+            SignalID = as.integer(SignalID), 
             Timeperiod = Timeperiod, 
-            Detector = factor(as.integer(Detector)), 
-            CallPhase = factor(CallPhase),
+            Detector = as.integer(Detector),
+            CallPhase = as.integer(CallPhase),
             vol_rc = as.integer(vol_rc),
             vol_ac = ifelse(bad_day, as.integer(vol_ac), NA),
             bad_day) %>%
-        arrange(SignalID, Detector, Timeperiod)
+        arrange(
+            SignalID, 
+            Detector, 
+            Timeperiod)
     #----------------------------------------------------------------
     
-    df <- df %>% 
-        nest(data = -c(SignalID, Timeperiod))
-    df$data <- sapply(df$data, rjson::toJSON)
-    df <- df %>% 
-        spread(SignalID, data)
-    
+    df <- df %>% mutate(
+        Hour = hour(Timeperiod)) %>% 
+        select(-Timeperiod) %>%
+        relocate(Hour) %>%
+        nest(data = -c(SignalID))
+            
     s3write_using(
         df, 
         write_parquet, 
-        use_deprecated_int96_timestamps = TRUE,
         bucket = conf$bucket, 
         object = glue("mark/signal_details/date={plot_date}/sg_{plot_date}.parquet"),
         opts = list(multipart=TRUE))
-    
-    table_name <- "signal_details"
-    
-    athena <- get_athena_connection(conf)
-    tryCatch({
-        response <- dbGetQuery(athena,
-                               sql(glue(paste("ALTER TABLE {conf$athena$database}.{table_name}",
-                                              "ADD PARTITION (date='{plot_date}')"))))
-        print(glue("Successfully created partition (date='{plot_date}') for {conf$athena$database}.{table_name}"))
-    }, error = function(e) {
-        message <- e
-    })
-    dbDisconnect(athena)
-    
-    aurora <- get_aurora_connection()
-    tryCatch({
-        dbWriteTable(aurora, table_name, df, append = TRUE, overwrite = FALSE, row.names = FALSE)
-        print(glue("Successfully wrote {table_name} to database (date='{plot_date}')"))
-    }, error = function(e) {
-        message <- e
-    })
-    dbDisconnect(aurora)
-    
+            
+    add_partition(conf, "signal_details", plot_date)
 }
 
 
