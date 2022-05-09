@@ -29,7 +29,9 @@ Sys.setenv(AWS_DEFAULT_REGION = conf$aws_region)
 
 base_path = '.'
 
-logger <- log4r::logger(threshold = "DEBUG")
+if (!dir.exists('logs')) { 
+    dir.create('logs') 
+}
 
 
 read_zipped_feather <- function(x) {
@@ -133,7 +135,7 @@ tryCatch({
 tryCatch({
     conn <- get_aurora_connection()
     dbExecute(conn, "TRUNCATE TABLE WatchdogAlerts")
-    DBI::dbWriteTable(conn, "WatchdogAlerts", alerts, row.names = FALSE, append = TRUE, overwrite = FALSE)
+    dbWriteTable(conn, "WatchdogAlerts", alerts, row.names = FALSE, append = TRUE, overwrite = FALSE)
 
     write(
         glue(paste0(
