@@ -1404,8 +1404,6 @@ plot_height <- reactive({
 })
 
 filtered_alerts <- reactive({
-    alerts_by_date <- filter_alerts_by_date(alerts(), input$date_range)
-
     phase_ <- if (input$phase.eight != "All") {
         input$phase.eight
     } else {
@@ -1413,7 +1411,8 @@ filtered_alerts <- reactive({
     }
 
     filter_alerts(
-        alerts_by_date,
+        aurora_connection_pool,
+        input$date_range,
         input$alert_type,
         zone_group(),
         corridor(),
@@ -1461,7 +1460,6 @@ div(
     selectInput(
         "alert_type", "Alert:",
         choices = c(
-            "No Camera Image",
             "Bad Vehicle Detection",
             "Bad Ped Pushbuttons",
             "Pedestrian Activations",
@@ -1470,7 +1468,7 @@ div(
             "Count",
             "Missing Records"
         ),
-        selected = "No Camera Image"
+        selected = "Bad Vehicle Detection"
     ),
 
     conditionalPanel(

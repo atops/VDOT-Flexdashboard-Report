@@ -45,18 +45,19 @@ if (interactive()) {
 
 source("Utilities.R")
 source("Classes.R")
+source("Database_Functions.R")
 # source("zone_manager_reports_editor.R")
 
 usable_cores <- get_usable_cores()
 doParallel::registerDoParallel(cores = usable_cores)
 
+conf <- read_yaml("Monthly_Report.yaml")
 
 # Set credentials from ~/.aws/credentials file
 aws.signature::use_credentials(profile = conf$profile)
 
 # Need to set the default region as well. use_credentials doesn't do this.
-cred <- aws.signature::read_credentials()[[conf$profile]]
-Sys.setenv(AWS_DEFAULT_REGION = cred$DEFAULT_REGION)
+Sys.setenv(AWS_DEFAULT_REGION = conf$aws_region)
 
 
 logger <- log4r::logger(threshold = "DEBUG")
@@ -151,8 +152,6 @@ tick_format <- function(data_type) {
 }
 
 
-
-
 goal <- list("tp" = NULL,
              "aogd" = 0.80,
              "prd" = 1.20,
@@ -167,14 +166,12 @@ goal <- list("tp" = NULL,
              "pau" = 0.95)
 
 
-conf <- read_yaml("Monthly_Report.yaml")
 
 
 aws_conf <- read_yaml("Monthly_Report_AWS.yaml")
 conf$athena$uid <- aws_conf$AWS_ACCESS_KEY_ID
 conf$athena$pwd <- aws_conf$AWS_SECRET_ACCESS_KEY
 
-source("Database_Functions.R")
 
 athena_connection_pool <- get_athena_connection_pool(conf$athena)
 
@@ -2316,42 +2313,30 @@ detector_dashboard_athena <- function(sigid, start_date, conf_athena, pth = "s3"
 # Watchdog Alerts Plots ---------------------------------------------------
 
 
-filter_alerts_by_date <- function(alerts, dr) {
-    
+filter_alerts <- function(conn, dr, alert_type_, zone_group_, corridor_, phase_, id_filter_, active_streak)  {
+
     start_date <- dr[1]
     end_date <- dr[2]
     
-    alerts %>%
-        filter(Date >= start_date & Date <= end_date)
-}
-
-
-
-filter_alerts <- function(alerts_by_date, alert_type_, zone_group_, corridor_, phase_, id_filter_, active_streak)  {
-    
-    most_recent_date <- alerts_by_date %>% 
+    most_recent_date <- tbl(conn, "WatchdogAlerts") %>%
+        filter(Date >= start_date & Date <= end_date) %>%
         group_by(Alert) %>% 
-        summarize(Date = max(Date)) %>% 
+        summarize(Date = max(Date)) %>% collect() %>%
         spread(Alert, Date) %>% as.list()
-    df <- filter(alerts_by_date, Alert == alert_type_)
     
+    df <- tbl(conn, "WatchdogAlerts") %>%
+        filter(
+            Date >= start_date & Date <= end_date,
+            Alert == alert_type_) %>%
+        collect()
+
+
     if (nrow(df)) {
-        
+
         # Filter by Zone Group if "All Corridors" selected
         if (corridor_ == "All Corridors") {
-            if (zone_group_ == "All RTOP") {
-                df <- filter(df, Zone_Group %in% c("RTOP1", "RTOP2"))
-                
-            } else if (zone_group_ == "Zone 7") {
-                df <- filter(df, Zone %in% c("Zone 7m", "Zone 7d"))
-                
-            } else if (grepl("^Zone", zone_group_)) {
-                df <- filter(df, Zone == zone_group_)
-                
-            } else {
-                df <- filter(df, Zone_Group == zone_group_)
-            }
-            # Otherwise filter by Corridor
+            df <- filter(df, Zone_Group == zone_group_)
+        # Otherwise filter by Corridor
         } else {
             df <- filter(df, Corridor == corridor_)
         }

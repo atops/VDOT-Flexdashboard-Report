@@ -80,7 +80,7 @@ get_duckdb_connection_pool <- function(dbdir, read_only = FALSE) {
 
 
 get_athena_connection <- function(conf_athena, f = dbConnect) {
-    f(odbc::odbc(), dsn = "athena")
+    f(odbc::odbc(), dsn = "vdot_spm")
 }
 
 
