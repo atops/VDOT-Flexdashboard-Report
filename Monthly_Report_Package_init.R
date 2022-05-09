@@ -45,7 +45,7 @@ subcorridors <- corridors %>%
         Corridor = Subcorridor) 
 
 
-conn <- get_athena_connection(conf$athena)
+conn <- get_athena_connection(conf)
 
 # cam_config <- get_cam_config(
 #     object = conf$cctv_config_filename, 

@@ -531,7 +531,6 @@ tryCatch(
 
 print(glue("{Sys.time()} Pedestrian Delay [6 of 23]"))
 
-if (FALSE) {
 tryCatch(
     {
         cb <- function(x) {
@@ -596,7 +595,6 @@ tryCatch(
         print(e)
     }
 )
-}
 
 
 # GET COMMUNICATIONS UPTIME ###################################################
