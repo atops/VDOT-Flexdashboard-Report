@@ -56,7 +56,7 @@ write_sigops_to_db <- function(
                         head(df_, 3), 
                         overwrite = TRUE,
                         row.names = FALSE)
-                    dbExecute(conn, glue("DELETE FROM {table_name}"))
+                    dbExecute(conn, glue("TRUNCATE TABLE {table_name}"))
                 } else {
                     if (table_name %in% dbListTables(conn)) {
                         # Clear head of table prior to report start date
@@ -273,7 +273,7 @@ recreate_database <- function(conn, df, dfname) {
             c( "delta` [^ ,]+", "delta` DOUBLE"),
             c("`ones` [^ ,]+", "`ones` DOUBLE"),
             c("`data` [^ ,]+", "`data` mediumtext"),
-            c("`Description` [^ ,)]+", "`Description` VARCHAR(128)"), 
+            c("`Description` [^ ,]+", "`Description` VARCHAR(128)"), 
             c( "Score` [^ ,]+", "Score` DOUBLE")
         )
         ) {
@@ -282,10 +282,14 @@ recreate_database <- function(conn, df, dfname) {
         
         # Delete and recreate with proper data types
         lapply(create_statements$Table, function(x) {
-            dbRemoveTable(conn, x)
+            try(
+                dbRemoveTable(conn, x)
+            )
         })
         lapply(create_statements[["Create Table"]], function(x) {
-            dbSendStatement(conn, x)
+            try(
+                dbSendStatement(conn, x)
+            )
         })
         # Create Indexes
         lapply(create_statements$Table, function(x) {

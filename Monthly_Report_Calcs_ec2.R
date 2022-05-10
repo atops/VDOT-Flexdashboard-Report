@@ -149,6 +149,27 @@ if (conf$run$counts == TRUE) {
             )
         }
     }
+
+
+    print(glue("{Sys.time()} Detection Levels by Signal [5.1 of 11]"))
+
+    date_range <- seq(ymd(start_date), ymd(end_date), by = "1 day")
+
+    lapply(date_range, function(date_) {
+
+        signals_df <- select(corridors, SignalID) %>% mutate(Date = date_)
+        detection_levels_df <- get_detection_levels_by_signal(date_)
+
+        det_levels <- left_join(signals_df, detection_levels_df, by = "SignalID") %>%
+            replace_na(list(Level = 0))
+        s3_upload_parquet_date_split(
+            det_levels,
+            bucket = conf$bucket,
+            prefix = "detection_levels",
+            table_name = "detection_levels",
+            conf = conf, parallel = FALSE
+        )
+    })
 }
 
 
@@ -178,28 +199,6 @@ signals_list <- unique(as.character(signals_list[signals_list > 0]))
 # df <- s3read_using(read_parquet, bucket = conf$bucket, object = "mark/comm_quality/date=2022-04-28/2022-04-28_cq.parquet") %>% convert_to_utc()
 # df %>% transmute(SignalID = INTID, CallPhase = 0, uptime = AvgQuality/100, ones = 1, Date = as_date(CSDATE))
 
-print(glue("{Sys.time()} Detection Levels by Signal [5.1 of 11]"))
-
-if (TRUE) {
-    date_range <- seq(ymd(start_date), ymd(end_date), by = "1 day")
-
-    lapply(date_range, function(date_) {
-
-        signals_df <- select(corridors, SignalID) %>% mutate(Date = date_)
-        detection_levels_df <- get_detection_levels_by_signal(date_)
-
-        det_levels <- left_join(signals_df, detection_levels_df, by = "SignalID") %>%
-            replace_na(list(Level = 0))
-        s3_upload_parquet_date_split(
-            det_levels,
-            bucket = conf$bucket,
-            prefix = "detection_levels",
-            table_name = "detection_levels",
-            conf = conf, parallel = FALSE
-        )
-    })
-}
-
 
 
 print(glue("{Sys.time()} counts-based measures [6 of 11]"))
@@ -223,8 +222,12 @@ get_counts_based_measures <- function(month_abbrs) {
         prep_db_for_adjusted_counts_arrow("filtered_counts_1hr", conf, date_range)
         get_adjusted_counts_arrow("filtered_counts_1hr", "adjusted_counts_1hr", conf)
 
-        fc_ds <- arrow::open_dataset(sources = "filtered_counts_1hr/")
-        ac_ds <- arrow::open_dataset(sources = "adjusted_counts_1hr/")
+        fc_ds <- keep_trying(
+            function() arrow::open_dataset(sources = "filtered_counts_1hr/"), 
+            n_tries = 3, timeout = 60)
+        ac_ds <- keep_trying(
+            function() arrow::open_dataset(sources = "adjusted_counts_1hr/"), 
+            n_tries = 3, timeout = 60)
 
         lapply(date_range, function(date_) {
             # print(date_)
@@ -345,8 +348,12 @@ get_counts_based_measures <- function(month_abbrs) {
         prep_db_for_adjusted_counts_arrow("filtered_counts_15min", conf, date_range)
         get_adjusted_counts_arrow("filtered_counts_15min", "adjusted_counts_15min", conf)
 
-        fc_ds <- arrow::open_dataset(sources = "filtered_counts_15min/")
-        ac_ds <- arrow::open_dataset(sources = "adjusted_counts_15min/")
+        fc_ds <- keep_trying(
+            function() arrow::open_dataset(sources = "filtered_counts_15min/"), 
+            n_tries = 3, timeout = 60)
+        ac_ds <- keep_trying(
+            function() arrow::open_dataset(sources = "adjusted_counts_15min/"), 
+            n_tries = 3, timeout = 60)
 
         lapply(date_range, function(date_) {
             print(date_)

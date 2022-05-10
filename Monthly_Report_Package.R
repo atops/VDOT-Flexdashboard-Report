@@ -1389,7 +1389,66 @@ tryCatch(
 
 
 
-print(glue("{Sys.time()} Skip [20 of 23]"))
+# DAILY DETECTION LEVELS ##################################################### 
+
+tryCatch(
+    {
+        print(glue("{Sys.time()} Daily Detection Levels [15 of 23]"))
+
+        dl <- s3_read_parquet_parallel(
+            bucket = conf$bucket,
+            table_name = "detection_levels",
+            start_date = wk_calcs_start_date,
+            end_date = report_end_date,
+            signals_list = signals_list,
+            callback = function(x) 
+                mutate(x, CallPhase = 0, Week = week(Date), DOW = wday(Date))
+        ) %>%
+            transmute(
+                SignalID = factor(SignalID),
+                CallPhase = factor(CallPhase),
+                Level,
+                Week,
+                DOW,
+                Date = date(Date)
+            )
+
+        weekly_dl_by_day <- get_weekly_avg_by_day(dl, "Level", peak_only = FALSE)
+        cor_weekly_dl_by_day <- get_cor_weekly_avg_by_day(weekly_dl_by_day, corridors, "Level")
+        sub_weekly_dl_by_day <- get_cor_weekly_avg_by_day(weekly_dl_by_day, subcorridors, "Level") %>%
+            filter(!is.na(Corridor))
+
+        monthly_dl_by_day <- get_monthly_avg_by_day(dl, "Level", peak_only = FALSE)
+        cor_monthly_dl_by_day <- get_cor_monthly_avg_by_day(monthly_dl_by_day, corridors, "Level")
+        sub_monthly_dl_by_day <- get_cor_monthly_avg_by_day(monthly_dl_by_day, subcorridors, "Level") %>%
+            filter(!is.na(Corridor))
+
+
+        addtoRDS(weekly_dl_by_day, "weekly_dl.rds", "Level", report_start_date, wk_calcs_start_date)
+        addtoRDS(monthly_dl_by_day, "monthly_dl.rds", "Level", report_start_date, calcs_start_date)
+        addtoRDS(cor_weekly_dl_by_day, "cor_weekly_dl.rds", "Level", report_start_date, wk_calcs_start_date)
+        addtoRDS(cor_monthly_dl_by_day, "cor_monthly_dl.rds", "Level", report_start_date, calcs_start_date)
+        addtoRDS(sub_weekly_dl_by_day, "sub_weekly_dl.rds", "Level", report_start_date, wk_calcs_start_date)
+        addtoRDS(sub_monthly_dl_by_day, "sub_monthly_dl.rds", "Level", report_start_date, calcs_start_date)
+
+
+        rm(dl)
+        rm(weekly_dl_by_day)
+        rm(monthly_dl_by_day)
+        rm(cor_weekly_dl_by_day)
+        rm(cor_monthly_dl_by_day)
+        rm(sub_weekly_dl_by_day)
+        rm(sub_monthly_dl_by_day)
+    },
+    error = function(e) {
+        print("ENCOUNTERED AN ERROR:")
+        print(e)
+    }
+)
+
+
+
+
 print(glue("{Sys.time()} Skip [21 of 23]"))
 
 
@@ -1472,7 +1531,8 @@ tryCatch(
             "sfo" = readRDS("cor_wsfo.rds"),
             "du" = readRDS("cor_weekly_detector_uptime.rds"),
             "cu" = readRDS("cor_weekly_comm_uptime.rds"),
-            "pau" = readRDS("cor_weekly_pa_uptime.rds")
+            "pau" = readRDS("cor_weekly_pa_uptime.rds"),
+            "dl" = readRDS("cor_weekly_dl.rds")
         )
         cor$mo <- list(
             "vpd" = readRDS("cor_monthly_vpd.rds"),
@@ -1502,8 +1562,8 @@ tryCatch(
             "spdh" = readRDS("cor_monthly_spd_by_hr.rds"),
             "du" = readRDS("cor_monthly_detector_uptime.rds"),
             "cu" = readRDS("cor_monthly_comm_uptime.rds"),
-            "pau" = readRDS("cor_monthly_pa_uptime.rds")
-
+            "pau" = readRDS("cor_monthly_pa_uptime.rds"),
+            "dl" = readRDS("cor_monthly_dl.rds")
         )
         cor$qu <- list(
             "vpd" = get_quarterly(cor$mo$vpd, "vpd"),
@@ -1523,7 +1583,8 @@ tryCatch(
             "bi" = get_quarterly(cor$mo$bi, "bi"),
             "du" = get_quarterly(cor$mo$du, "uptime"),
             "cu" = get_quarterly(cor$mo$cu, "uptime"),
-            "pau" = get_quarterly(cor$mo$pau, "uptime")
+            "pau" = get_quarterly(cor$mo$pau, "uptime"),
+            "dl" = get_quarterly(cor$mo$dl, "Level")
         )
 
         # cor$summary_data <- get_corridor_summary_data(cor)
@@ -1575,7 +1636,9 @@ tryCatch(
             "cu" = readRDS("sub_weekly_comm_uptime.rds") %>%
                 select(Zone_Group, Corridor, Date, uptime),
             "pau" = readRDS("sub_weekly_pa_uptime.rds") %>%
-                select(Zone_Group, Corridor, Date, uptime)
+                select(Zone_Group, Corridor, Date, uptime),
+            "dl" = readRDS("sub_weekly_dl.rds") %>%
+                select(Zone_Group, Corridor, Date, Level)
         )
         sub$mo <- list(
             "vpd" = readRDS("sub_monthly_vpd.rds"),
@@ -1603,7 +1666,8 @@ tryCatch(
             "bih" = readRDS("sub_monthly_bi_by_hr.rds"),
             "du" = readRDS("sub_monthly_detector_uptime.rds"),
             "cu" = readRDS("sub_monthly_comm_uptime.rds"),
-            "pau" = readRDS("sub_monthly_pa_uptime.rds")
+            "pau" = readRDS("sub_monthly_pa_uptime.rds"),
+            "dl" = readRDS("sub_monthly_dl.rds")
         )
         sub$qu <- list(
             "vpd" = get_quarterly(sub$mo$vpd, "vpd"),
@@ -1618,7 +1682,8 @@ tryCatch(
             "sfo" = get_quarterly(sub$mo$sfo, "sf_freq"),
             "du" = get_quarterly(sub$mo$du, "uptime"),
             "cu" = get_quarterly(sub$mo$cu, "uptime"),
-            "pau" = get_quarterly(sub$mo$pau, "uptime")
+            "pau" = get_quarterly(sub$mo$pau, "uptime"),
+            "dl" = get_quarterly(sub$mo$dl, "Level")
         )
     },
     error = function(e) {
@@ -1669,7 +1734,9 @@ tryCatch(
             "cu" = sigify(readRDS("weekly_comm_uptime.rds"), cor$wk$cu, corridors) %>%
                 select(Zone_Group, Corridor, Date, uptime),
             "pau" = sigify(readRDS("weekly_pa_uptime.rds"), cor$wk$pau, corridors) %>%
-                select(Zone_Group, Corridor, Date, uptime)
+                select(Zone_Group, Corridor, Date, uptime),
+            "dl" = sigify(readRDS("weekly_dl.rds"), cor$wk$dl, corridors) %>%
+                select(Zone_Group, Corridor, Date, Level)
         )
         sig$mo <- list(
             "vpd" = sigify(readRDS("monthly_vpd.rds"), cor$mo$vpd, corridors) %>%
@@ -1714,7 +1781,9 @@ tryCatch(
             "cu" = sigify(readRDS("monthly_comm_uptime.rds"), cor$mo$cu, corridors) %>%
                 select(Zone_Group, Corridor, Month, uptime, delta),
             "pau" = sigify(readRDS("monthly_pa_uptime.rds"), cor$mo$pau, corridors) %>%
-                select(Zone_Group, Corridor, Month, uptime, delta)
+                select(Zone_Group, Corridor, Month, uptime, delta),
+            "dl" = sigify(readRDS("monthly_dl.rds"), cor$mo$dl, corridors) %>%
+                select(Zone_Group, Corridor, Month, Level, delta)
         )
     },
     error = function(e) {
@@ -1734,7 +1803,7 @@ descs <- corridors %>%
 for (tab in c(
     "vpd", "vphpa", "vphpp", "papd", "pd", "bpsi", "rsi", "cri", "kabco",
     "tp", "aog", "aogd", "aogh", "prd", "prh", "qsd", "qsh", "sfd", "sfh", "sfo",
-    "du", "cu", "pau", "cctv", "maint_plot", "ops_plot", "safety_plot"
+    "du", "cu", "pau", "dl", "cctv", "maint_plot", "ops_plot", "safety_plot"
 )) {
     if (tab %in% names(sig$mo) & tab != "cctv") {
         sig$mo[[tab]] <- sig$mo[[tab]] %>%

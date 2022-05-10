@@ -107,24 +107,24 @@ read_zipped_feather <- function(x) {
 
 
 
-keep_trying <- function(func, n_tries, ...){
-    
-    possibly_func = purrr::possibly(func, otherwise = NULL, quiet = FALSE)
-    
+keep_trying <- function(func, n_tries, ..., timeout = Inf) {
+
+    possibly_func = purrr::possibly(func, otherwise = NULL)
+
     result = NULL
     try_number = 1
     sleep = 1
-    
-    while(is.null(result) && try_number <= n_tries){
+
+    while(is.null(result) && try_number <= n_tries) {
         if (try_number > 1) {
-            print(paste(substitute(func), "Attempt:", try_number))
+            print(glue("{deparse(substitute(func))} Attempt: {try_number}"))
         }
         try_number = try_number + 1
-        result = possibly_func(...)
+        result = R.utils::withTimeout(possibly_func(...), timeout=timeout, onTimeout="error")
+
         Sys.sleep(sleep)
         sleep = sleep + 1
     }
-    
     return(result)
 }
 
