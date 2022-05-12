@@ -231,7 +231,7 @@ dbWriteTable <- function(conn, name, value, ...) {
     print(class(conn)[1])
     if (class(conn)[1] == "MariaDBConnection") {
         fn <- tempfile()
-        write_csv(value, fn)
+        readr::write_csv(value, fn)
         DBI::dbExecute(
             conn,
             glue("LOAD DATA LOCAL INFILE '{fn}' into table {name} fields terminated by ',' IGNORE 1 LINES"))
