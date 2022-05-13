@@ -159,6 +159,7 @@ if __name__ == '__main__':
             conf = yaml.load(yaml_file, Loader=yaml.FullLoader)
 
         bucket = conf['bucket']
+        region = conf['region']
         atspm_table = conf['athena']['atspm_table']
         athena_database = conf['athena']['database']
         staging_dir = conf['athena']['staging_dir']
@@ -166,6 +167,7 @@ if __name__ == '__main__':
         athena_bucket = x[1] # first path element that's not s3:
         athena_prefix = '/'.join(x[2:])
 
+        Signals.to_parquet(f's3://{bucket}/Signals_{region}.parquet')
 
         if len(sys.argv) == 3:
             start_date = sys.argv[1]
