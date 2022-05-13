@@ -230,6 +230,8 @@ dbWriteTable <- function(conn, name, value, ...) {
     tic()
     print(class(conn)[1])
     if (class(conn)[1] == "MariaDBConnection") {
+        cols_ <- dbListFields(conn, name)
+        value <- value[cols_]  # Make sure columns are in the right order
         fn <- tempfile()
         readr::write_csv(value, fn)
         DBI::dbExecute(
