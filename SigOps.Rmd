@@ -1324,9 +1324,9 @@ shinyApp(
                         options = layersControlOptions(collapsed = FALSE)
                     ) %>%
                     enableTileCaching() %>%
-                    setView(lat = conf$map_center$`Central Region`[1],
-                            lng = conf$map_center$`Central Region`[2],
-                            zoom = conf$map_center$`Central Region`[3]) %>%
+                    setView(lat = conf$map_center$`Northern Region`[1],
+                            lng = conf$map_center$`Northern Region`[2],
+                            zoom = conf$map_center$`Northern Region`[3]) %>%
                     addCircleMarkers(
                         data = map_data(),
                         lng = ~ Longitude,
@@ -1558,7 +1558,7 @@ shinyApp(
                         lng = coords[2],
                         zoom = coords[3])
             }
-        })        
+        })
 
     },
 
