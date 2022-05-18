@@ -51,48 +51,27 @@ selectInput("month", "Month:",
     selected = month_options[1]
 ) # Default to current month
 
-selectInput("zone_group", "Signal Group:",
+selectInput("zone_group", "Region:",
     choices = zone_group_options,
-    selected = "All RTOP"
+    selected = NULL
 )
 
 
 
 # Corridor Selection Drop Down based on Zone/Zone Group ---
 
-conditionalPanel(
-    "input.zone_group != 'All RTOP'",
-    selectInput("corridor_x", "Corridor:",
-        choices = c("All Corridors"),
-        selected = "All Corridors"
-    )
+selectInput("corridor_x", "Corridor:",
+    choices = c("All Corridors"),
+    selected = "All Corridors"
 )
 
 observe({
     debug(logger, "observe on input$zone_group: sidebar zone_group dropdown choices")
-    choices_ <- if (is.null(input$zone_group)) {
-        NULL
-    } else {
-        if (input$zone_group == "All RTOP") {
-            c("All Corridors")
-        } else if (input$zone_group %in% c("RTOP1", "RTOP2")) {
-            c(
-                "All Corridors",
-                # as.character(unique(corridors[corridors$Zone_Group == input$zone_group,]$Corridor))
-                as.character(unique(filter(
-                    corridors, Zone_Group == input$zone_group
-                )$Corridor))
-            )
-        } else {
-            c(
-                "All Corridors",
-                # as.character(unique(corridors[corridors$Zone == input$zone_group,]$Corridor))
-                as.character(unique(filter(
-                    corridors, Zone == input$zone_group
-                )$Corridor))
-            )
-        }
-    }
+    req(input$zone_group)    
+    choices_ <- c(
+        "All Corridors",
+        as.character(unique(filter(corridors, Zone == input$zone_group)$Corridor))
+    )
     updateSelectInput(session, "corridor_x", choices = sort(choices_), selected = "All Corridors")
 })
 
@@ -122,19 +101,15 @@ endof_current_month <- reactive(lubridate::dmy(paste(1, input$month)) + months(1
 current_quarter <- reactive(as.character(lubridate::quarter(current_month(), with_year = TRUE)))
 
 
-# This is a simpler version of what is commented out below
 corridor <- reactive({
     debug(logger, "reactive on input$corridor_x: corridor()")
-    if (input$zone_group == "All RTOP") {
-        "All Corridors"
-    } else {
-        input$corridor_x
-    }
+    input$corridor_x
 })
 
 
 zone_group <- reactive({
     debug(logger, "reactive on corridor() and input$zone_group: zone_group()")
+    req(corridor())
     if (corridor() == "All Corridors") {
         input$zone_group
     } else {
@@ -176,10 +151,9 @@ ntraces <- reactive({
         nrow()
 })
 
-TODO: This is no longer reactive. Put in MR_UI.R
 filtered_signalids <- reactive({
     debug(logger, "reactive on corridors: filtered_signalids()")
-    x <- corridors %>% # filtered_corridors() %>%
+    x <- filtered_corridors() %>%
         filter(as.integer(as.character(SignalID)) > 0) %>%
         arrange(as.integer(as.character(SignalID)))
     paste0(x$SignalID, ": ", x$Name)
@@ -187,25 +161,6 @@ filtered_signalids <- reactive({
 ```
 
 
-
-
-
-
-
-One-Month Summary
-=====================================
-
-Row {data-height = 50}
--------------------------------------
-
-### Performance <a id = "page_performance"></a>
-
-Arterial performance measures (% change from previous month)
-
-Row
--------------------------------------
-
-### Throughput [vph] {.value-box}
 
 ```{r}
 tp_valuebox <- reactive({
@@ -221,15 +176,15 @@ tp_valuebox <- reactive({
     )
 })
 
-output$tp_valuebox1 <- output$tp_valuebox2 <- renderValueBox({
+output$tp_valuebox <- renderValueBox({
     tp_valuebox()
 })
-valueBoxOutput("tp_valuebox1")
-```
 
-### Arrivals on Green {.value-box}
 
-```{r}
+
+
+
+
 aog_valuebox <- reactive({
     valueBox(
         value = get_valuebox_value(
@@ -241,15 +196,15 @@ aog_valuebox <- reactive({
     )
 })
 
-output$aog_valuebox1 <- output$aog_valuebox2 <- renderValueBox({
+output$aog_valuebox <- renderValueBox({
     aog_valuebox()
 })
-valueBoxOutput("aog_valuebox1")
-```
 
-### Progression Ratio {.value-box}
 
-```{r}
+
+
+
+
 pr_valuebox <- reactive({
     valueBox(
         value = get_valuebox_value(
@@ -260,15 +215,15 @@ pr_valuebox <- reactive({
         color = BLUE
     )
 })
-output$pr_valuebox1 <- output$pr_valuebox2 <- renderValueBox({
+output$pr_valuebox <- renderValueBox({
     pr_valuebox()
 })
-valueBoxOutput("pr_valuebox1")
-```
 
-### Spillback Rate {.value-box}
 
-```{r}
+
+
+
+
 qs_valuebox <- reactive({
     valueBox(
         value = get_valuebox_value(
@@ -279,15 +234,15 @@ qs_valuebox <- reactive({
         color = BLUE
     )
 })
-output$qs_valuebox1 <- output$qs_valuebox2 <- renderValueBox({
+output$qs_valuebox <- renderValueBox({
     qs_valuebox()
 })
-valueBoxOutput("qs_valuebox1")
-```
 
-### Peak Period Split Failures {.value-box}
 
-```{r}
+
+
+
+
 sf_valuebox <- reactive({
     valueBox(
         value = get_valuebox_value(
@@ -298,15 +253,15 @@ sf_valuebox <- reactive({
         color = BLUE
     )
 })
-output$sf_valuebox1 <- output$sf_valuebox2 <- renderValueBox({
+output$sf_valuebox <- renderValueBox({
     sf_valuebox()
 })
-valueBoxOutput("sf_valuebox1")
-```
 
-### Off-Peak Split Failures {.value-box}
 
-```{r}
+
+
+
+
 sfo_valuebox <- reactive({
     valueBox(
         value = get_valuebox_value(
@@ -317,15 +272,15 @@ sfo_valuebox <- reactive({
         color = BLUE
     )
 })
-output$sfo_valuebox1 <- output$sfo_valuebox2 <- renderValueBox({
+output$sfo_valuebox <- renderValueBox({
     sfo_valuebox()
 })
-valueBoxOutput("sfo_valuebox1")
-```
 
-### Travel Time Index {.value-box}
 
-```{r}
+
+
+
+
 tti_valuebox <- reactive({
     valueBox(
         value = get_valuebox_value(
@@ -336,15 +291,15 @@ tti_valuebox <- reactive({
         color = BLUE
     )
 })
-output$tti_valuebox1 <- output$tti_valuebox2 <- renderValueBox({
+output$tti_valuebox <- renderValueBox({
     tti_valuebox()
 })
-valueBoxOutput("tti_valuebox1")
-```
 
-### Planning Time Index {.value-box}
 
-```{r}
+
+
+
+
 pti_valuebox <- reactive({
     valueBox(
         value = get_valuebox_value(
@@ -355,26 +310,14 @@ pti_valuebox <- reactive({
         color = BLUE
     )
 })
-output$pti_valuebox1 <- output$pti_valuebox2 <- renderValueBox({
+output$pti_valuebox <- renderValueBox({
     pti_valuebox()
 })
-valueBoxOutput("pti_valuebox1")
-```
-
-Row {data-height = 50}
--------------------------------------
-
-### Volume-Based Measures
-
-Corridor volumes (% change from previous month)
-
-Row
--------------------------------------
 
 
-### Traffic Volume [veh/day] {.value-box}
 
-```{r}
+
+
 vpd_valuebox <- reactive({
     valueBox(
         value = get_valuebox_value(
@@ -385,15 +328,15 @@ vpd_valuebox <- reactive({
         color = BLUE
     )
 })
-output$vpd_valuebox1 <- output$vpd_valuebox2 <- renderValueBox({
+output$vpd_valuebox <- renderValueBox({
     vpd_valuebox()
 })
-valueBoxOutput("vpd_valuebox1")
-```
 
-### AM Peak Volume [veh/hr] {.value-box}
 
-```{r}
+
+
+
+
 vphpa_valuebox <- reactive({
     valueBox(
         value = get_valuebox_value(
@@ -404,15 +347,15 @@ vphpa_valuebox <- reactive({
         color = BLUE
     )
 })
-output$vphpa_valuebox1 <- output$vphpa_valuebox2 <- renderValueBox({
+output$vphpa_valuebox <- renderValueBox({
     vphpa_valuebox()
 })
-valueBoxOutput("vphpa_valuebox1")
-```
 
-### PM Peak Volume [veh/hr] {.value-box}
 
-```{r}
+
+
+
+
 vphpp_valuebox <- reactive({
     valueBox(
         value = get_valuebox_value(
@@ -423,16 +366,16 @@ vphpp_valuebox <- reactive({
         color = BLUE
     )
 })
-output$vphpp_valuebox1 <- output$vphpp_valuebox2 <- renderValueBox({
+output$vphpp_valuebox <- renderValueBox({
     vphpp_valuebox()
 })
-valueBoxOutput("vphpp_valuebox1")
-```
 
 
-### Pedestrian Activations [pa/day] {.value-box}
 
-```{r}
+
+
+
+
 papd_valuebox <- reactive({
     valueBox(
         value = get_valuebox_value(
@@ -443,15 +386,15 @@ papd_valuebox <- reactive({
         color = BLUE
     )
 })
-output$papd_valuebox1 <- output$papd_valuebox2 <- renderValueBox({
+output$papd_valuebox <- renderValueBox({
     papd_valuebox()
 })
-valueBoxOutput("papd_valuebox1")
-```
 
-### {.value-box}
 
-```{r, eval = TRUE}
+
+
+
+
 renderValueBox({
     valueBox(
         value = NULL,
@@ -459,21 +402,20 @@ renderValueBox({
         color = "gray80"
     )
 })
-```
 
-Row {data-height = 50}
--------------------------------------
 
-### Equipment Measures
 
-Device and Communications Uptime (% change from previous month)
 
-Row
--------------------------------------
 
-### Vehicle Detector Availability {.value-box}
 
-```{r}
+
+
+
+
+
+
+
+
 du_valuebox <- reactive({
     valueBox(
         value = get_valuebox_value(
@@ -484,15 +426,15 @@ du_valuebox <- reactive({
         color = BLUE
     )
 })
-output$du_valuebox1 <- output$du_valuebox2 <- renderValueBox({
+output$du_valuebox <- renderValueBox({
     du_valuebox()
 })
-valueBoxOutput("du_valuebox1")
-```
 
-### Pedestrian Pushbutton Availability {.value-box}
 
-```{r}
+
+
+
+
 pau_valuebox <- reactive({
     valueBox(
         value = get_valuebox_value(
@@ -503,15 +445,15 @@ pau_valuebox <- reactive({
         color = BLUE
     )
 })
-output$pau_valuebox1 <- output$pau_valuebox2 <- renderValueBox({
+output$pau_valuebox <- renderValueBox({
     pau_valuebox()
 })
-valueBoxOutput("pau_valuebox1")
-```
 
-### Communications Uptime {.value-box}
 
-```{r}
+
+
+
+
 cu_valuebox <- reactive({
     valueBox(
         value = get_valuebox_value(
@@ -522,342 +464,11 @@ cu_valuebox <- reactive({
         color = BLUE
     )
 })
-output$cu_valuebox1 <- output$cu_valuebox2 <- renderValueBox({
+output$cu_valuebox <- renderValueBox({
     cu_valuebox()
 })
-valueBoxOutput("cu_valuebox1")
+
 ```
-
-### {.value-box}
-
-```{r, eval = TRUE}
-renderValueBox({
-    valueBox(
-        value = NULL,
-        icon = NULL,
-        color = "gray80"
-    )
-})
-```
-
-### {.value-box}
-
-```{r, eval = TRUE}
-renderValueBox({
-    valueBox(
-        value = NULL,
-        icon = NULL,
-        color = "gray80"
-    )
-})
-```
-
-
-
-
-
-
-
-Quarter Summary
-=====================================
-
-Row {data-height = 50}
--------------------------------------
-
-### Performance
-
-Arterial performance measures (% change from previous quarter)
-
-Row
--------------------------------------
-
-### Throughput [vph] {.value-box}
-
-```{r}
-renderValueBox({
-    valueBox(
-        value = get_valuebox_value(
-            throughput,
-            zone_group = input$zone_group, corridor = corridor(), quarter = current_quarter(), line_break = TRUE
-        ),
-        icon = "fa-bar-chart",
-        color = GDOT_BLUE
-    )
-})
-```
-
-### Arrivals on Green {.value-box}
-
-```{r}
-renderValueBox({
-    valueBox(
-        value = get_valuebox_value(
-            arrivals_on_green,
-            zone_group = input$zone_group, corridor = corridor(), quarter = current_quarter(), line_break = TRUE
-        ),
-        icon = "fa-car",
-        color = GDOT_BLUE_RGB
-    )
-})
-```
-
-### Progression Ratio {.value-box}
-
-```{r}
-renderValueBox({
-    valueBox(
-        value = get_valuebox_value(
-            progression_ratio,
-            zone_group = input$zone_group, corridor = corridor(), quarter = current_quarter(), line_break = TRUE
-        ),
-        icon = "fa-car",
-        color = GDOT_BLUE
-    )
-})
-```
-
-### Spillback Rate {.value-box}
-
-```{r}
-renderValueBox({
-    valueBox(
-        value = get_valuebox_value(
-            queue_spillback_rate,
-            zone_group = input$zone_group, corridor = corridor(), quarter = current_quarter(), line_break = TRUE
-        ),
-        icon = "fa-car",
-        color = GDOT_BLUE_RGB
-    )
-})
-```
-
-### Peak Period Split Failures {.value-box}
-
-```{r}
-renderValueBox({
-    valueBox(
-        value = get_valuebox_value(
-            peak_period_split_failures,
-            zone_group = input$zone_group, corridor = corridor(), quarter = current_quarter(), line_break = TRUE
-        ),
-        icon = "fa-car",
-        color = GDOT_BLUE
-    )
-})
-```
-
-### Off-Peak Split Failures {.value-box}
-
-```{r}
-renderValueBox({
-    valueBox(
-        value = get_valuebox_value(
-            off_peak_split_failures,
-            zone_group = input$zone_group, corridor = corridor(), quarter = current_quarter(), line_break = TRUE
-        ),
-        icon = "fa-car",
-        color = GDOT_BLUE_RGB
-    )
-})
-```
-
-### Travel Time Index {.value-box}
-
-```{r}
-renderValueBox({
-    valueBox(
-        value = get_valuebox_value(
-            travel_time_index,
-            zone_group = input$zone_group, corridor = corridor(), quarter = current_quarter(), line_break = TRUE
-        ),
-        icon = "fa-dashboard",
-        color = GDOT_BLUE
-    )
-})
-```
-
-### Planning Time Index {.value-box}
-
-```{r}
-renderValueBox({
-    valueBox(
-        value = get_valuebox_value(
-            planning_time_index,
-            zone_group = input$zone_group, corridor = corridor(), quarter = current_quarter(), line_break = TRUE
-        ),
-        icon = "fa-dashboard",
-        color = GDOT_BLUE_RGB
-    )
-})
-```
-
-
-Row {data-height = 50}
--------------------------------------
-
-### Volume-Based Measures
-
-Corridor volumes (% change from previous quarter)
-
-Row
--------------------------------------
-
-
-### Traffic Volume [veh/day] {.value-box}
-
-```{r}
-renderValueBox({
-    valueBox(
-        value = get_valuebox_value(
-            vpd,
-            zone_group = input$zone_group, corridor = corridor(), quarter = current_quarter(), line_break = FALSE
-        ),
-        icon = "fa-area-chart",
-        color = GDOT_YELLOW_RGB
-    )
-})
-```
-
-### AM Peak Volume [veh/hr] {.value-box}
-
-```{r}
-renderValueBox({
-    valueBox(
-        value = get_valuebox_value(
-            am_peak_vph,
-            zone_group = input$zone_group, corridor = corridor(), quarter = current_quarter(), line_break = FALSE
-        ),
-        icon = "fa-area-chart",
-        color = GDOT_YELLOW
-    )
-})
-```
-
-### PM Peak Volume [veh/hr] {.value-box}
-
-```{r}
-renderValueBox({
-    valueBox(
-        value = get_valuebox_value(
-            pm_peak_vph,
-            zone_group = input$zone_group, corridor = corridor(), quarter = current_quarter(), line_break = FALSE
-        ),
-        icon = "fa-area-chart",
-        color = GDOT_YELLOW_RGB
-    )
-})
-```
-
-
-### Pedestrian Activations [pa/day] {.value-box}
-
-```{r}
-renderValueBox({
-    valueBox(
-        value = get_valuebox_value(
-            daily_pedestrian_pushbuttons,
-            zone_group = input$zone_group, corridor = corridor(), quarter = current_quarter(), line_break = FALSE
-        ),
-        icon = "fa-area-chart",
-        color = GDOT_YELLOW
-    )
-})
-```
-
-
-### {.value-box}
-
-```{r, eval = TRUE}
-renderValueBox({
-    valueBox(
-        value = NULL,
-        icon = NULL,
-        color = "gray80"
-    )
-})
-```
-
-Row {data-height = 50}
--------------------------------------
-
-### Equipment Measures
-
-Device and Communications Uptime (% change from previous quarter)
-
-Row
--------------------------------------
-
-### Vehicle Detector Availability {.value-box}
-
-```{r}
-renderValueBox({
-    valueBox(
-        value = get_valuebox_value(
-            detector_uptime,
-            zone_group = input$zone_group, corridor = corridor(), quarter = current_quarter(), line_break = FALSE
-        ),
-        icon = "fa-car",
-        color = GDOT_BLUE
-    )
-})
-```
-
-### Pedestrian Pushbutton Availability {.value-box}
-
-```{r}
-
-renderValueBox({
-    valueBox(
-        value = get_valuebox_value(
-            ped_button_uptime,
-            zone_group = input$zone_group, corridor = corridor(), quarter = current_quarter(), line_break = FALSE
-        ),
-        icon = "fa-walking",
-        color = GDOT_BLUE_RGB
-    )
-})
-```
-
-### Communications Uptime {.value-box}
-
-```{r}
-renderValueBox({
-    valueBox(
-        value = get_valuebox_value(
-            comm_uptime,
-            zone_group = input$zone_group, corridor = corridor(), quarter = current_quarter(), line_break = FALSE
-        ),
-        icon = "fa-broadcast-tower",
-        color = GDOT_BLUE_RGB
-    )
-})
-```
-
-### {.value-box}
-
-```{r, eval = TRUE}
-renderValueBox({
-    valueBox(
-        value = NULL,
-        icon = NULL,
-        color = "gray80"
-    )
-})
-```
-
-### {.value-box}
-
-```{r, eval = TRUE}
-renderValueBox({
-    valueBox(
-        value = NULL,
-        icon = NULL,
-        color = "gray80"
-    )
-})
-```
-
-
 
 
 
@@ -1045,49 +656,49 @@ Row
 ### Throughput [vph] {.value-box}
 
 ```{r, warning = FALSE}
-valueBoxOutput("tp_valuebox2")
+valueBoxOutput("tp_valuebox")
 ```
 
 ### Arrivals on Green {.value-box}
 
 ```{r, warning = FALSE}
-valueBoxOutput("aog_valuebox2")
+valueBoxOutput("aog_valuebox")
 ```
 
 ### Progression Ratio {.value-box}
 
 ```{r, warning = FALSE}
-valueBoxOutput("pr_valuebox2")
+valueBoxOutput("pr_valuebox")
 ```
 
 ### Spillback Rate {.value-box}
 
 ```{r, warning = FALSE}
-valueBoxOutput("qs_valuebox2")
+valueBoxOutput("qs_valuebox")
 ```
 
 ### Peak Period Split Failures {.value-box}
 
 ```{r}
-valueBoxOutput("sf_valuebox2")
+valueBoxOutput("sf_valuebox")
 ```
 
 ### Off-Peak Split Failures {.value-box}
 
 ```{r}
-valueBoxOutput("sfo_valuebox2")
+valueBoxOutput("sfo_valuebox")
 ```
 
 ### Travel Time Index {.value-box}
 
 ```{r, warning = FALSE}
-valueBoxOutput("tti_valuebox2")
+valueBoxOutput("tti_valuebox")
 ```
 
 ### Planning Time Index {.value-box}
 
 ```{r, warning = FALSE}
-valueBoxOutput("pti_valuebox2")
+valueBoxOutput("pti_valuebox")
 ```
 
 Row {data-height=40}
@@ -1180,19 +791,19 @@ Row
 ### Traffic Volume [veh/day] {.value-box}
 
 ```{r, warning = FALSE}
-valueBoxOutput("vpd_valuebox2")
+valueBoxOutput("vpd_valuebox")
 ```
 
 ### AM Peak Volume [veh/hr] {.value-box}
 
 ```{r, warning = FALSE}
-valueBoxOutput("vphpa_valuebox2")
+valueBoxOutput("vphpa_valuebox")
 ```
 
 ### PM Peak Volume [veh/hr] {.value-box}
 
 ```{r, warning = FALSE}
-valueBoxOutput("vphpp_valuebox2")
+valueBoxOutput("vphpp_valuebox")
 ```
 
 Row {data-height=40}
@@ -1252,25 +863,25 @@ Row
 ### Vehicle Detector Availability {.value-box}
 
 ```{r, warning = FALSE}
-valueBoxOutput("du_valuebox2")
+valueBoxOutput("du_valuebox")
 ```
 
 ### Pedestrian Pushbutton Availability {.value-box}
 
 ```{r, warning = FALSE}
-valueBoxOutput("pau_valuebox2")
+valueBoxOutput("pau_valuebox")
 ```
 
 ### Communications Uptime {.value-box}
 
 ```{r, warning = FALSE}
-valueBoxOutput("cu_valuebox2")
+valueBoxOutput("cu_valuebox")
 ```
 
 
 ```{r, eval = FALSE}
 ### Roadside Unit (RSU) Uptime {.value-box}
-valueBoxOutput("ru_valuebox2")
+valueBoxOutput("ru_valuebox")
 ```
 
 ```{r, eval = TRUE}
@@ -1511,7 +1122,7 @@ fillRow(
                         filtered_alerts()$intersections < 2000,
                         paste(
                             "\n\n\nTOO MUCH DATA TO PLOT.",
-                            "Select a Zone, Corridor of Phase",
+                            "Select a Region, Corridor or Phase",
                             "to reduce the number of records."
                         )
                     )
@@ -1713,9 +1324,9 @@ shinyApp(
                         options = layersControlOptions(collapsed = FALSE)
                     ) %>%
                     enableTileCaching() %>%
-                    setView(lat = conf$map_center$`Central Region`[1],
-                            lng = conf$map_center$`Central Region`[2],
-                            zoom = conf$map_center$`Central Region`[3]) %>%
+                    setView(lat = conf$map_center$`Northern Region`[1],
+                            lng = conf$map_center$`Northern Region`[2],
+                            zoom = conf$map_center$`Northern Region`[3]) %>%
                     addCircleMarkers(
                         data = map_data(),
                         lng = ~ Longitude,
@@ -1947,7 +1558,7 @@ shinyApp(
                         lng = coords[2],
                         zoom = coords[3])
             }
-        })        
+        })
 
     },
 
@@ -1987,9 +1598,10 @@ fillCol(
     )
 )
 
-observeEvent(input$zone_group, {
+observeEvent(zone_group(), {
+    req(zone_group())
     updateSelectizeInput(session, "signalid", choices = c("Select", filtered_signalids()), server = TRUE)
-}, priority = -1)
+})
 
 sid <- eventReactive(input$signal_details_button, {
     req(input$signalid)
@@ -2009,18 +1621,6 @@ fillCol(
         )
     })
 )
-```
-
-
-
-
-
-
-
-            }
-        }
-    # })
-})
 ```
 
 
