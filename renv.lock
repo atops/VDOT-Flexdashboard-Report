@@ -19,10 +19,10 @@
     },
     "DT": {
       "Package": "DT",
-      "Version": "0.22",
+      "Version": "0.23",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "fc53164de9ee32692eef6fdd14115381",
+      "Hash": "d8f1498dc47763ce4647c8d03214d30b",
       "Requirements": [
         "crosstalk",
         "htmltools",
@@ -170,10 +170,10 @@
     },
     "arrow": {
       "Package": "arrow",
-      "Version": "7.0.0",
+      "Version": "8.0.0",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "77fa403564ce3495510be855fb0c21d0",
+      "Hash": "58b7ef7a5c997e324767b86ae0bb0896",
       "Requirements": [
         "R6",
         "assertthat",
@@ -653,12 +653,11 @@
     },
     "furrr": {
       "Package": "furrr",
-      "Version": "0.2.3",
+      "Version": "0.3.0",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "2aba4ab06e8707ac054c6683cb6fed56",
+      "Hash": "c7cf394610e3aaf086fa4b66c382016e",
       "Requirements": [
-        "ellipsis",
         "future",
         "globals",
         "lifecycle",
@@ -701,10 +700,10 @@
     },
     "ggplot2": {
       "Package": "ggplot2",
-      "Version": "3.3.5",
+      "Version": "3.3.6",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "d7566c471c7b17e095dd023b9ef155ad",
+      "Hash": "0fb26d0674c82705c6b701d1a61e02ea",
       "Requirements": [
         "MASS",
         "digest",
@@ -720,10 +719,10 @@
     },
     "globals": {
       "Package": "globals",
-      "Version": "0.14.0",
+      "Version": "0.15.0",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "eca8023ed5ca6372479ebb9b3207f5ae",
+      "Hash": "ace993e2dad5e64ed46391302b79e94f",
       "Requirements": [
         "codetools"
       ]
@@ -818,10 +817,10 @@
     },
     "httr": {
       "Package": "httr",
-      "Version": "1.4.2",
+      "Version": "1.4.3",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "a525aba14184fec243f9eaec62fbed43",
+      "Hash": "88d1b310583777edf01ccd1216fb0b2b",
       "Requirements": [
         "R6",
         "curl",
@@ -1081,10 +1080,10 @@
     },
     "openssl": {
       "Package": "openssl",
-      "Version": "2.0.0",
+      "Version": "2.0.1",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "cf4329aac12c2c44089974559c18e446",
+      "Hash": "edde731e84cf3d42aa9b7f04b8de5941",
       "Requirements": [
         "askpass"
       ]
@@ -1616,10 +1615,10 @@
     },
     "tibble": {
       "Package": "tibble",
-      "Version": "3.1.6",
+      "Version": "3.1.7",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "8a8f02d1934dfd6431c671361510dd0b",
+      "Hash": "08415af406e3dd75049afef9552e7355",
       "Requirements": [
         "ellipsis",
         "fansi",
@@ -1675,10 +1674,10 @@
     },
     "tinytex": {
       "Package": "tinytex",
-      "Version": "0.38",
+      "Version": "0.39",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "759d047596ac173433985deddf313450",
+      "Hash": "29f67ab15405b390b90e56ff22198ead",
       "Requirements": [
         "xfun"
       ]
@@ -1784,10 +1783,10 @@
     },
     "xfun": {
       "Package": "xfun",
-      "Version": "0.30",
+      "Version": "0.31",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "e83f48136b041845e50a6658feffb197",
+      "Hash": "a318c6f752b8dcfe9fb74d897418ab2b",
       "Requirements": []
     },
     "xml2": {
