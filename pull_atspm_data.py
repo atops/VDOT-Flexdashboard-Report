@@ -57,6 +57,17 @@ def get_atspm_engine(username, password, hostname = None, database = None, dsn =
     return engine
 
 
+def get_asof(s, conn):
+    Asof = pd.read_sql_query(
+        f'''SELECT SignalID, MIN(Timestamp) as Asof 
+           FROM Controller_Event_Log 
+           WHERE EventCode = 0 AND SignalID = '{s}'
+           GROUP BY SignalID''', con=conn)
+    if len(Asof): 
+        Asof.Asof = Asof.Asof.dt.date
+    return Asof
+
+
 def add_barriers(df):
     '''
     Where main street phases (1,6, 2,5) terminate and side street phases (4,7, 3,8)
@@ -145,6 +156,9 @@ if __name__ == '__main__':
         with open('Monthly_Report_AWS.yaml') as yaml_file:
             cred = yaml.load(yaml_file, Loader=yaml.Loader)
 
+        with open('Monthly_Report.yaml') as yaml_file:
+            conf = yaml.load(yaml_file, Loader=yaml.FullLoader)
+
         engine = get_atspm_engine(
             username=cred['ATSPM_UID'], 
             password=cred['ATSPM_PWD'], 
@@ -153,10 +167,13 @@ if __name__ == '__main__':
             dsn=cred['ATSPM_DSN'])
 
         with engine.connect() as conn:
-            Signals = pd.read_sql_table('Signals', conn)
+            Signals = (pd.read_sql_table('Signals', conn)
+                        .sort_values(['SignalID', 'VersionID'])
+                        .groupby('SignalID')
+                        .tail(1))
 
-        with open('Monthly_Report.yaml') as yaml_file:
-            conf = yaml.load(yaml_file, Loader=yaml.FullLoader)
+            asof = pd.concat([get_asof(s, conn) for s in Signals.SignalID.values])
+            Signals = pd.merge(Signals, asof, left_on='SignalID', right_on='SignalID', how='left')
 
         bucket = conf['bucket']
         region = conf['region']
