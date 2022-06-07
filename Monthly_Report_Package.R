@@ -418,6 +418,46 @@ tryCatch(
         # -- Alerts: CCTV downtime --
 
 
+        # -- Alerts: Comm downtime --
+
+        bad_comm <- s3_read_parquet_parallel(
+            bucket = conf$bucket,
+            table_name = "comm_quality",
+            start_date = today() - days(90),
+            end_date = today() - days(1),
+            signals_list = signals_list,
+        )
+        if (nrow(bad_comm)) {
+            bad_comm <- bad_comm %>%
+                mutate(SignalID = factor(AssetNum)) %>%
+
+                left_join(
+                    dplyr::select(corridors, Zone_Group, Zone, Corridor, SignalID, Name),
+                    by = c("SignalID")
+                ) %>% 
+                filter(
+                    !is.na(Corridor),
+                    AvgQuality < 90) %>%
+                transmute(Zone_Group,
+                          Zone,
+                          Corridor = factor(Corridor),
+                          SignalID = factor(SignalID),
+                          CallPhase = factor(0),
+                          Detector = factor(0),
+                          Date,
+                          Alert = factor("Bad Comm"),
+                          Name = factor(Name)
+                )
+
+            s3write_using(
+                bad_comm,
+                FUN = write_parquet,
+                object = "mark/watchdog/bad_comm.parquet",
+                bucket = conf$bucket)
+        }
+        rm(bad_comm)
+
+
         # -- Watchdog Alerts --
 
         # Nothing to do here
@@ -603,18 +643,26 @@ print(glue("{Sys.time()} Communication Uptime [7 of 23]"))
 
 tryCatch(
     {
+        # New Comm Quality Metric from KITS
         cu <- s3_read_parquet_parallel(
             bucket = conf$bucket,
-            table_name = "comm_uptime",
+            table_name = "comm_quality",
             start_date = wk_calcs_start_date,
             end_date = report_end_date,
             signals_list = signals_list
         ) %>%
             mutate(
-                SignalID = factor(SignalID),
+                SignalID = factor(AssetNum),
+                CallPhase = 0,
+                uptime = AvgQuality,
                 CallPhase = factor(CallPhase),
-                Date = date(Date)
-            )
+                Date = date(Date),
+                DOW = wday(Date),
+                Week = week(Date)
+            ) %>% 
+            filter(SignalID %in% corridors$SignalID, Date == as_date(CSDATE)) %>% 
+            left_join(select(corridors, SignalID, Asof), by = "SignalID") %>% 
+            filter(Date >= Asof)
 
         daily_comm_uptime <- get_daily_avg(cu, "uptime", peak_only = FALSE)
         cor_daily_comm_uptime <-
