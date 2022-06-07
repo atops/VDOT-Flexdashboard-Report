@@ -1056,6 +1056,7 @@ div(
     selectInput(
         "alert_type", "Alert:",
         choices = c(
+            "Bad Comm",
             "Bad Vehicle Detection",
             "Bad Ped Pushbuttons",
             "Pedestrian Activations",
@@ -1069,7 +1070,8 @@ div(
 
     conditionalPanel(
         "(input.alert_type == 'Missing Records') ||
-             (input.alert_type == 'No Camera Image')",
+         (input.alert_type == 'No Camera Image') ||
+         (input.alert_type == 'Bad Comm')",
         selectInput("phase.all", "Phase:",
             choices = "All",
             selected = "All"
@@ -1600,6 +1602,7 @@ fillCol(
 
 observeEvent(zone_group(), {
     req(zone_group())
+    debug(logger, "Update signal details dropdown on zone_group()")
     updateSelectizeInput(session, "signalid", choices = c("Select", filtered_signalids()), server = TRUE)
 })
 

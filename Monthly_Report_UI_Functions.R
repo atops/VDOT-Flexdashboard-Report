@@ -2452,7 +2452,7 @@ filter_alerts <- function(conn, dr, alert_type_, zone_group_, corridor_, phase_,
             df <- df %>% right_join(select(table_df, SignalID, Detector))
         }
         
-        if (alert_type_ == "Missing Records") {
+        if (alert_type_ == "Missing Records" || alert_type_ == "Bad Comm") {
             
             plot_df <- df %>% 
                 arrange(
