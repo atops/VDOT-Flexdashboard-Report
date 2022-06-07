@@ -57,6 +57,18 @@ def get_atspm_engine(username, password, hostname = None, database = None, dsn =
     return engine
 
 
+def get_aurora_engine(credfile='Monthly_Report_AWS.yaml'):
+    with open(credfile) as f:
+        cred = yaml.load(f, Loader=yaml.Loader)
+    username=cred['RDS_USERNAME'] 
+    password=cred['RDS_PASSWORD'] 
+    hostname=cred['RDS_HOST'] 
+    database=cred['RDS_DATABASE']
+
+    engine = sq.create_engine(f'mysql+pymysql://{username}:{password}@{hostname}/{database}')
+    return engine
+
+
 def get_asof(s, conn):
     Asof = pd.read_sql_query(
         f'''SELECT SignalID, MIN(Timestamp) as Asof 

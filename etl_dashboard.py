@@ -97,8 +97,8 @@ def main(start_date, end_date, conf):
 
     bucket = conf['bucket']
    
-    corridors_filename = re.sub('\..*', '.feather', conf['corridors_filename_s3'])
-    corridors = pd.read_feather(f's3://{bucket}/{corridors_filename}')
+    corridors_filename = re.sub('\..*', '.parquet', conf['corridors_filename_s3'])
+    corridors = pd.read_parquet(f's3://{bucket}/{corridors_filename}')
     corridors = corridors[~corridors.SignalID.isna()]
 
     signalids = list(corridors.SignalID.astype('int').values)
@@ -135,7 +135,7 @@ def main(start_date, end_date, conf):
             #-----------------------------------------------------------------------------------------
             # with Pool(processes=nthreads) as pool:
             with get_context('spawn').Pool(processes=nthreads) as pool:
-                result = pool.starmap_async(
+                pool.starmap_async(
                     etl2, list(itertools.product(signalids, [date_], [det_config], [conf])), chunksize=(nthreads-1)*4)
                 pool.close()
                 pool.join()
