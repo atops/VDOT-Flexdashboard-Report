@@ -66,7 +66,7 @@ if (as_datetime(xlsx_last_modified) > as_datetime(qs_last_modified)) {
     )
     dbExecute(aurora, "TRUNCATE TABLE Corridors")
     dbWriteTable(aurora, "Corridors", corridors, overwrite = FALSE, append = TRUE, row.names = FALSE)
-    
+
     all_corridors <- s3read_using(
         function(x) get_corridors(x, filter_signals = FALSE),
         object = conf$corridors_filename_s3,
@@ -85,7 +85,7 @@ if (as_datetime(xlsx_last_modified) > as_datetime(qs_last_modified)) {
 }
 
 corridors <- dbReadTable(aurora, "Corridors")
-dbDisconnect(aurora) 
+dbDisconnect(aurora)
 
 
 signals_list <- unique(corridors$SignalID)
@@ -223,10 +223,10 @@ get_counts_based_measures <- function(month_abbrs) {
         get_adjusted_counts_arrow("filtered_counts_1hr", "adjusted_counts_1hr", conf)
 
         fc_ds <- keep_trying(
-            function() arrow::open_dataset(sources = "filtered_counts_1hr/"), 
+            function() arrow::open_dataset(sources = "filtered_counts_1hr/"),
             n_tries = 3, timeout = 60)
         ac_ds <- keep_trying(
-            function() arrow::open_dataset(sources = "adjusted_counts_1hr/"), 
+            function() arrow::open_dataset(sources = "adjusted_counts_1hr/"),
             n_tries = 3, timeout = 60)
 
         lapply(date_range, function(date_) {
@@ -349,10 +349,10 @@ get_counts_based_measures <- function(month_abbrs) {
         get_adjusted_counts_arrow("filtered_counts_15min", "adjusted_counts_15min", conf)
 
         fc_ds <- keep_trying(
-            function() arrow::open_dataset(sources = "filtered_counts_15min/"), 
+            function() arrow::open_dataset(sources = "filtered_counts_15min/"),
             n_tries = 3, timeout = 60)
         ac_ds <- keep_trying(
-            function() arrow::open_dataset(sources = "adjusted_counts_15min/"), 
+            function() arrow::open_dataset(sources = "adjusted_counts_15min/"),
             n_tries = 3, timeout = 60)
 
         lapply(date_range, function(date_) {
@@ -597,6 +597,34 @@ if (conf$run$split_failures == TRUE) {
     get_sf_date_range(start_date, end_date)
 }
 
+
+
+# # GET TERMINATION TYPES #####################################################
+
+print(glue("{Sys.time()} termination types [11b of 11]"))
+
+f <- function(start_date, end_date) {
+    date_range <- seq(ymd(start_date), ymd(end_date), by = "1 day")
+
+    lapply(date_range, function(date_) {
+        print(date_)
+
+        terms <- get_termination_type(date_, conf, signals_list)
+
+        s3_upload_parquet_date_split(
+            terms,
+            bucket = conf$bucket,
+            prefix = "term",
+            table_name = "termination_types",
+            conf = conf
+        )
+    })
+}
+
+if (conf$run$split_failures == TRUE) {
+    # Utah method, based on green, start-of-red occupancies
+    f(start_date, end_date)
+}
 
 
 print("\n--------------------- End Monthly Report calcs -----------------------\n")
