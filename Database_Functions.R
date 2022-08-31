@@ -119,7 +119,7 @@ query_data <- function(
     hourly = FALSE, 
     zone_group, 
     corridor = NULL,
-    month = NULL, 
+    month, 
     quarter = NULL, 
     upto = TRUE) {
     
@@ -193,10 +193,8 @@ query_data <- function(
         query <- paste(query, glue("AND Month {comparison} '{month}'"))
     } else if (resolution == "quarterly") { # current_quarter is not null
         query <- paste(query, glue("AND Quarter {comparison} {quarter}"))
-        
     } else if (resolution == "weekly" | resolution == "daily") {
         query <- paste(query, glue("AND Date {comparison} '{month + months(1) - days(1)}'"))
-        
     } else {
         "oops"
     }
