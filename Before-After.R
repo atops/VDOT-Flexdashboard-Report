@@ -268,6 +268,10 @@ get_before_after_scatter_plot <- function(df_x_scatter, df_y_scatter, metric_x, 
             hovertemplate = "%{customdata}",
             hoverlabel = list(font = list(family = "Source Sans Pro"))
         ) %>%
+        add_trace(
+            x = ~after_x, y = ~after_y, name = 'Label', type = "scatter", mode = 'text', 
+            text = ~Description, textposition = 'middle right', texttemplate = "    %{text}"
+        ) %>% 
         add_annotations(data = df[complete.cases(df),],
                         ax = ~before_x,
                         x = ~after_x,
