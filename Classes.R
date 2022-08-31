@@ -76,7 +76,6 @@ cctv_uptime <- structure(
 comm_uptime <- structure(
     inherit(metrics[["uptime"]], metrics[["comm_uptime"]]), class = "metric"
 )
-
 detection_level <- structure(
     metrics[["detection_level"]], class = "metric"
 )
@@ -92,9 +91,9 @@ get_descriptionBlock <- function(x, zone_group, month, quarter = NULL) {
         vals <- cor$qu[[x$table]] %>%
             dplyr::filter(Corridor == zone_group & Quarter == quarter) %>% as.list()
     }
-    
+
     vals$delta <- if_else(is.na(vals$delta), 0, vals$delta)
-    
+
     if (vals$delta > 0) {
         delta_prefix <- " +"
         color <- "success"
@@ -108,14 +107,14 @@ get_descriptionBlock <- function(x, zone_group, month, quarter = NULL) {
         color <- "failure"
         color_icon <- "caret-down"
     }
-    
+
     value <- data_format(x$data_type)(vals[[x$variable]])
     delta <- glue('{delta_prefix} {as_pct(vals$delta)}')
-    
-    
+
+
     validate(need(value, message = "NA"))
-    
-    
+
+
     descriptionBlock(
         number = delta,
         numberColor = color,
@@ -131,11 +130,11 @@ get_descriptionBlock <- function(x, zone_group, month, quarter = NULL) {
 
 get_minimal_trendline <- function(x, zone_group) {
     ggplot(
-        data = filter(cor$wk[[x$table]], 
-                      as.character(Zone_Group) == as.character(Corridor), 
-                      Zone_Group == zone_group), 
-        mapping = aes_string(x = "Date", y = x$variable)) + 
-        geom_line(color = GDOT_BLUE) + 
+        data = filter(cor$wk[[x$table]],
+                      as.character(Zone_Group) == as.character(Corridor),
+                      Zone_Group == zone_group),
+        mapping = aes_string(x = "Date", y = x$variable)) +
+        geom_line(color = GDOT_BLUE) +
         theme_void()
 }
 
@@ -148,48 +147,48 @@ p0 <- plot_ly(type = "scatter", mode = "markers") %>% layout(xaxis = x0, yaxis =
 
 
 get_valuebox_value <- function(metric, zone_group, corridor, month, quarter = NULL, line_break = FALSE) {
-    
+
     if (corridor == "All Corridors") {
         corridor <- NULL
     }
 
     if (is.null(quarter)) { # want monthly, not quarterly data
         vals <- query_data(
-            metric, 
-            level = "corridor", 
-            resolution = "monthly", 
-            zone_group = zone_group, 
-            corridor = corridor, 
-            month = month, 
+            metric,
+            level = "corridor",
+            resolution = "monthly",
+            zone_group = zone_group,
+            corridor = corridor,
+            month = month,
             upto = FALSE
         )
     } else {
         vals <- query_data(
-            metric, 
-            level = "corridor", 
-            resolution = "quarterly", 
-            zone_group = zone_group, 
-            corridor = corridor, 
-            quarter = quarter, 
+            metric,
+            level = "corridor",
+            resolution = "quarterly",
+            zone_group = zone_group,
+            corridor = corridor,
+            quarter = quarter,
             upto = FALSE
         )
     }
-    
+
     if (is.null(corridor)) {
         if (zone_group %in% c("All RTOP", "RTOP1", "RTOP2", "Zone 7")) {
             vals <- subset(vals, Zone_Group == zone_group)
         } else if (is.null(corridor)) {
             vals <- subset(vals, Zone_Group == Corridor)
         }
-    } 
+    }
     vals <- as.list(vals)
-    
+
     value <- data_format(metric$data_type)(vals[[metric$variable]])
     shiny::validate(need(value, message = "NA"))
-    
-    
+
+
     vals$delta <- if_else(is.na(vals$delta), 0, vals$delta)
-    
+
     if (vals$delta > 0) {
         delta_prefix <- "+"
     } else if (vals$delta == 0) {
@@ -197,9 +196,9 @@ get_valuebox_value <- function(metric, zone_group, corridor, month, quarter = NU
     } else { # vals$delta < 0
         delta_prefix <- " "
     }
-    
+
     delta <- glue("({delta_prefix}{as_pct(vals$delta)})")
-    
+
     if (line_break) {
         tags$div(HTML(paste(
             value,
@@ -207,7 +206,7 @@ get_valuebox_value <- function(metric, zone_group, corridor, month, quarter = NU
         )))
     } else {
         tags$div(HTML(paste(
-            value, 
+            value,
             tags$span(delta, style = "font-size: 70%;")
         )))
     }
@@ -216,48 +215,48 @@ get_valuebox_value <- function(metric, zone_group, corridor, month, quarter = NU
 
 
 summary_plot <- function(metric, zone_group, corridor, month) {
-    
+
     if (!is.null(corridor)) {
         if (corridor == "All Corridors") {
             corridor <- NULL
         }
     }
-    
+
     data <- query_data(
-        metric, 
-        level = "corridor", 
-        resolution = "monthly", 
-        zone_group = zone_group, 
-        corridor = corridor, 
-        month = month, 
+        metric,
+        level = "corridor",
+        resolution = "monthly",
+        zone_group = zone_group,
+        corridor = corridor,
+        month = month,
         upto = TRUE
     )
-    
+
     if (is.null(corridor)) {
         data <- subset(data, Zone_Group == Corridor)
-    } 
+    }
     shiny::validate(need(nrow(data) > 0, "No Data"))
-    
+
     first <- data[which.min(data$Month), ]
     last <- data[which.max(data$Month), ]
-    
+
     first_last <- c(first$Month, last$Month)
-    
+
     arrow <- if_else(last$delta >= 0, "\u25b2", "\u25bc")
-    
+
     ax <- list(
-        title = "", showticklabels = TRUE, showgrid = FALSE, 
+        title = "", showticklabels = TRUE, showgrid = FALSE,
         ticktext = format(first_last, "%b %Y"), tickvals = first_last)
     ay <- list(
-        title = "", showticklabels = FALSE, showgrid = FALSE, 
+        title = "", showticklabels = FALSE, showgrid = FALSE,
         zeroline = FALSE, hoverformat = tick_format(metric$data_type))
-    
+
     p <- plot_ly(type = "scatter", mode = "markers")
-    
+
     if (!is.null(metric$goal)) {
         p <- p %>%
             add_trace(
-                x = data$Month, 
+                x = data$Month,
                 y = metric$goal,
                 name = "Goal",
                 line = list(color = DARK_GRAY, width = 1),
@@ -273,7 +272,7 @@ summary_plot <- function(metric, zone_group, corridor, month) {
     } else {
         p <- p %>%
             add_trace(
-                x = data$Month, 
+                x = data$Month,
                 y = first[[metric$variable]],
                 name = NULL,
                 line = list(color = LIGHT_GRAY_BAR, width = 1),
@@ -318,22 +317,22 @@ summary_plot <- function(metric, zone_group, corridor, month) {
 
 
 get_trend_multiplot <- function(metric, level, zone_group, month, line_chart = "weekly", accent_average = TRUE) {
-    
+
     if (class(month) == "character") {
         month <- as_date(month)
     }
     var_ <- as.name(metric$variable)
 
     mdf <- query_data(metric, level, zone_group = zone_group, month = month, upto = FALSE)
-    
+
     if ((line_chart == "weekly" & !metric$has_weekly) | (line_chart == "monthly")) {
         wdf <- query_data(metric, level, resolution = "monthly", zone_group = zone_group, month = month, upto = TRUE) %>%
             rename(Date = Month)
     } else {
         wdf <- query_data(metric, level, resolution = line_chart, zone_group = zone_group, month = month, upto = TRUE)
     }
-    
-    
+
+
     if (nrow(mdf) > 0 & nrow(wdf) > 0) {
         # Current Month Data
         mdf <- mdf %>%
@@ -343,12 +342,12 @@ get_trend_multiplot <- function(metric, level, zone_group, month, line_chart = "
                    col = factor(ifelse(accent_average & Corridor == zone_group, DARK_GRAY_BAR, LIGHT_GRAY_BAR)),
                    text_col = factor(ifelse(accent_average & Corridor == zone_group, "white", "black")),
                    Corridor = factor(Corridor, levels = Corridor))
-        
+
         sdm <- SharedData$new(mdf, ~Corridor, group = "grp")
-        
+
         bar_chart <- plot_ly(sdm,
                              type = "bar",
-                             x = ~var, 
+                             x = ~var,
                              y = ~Corridor,
                              marker = list(color = ~col),
                              text = ~data_format(metric$data_type)(var),
@@ -362,8 +361,8 @@ get_trend_multiplot <- function(metric, level, zone_group, month, line_chart = "
                              hoverlabel = list(font = list(family = "Source Sans Pro"))
         ) %>% layout(
                 barmode = "overlay",
-                xaxis = list(title = "Selected Month", 
-                             zeroline = FALSE, 
+                xaxis = list(title = "Selected Month",
+                             zeroline = FALSE,
                              tickformat = tick_format(metric$data_type)),
                 yaxis = list(title = ""),
                 showlegend = FALSE,
@@ -372,7 +371,7 @@ get_trend_multiplot <- function(metric, level, zone_group, month, line_chart = "
                               l = 100)
             )
         if (!is.null(metric$goal)) {
-            bar_chart <- bar_chart %>% 
+            bar_chart <- bar_chart %>%
                 add_lines(x = metric$goal,
                           y = ~Corridor,
                           mode = "lines",
@@ -381,7 +380,7 @@ get_trend_multiplot <- function(metric, level, zone_group, month, line_chart = "
                           name = "Goal",
                           showlegend = FALSE)
         }
-        
+
         # Weekly Data - historical trend
         wdf <- wdf %>%
             mutate(var = !!var_,
@@ -389,14 +388,14 @@ get_trend_multiplot <- function(metric, level, zone_group, month, line_chart = "
                    Corridor = factor(Corridor)) %>%
             filter(!is.na(var)) %>%
             group_by(Corridor)
-        
+
         sdw <- SharedData$new(wdf, ~Corridor, group = "grp")
-        
+
         weekly_line_chart <- plot_ly(sdw,
                                      type = "scatter",
                                      mode = "lines",
-                                     x = ~Date, 
-                                     y = ~var, 
+                                     x = ~Date,
+                                     y = ~var,
                                      color = ~col, colors = c(LIGHT_GRAY_BAR, BLACK),
                                      alpha = 0.6,
                                      name = "",
@@ -416,18 +415,18 @@ get_trend_multiplot <- function(metric, level, zone_group, month, line_chart = "
 
         # Hourly Data - current month
         if (!is.null(metric$hourly_table)) {
-            
+
             hdf <- query_data(
-                metric, 
-                level, resolution = "monthly", hourly = TRUE, 
+                metric,
+                level, resolution = "monthly", hourly = TRUE,
                 zone_group = zone_group, month = month, upto = FALSE
                 ) %>%
                 mutate(var = !!var_,
                        col = factor(ifelse(accent_average & Corridor == zone_group, 1, 0), levels = c(0, 1))) %>%
                 group_by(Corridor)
-            
+
             sdh <- SharedData$new(hdf, ~Corridor, group = "grp")
-            
+
             hourly_line_chart <- plot_ly(sdh) %>%
                 add_lines(x = ~Hour,
                           y = ~var,
@@ -444,26 +443,26 @@ get_trend_multiplot <- function(metric, level, zone_group, month, line_chart = "
                        yaxis = list(tickformat = tick_format(metric$data_type)),
                        title = "__plot2_title__",
                        showlegend = FALSE)
-            
-            s1 <- subplot(weekly_line_chart, p0, hourly_line_chart, 
+
+            s1 <- subplot(weekly_line_chart, p0, hourly_line_chart,
                           titleX = TRUE, heights = c(0.6, 0.1, 0.3), nrows = 3)
         } else {
             s1 <- weekly_line_chart
         }
-        
+
         subplot(bar_chart, s1, titleX = TRUE, widths = c(0.2, 0.8), margin = 0.03) %>%
             layout(margin = list(l = 100),
                    title = metric$label) %>%
             highlight(
-                color = metric$highlight_color, 
-                opacityDim = 0.9, 
+                color = metric$highlight_color,
+                opacityDim = 0.9,
                 defaultValues = c(zone_group),
                 selected = attrs_selected(
-                    insidetextfont = list(color = "white"), 
+                    insidetextfont = list(color = "white"),
                     textposition = "auto"),
                 on = "plotly_click",
                 off = "plotly_doubleclick")
-        
+
     } else(
         no_data_plot("")
     )
@@ -475,12 +474,12 @@ travel_times_plot <- function(level, zone_group, month) {
 
     data_format <- data_format(travel_time_index$data_type)
     tick_format <- tick_format(travel_time_index$data_type)
-    
+
     cor_monthly_tti <- query_data(
         travel_time_index, level = level, zone_group = zone_group, month = month, upto = TRUE)
     cor_monthly_pti <- query_data(
         planning_time_index, level = level, zone_group = zone_group, month = month, upto = TRUE)
-    
+
     cor_monthly_tti_by_hr <- query_data(
         travel_time_index, level = level, zone_group = zone_group, month = month, hourly = TRUE, upto = FALSE)
     cor_monthly_pti_by_hr <- query_data(
@@ -489,7 +488,7 @@ travel_times_plot <- function(level, zone_group, month) {
     if (class(month) == "character") {
         month <- as_date(month)
     }
-        
+
     mott <- full_join(cor_monthly_tti, cor_monthly_pti,
                       by = c("Corridor", "Zone_Group", "Month"),
                       suffix = c(".tti", ".pti")) %>%
@@ -499,8 +498,8 @@ travel_times_plot <- function(level, zone_group, month) {
         mutate(
             col = factor(ifelse(Corridor == zone_group, 1, 0), levels = c(0, 1)),
             text_col = ifelse(Corridor == zone_group, "white", "black"))
-            
-    
+
+
     hrtt <- full_join(cor_monthly_tti_by_hr, cor_monthly_pti_by_hr,
                       by = c("Corridor", "Zone_Group", "Hour"),
                       suffix = c(".tti", ".pti"))  %>%
@@ -510,17 +509,17 @@ travel_times_plot <- function(level, zone_group, month) {
         mutate(
             col = factor(ifelse(Corridor == zone_group, 1, 0), levels = c(0, 1)),
             Corridor = factor(Corridor))
-    
+
     mo_max <- round(max(mott$pti), 1) + 0.1
     hr_max <- round(max(hrtt$pti), 1) + 0.1
-    
+
     mo_min <- round(min(mott$pti), 1) - 0.1
     hr_min <- round(min(hrtt$pti), 1) - 0.1
-    
-    
-    if (nrow(mott) > 0 & nrow(hrtt) > 0) {    
-        
-        mdf <- mott[mott$Month == month,] %>% 
+
+
+    if (nrow(mott) > 0 & nrow(hrtt) > 0) {
+
+        mdf <- mott[mott$Month == month,] %>%
             arrange(tti) %>%
             mutate(Corridor = factor(Corridor, levels = Corridor)) %>%
             group_by(Corridor)
@@ -528,9 +527,9 @@ travel_times_plot <- function(level, zone_group, month) {
         sdb <- SharedData$new(mdf, ~Corridor, group = "grp")
         sdm <- SharedData$new(mott %>% group_by(Corridor), ~Corridor, group = "grp")
         sdh <- SharedData$new(hrtt %>% group_by(Corridor), ~Corridor, group = "grp")
-        
+
         pbar <- plot_ly(sdb) %>%
-            add_bars(x = ~tti, 
+            add_bars(x = ~tti,
                      y = ~Corridor,
                      text = ~data_format(tti),
                      color = ~col, colors = c(LIGHT_GRAY_BAR, BLACK),
@@ -553,8 +552,8 @@ travel_times_plot <- function(level, zone_group, month) {
                      hoverinfo = "none") %>%
             layout(
                 barmode = "stack",
-                xaxis = list(title = glue("{format(month, '%b %Y')} TTI & PTI"), 
-                             zeroline = FALSE, 
+                xaxis = list(title = glue("{format(month, '%b %Y')} TTI & PTI"),
+                             zeroline = FALSE,
                              tickformat = tick_format,
                              range = c(0, 2)),
                 yaxis = list(title = ""),
@@ -562,10 +561,10 @@ travel_times_plot <- function(level, zone_group, month) {
                 font = list(size = 11),
                 margin = list(pad = 4)
             )
-        
+
         pttimo <- plot_ly(sdm) %>%
-            add_lines(x = ~Month, 
-                      y = ~tti, 
+            add_lines(x = ~Month,
+                      y = ~tti,
                       color = ~col, colors = c(LIGHT_GRAY_BAR, BLACK),
                       alpha = 0.6,
                       name = "",
@@ -580,7 +579,7 @@ travel_times_plot <- function(level, zone_group, month) {
                    yaxis = list(range = c(mo_min, mo_max),
                                 tickformat = tick_format),
                    showlegend = FALSE)
-        
+
         pttihr <- plot_ly(sdh) %>%
             add_lines(x = ~Hour,
                       y = ~tti,
@@ -598,10 +597,10 @@ travel_times_plot <- function(level, zone_group, month) {
                    yaxis = list(range = c(hr_min, hr_max),
                                 tickformat = tick_format),
                    showlegend = FALSE)
-        
+
         pptimo <- plot_ly(sdm) %>%
-            add_lines(x = ~Month, 
-                      y = ~pti, 
+            add_lines(x = ~Month,
+                      y = ~pti,
                       color = ~col, colors = c(LIGHT_GRAY_BAR, BLACK),
                       alpha = 0.6,
                       name = "",
@@ -615,7 +614,7 @@ travel_times_plot <- function(level, zone_group, month) {
                    yaxis = list(range = c(mo_min, mo_max),
                                 tickformat = tick_format),
                    showlegend = FALSE)
-        
+
         pptihr <- plot_ly(sdh) %>%
             add_lines(x = ~Hour,
                       y = ~pti,
@@ -633,30 +632,30 @@ travel_times_plot <- function(level, zone_group, month) {
                    yaxis = list(range = c(hr_min, hr_max),
                                 tickformat = tick_format),
                    showlegend = FALSE)
-        
+
         x0 <- list(zeroline = FALSE, ticks = "", showticklabels = FALSE, showgrid = FALSE)
-        p0 <- plot_ly(type = "scatter", mode = "markers") %>% 
-            layout(xaxis = x0, 
+        p0 <- plot_ly(type = "scatter", mode = "markers") %>%
+            layout(xaxis = x0,
                    yaxis = x0)
-        
-        stti <- subplot(pttimo, p0, pttihr, 
+
+        stti <- subplot(pttimo, p0, pttihr,
                         titleX = TRUE, heights = c(0.6, 0.1, 0.3), nrows = 3)
-        
-        sbti <- subplot(pptimo, p0, pptihr, 
+
+        sbti <- subplot(pptimo, p0, pptihr,
                         titleX = TRUE, heights = c(0.6, 0.1, 0.3), nrows = 3)
-        
+
         subplot(pbar, stti, sbti, titleX = TRUE, widths = c(0.2, 0.4, 0.4), margin = 0.03) %>%
             layout(margin = list(l = 120, r = 80),
                    title = "Travel Time and Planning Time Index") %>%
-            highlight(color = travel_time_index$highlight_color, 
-                      opacityDim = 0.9, 
+            highlight(color = travel_time_index$highlight_color,
+                      opacityDim = 0.9,
                       defaultValues = c(zone_group),
                       selected = attrs_selected(
-                          insidetextfont = list(color = "white"), 
+                          insidetextfont = list(color = "white"),
                           textposition = "auto", base = 0),
                       on = "plotly_click",
                       off = "plotly_doubleclick")
-        
+
     } else {
         no_data_plot("")
     }
@@ -668,8 +667,8 @@ uptime_multiplot <- function(metric, level, zone_group, month) {
 
     # Plot  Uptime for a Corridor. The basis of subplot.
     uptime_line_plot <- function(df, corr, showlegend_) {
-        plot_ly(data = df) %>% 
-            add_lines(x = ~Date, 
+        plot_ly(data = df) %>%
+            add_lines(x = ~Date,
                       y = ~uptime, #
                       color = I(BLUE),
                       name = "Uptime", #
@@ -696,18 +695,18 @@ uptime_multiplot <- function(metric, level, zone_group, month) {
                                       showarrow = FALSE))
     }
     uptime_bar_plot <- function(df, month) {
-        
-        df <- df %>% 
+
+        df <- df %>%
             arrange(uptime) %>% ungroup() %>%
             mutate(
                 col = factor(ifelse(Corridor == zone_group, DARK_GRAY_BAR, LIGHT_GRAY_BAR)),
                 text_col = factor(ifelse(Corridor == zone_group, "white", "black")),
                 Corridor = factor(Corridor, levels = Corridor))
-        
+
         plot_ly(data = arrange(df, uptime),
                 marker = list(color = ~col)) %>%
             add_bars(
-                x = ~uptime, 
+                x = ~uptime,
                 y = ~Corridor,
                 text = ~as_pct(uptime),
                 textposition = "auto",
@@ -727,10 +726,10 @@ uptime_multiplot <- function(metric, level, zone_group, month) {
                       name = "Goal (95%)",
                       legendgroup = "Goal",
                       showlegend = FALSE) %>%
-            
+
             layout(
                 barmode = "overlay",
-                xaxis = list(title = glue("{format(month, '%b %Y')} Uptime (%)"), 
+                xaxis = list(title = glue("{format(month, '%b %Y')} Uptime (%)"),
                              zeroline = FALSE,
                              tickformat = "%"),
                 yaxis = list(title = ""),
@@ -740,7 +739,7 @@ uptime_multiplot <- function(metric, level, zone_group, month) {
                               l = 100)
             )
     }
-    
+
     if (class(month) == "character") {
         month <- as_date(month)
     }
@@ -755,11 +754,11 @@ uptime_multiplot <- function(metric, level, zone_group, month) {
     if (nrow(avg_daily_uptime) > 0) {
         cdfs <- split(avg_daily_uptime, avg_daily_uptime$Corridor)
         cdfs <- cdfs[lapply(cdfs, nrow)>0]
-        
+
         p1 <- uptime_bar_plot(avg_monthly_uptime, month)
-        
-        plts <- lapply(seq_along(cdfs), function(i) { 
-            uptime_line_plot(cdfs[[i]], names(cdfs)[i], ifelse(i==1, TRUE, FALSE)) 
+
+        plts <- lapply(seq_along(cdfs), function(i) {
+            uptime_line_plot(cdfs[[i]], names(cdfs)[i], ifelse(i==1, TRUE, FALSE))
         })
         s2 <- subplot(plts, nrows = min(length(plts), 4), shareX = TRUE, shareY = TRUE, which_layout = 1)
         subplot(p1, s2, titleX = TRUE, widths = c(0.2, 0.8), margin = 0.03) %>%
@@ -772,26 +771,26 @@ uptime_multiplot <- function(metric, level, zone_group, month) {
 
 
 individual_cctvs_plot <- function(zone_group, month) {
-    
+
     daily_cctv_df <- query_data(
         cctv_uptime, level = "signal", "daily", zone_group = zone_group, month = month
         )
 
     spr <- daily_cctv_df[daily_cctv_df$Corridor != zone_group,] %>%
-        rename(CameraID = Corridor, 
+        rename(CameraID = Corridor,
                Corridor = Zone_Group) %>%
         dplyr::select(CameraID, Description, Date, up) %>%
-        distinct() %>% 
+        distinct() %>%
         spread(Date, up, fill = 0) %>%
         arrange(desc(CameraID))
-    
+
     m <- as.matrix(spr %>% dplyr::select(-CameraID, -Description))
     m <- round(m,0)
-    
+
     row_names <- spr$CameraID
     col_names <- colnames(m)
     colnames(m) <- NULL
-    
+
     status <- function(x) {
         options <- c("Camera Down", "Working at encoder, but not 511", "Working on 511")
         options[x+1]
@@ -799,17 +798,17 @@ individual_cctvs_plot <- function(zone_group, month) {
     bind_description <- function(camera_status) {
         glue("<b>{as.character(spr$Description)}</b><br>{camera_status}")
     }
-    
-    plot_ly(x = col_names, 
-            y = row_names, 
-            z = m, 
+
+    plot_ly(x = col_names,
+            y = row_names,
+            z = m,
             colors = c(LIGHT_GRAY_BAR, "#e48c5b", BROWN),
             type = "heatmap",
             ygap = 1,
             showscale = FALSE,
             customdata = apply(apply(as.matrix(apply(m, 2, status)), 2, bind_description), 1, as.list),
             hovertemplate="<br>%{customdata}<br>%{x}<extra></extra>",
-            hoverlabel = list(font = list(family = "Source Sans Pro"))) %>% 
+            hoverlabel = list(font = list(family = "Source Sans Pro"))) %>%
         layout(yaxis = list(type = "category",
                             title = ""),
                margin = list(l = 150))
