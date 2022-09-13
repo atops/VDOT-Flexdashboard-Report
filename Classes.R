@@ -666,7 +666,7 @@ travel_times_plot <- function(level, zone_group, month) {
 uptime_multiplot <- function(metric, level, zone_group, month) {
 
     # Plot  Uptime for a Corridor. The basis of subplot.
-    uptime_line_plot <- function(df, corr, showlegend_) {
+    uptime_line_plot <- function(df, corr, showlegend_, tickformat) {
         plot_ly(data = df) %>%
             add_lines(x = ~Date,
                       y = ~uptime, #
@@ -682,7 +682,7 @@ uptime_multiplot <- function(metric, level, zone_group, month) {
                       showlegend = showlegend_) %>%
             layout(yaxis = list(title = "",
                                 range = c(0, 1.1),
-                                tickformat = "%"),
+                                tickformat = tickformat),
                    xaxis = list(title = ""),
                    annotations = list(text = corr,
                                       xref = "paper",
@@ -694,7 +694,7 @@ uptime_multiplot <- function(metric, level, zone_group, month) {
                                       y = 0.95,
                                       showarrow = FALSE))
     }
-    uptime_bar_plot <- function(df, month) {
+    uptime_bar_plot <- function(df, month, tickformat) {
 
         df <- df %>%
             arrange(uptime) %>% ungroup() %>%
@@ -731,7 +731,7 @@ uptime_multiplot <- function(metric, level, zone_group, month) {
                 barmode = "overlay",
                 xaxis = list(title = glue("{format(month, '%b %Y')} Uptime (%)"),
                              zeroline = FALSE,
-                             tickformat = "%"),
+                             tickformat = tickformat),
                 yaxis = list(title = ""),
                 showlegend = FALSE,
                 font = list(size = 11),
@@ -755,10 +755,10 @@ uptime_multiplot <- function(metric, level, zone_group, month) {
         cdfs <- split(avg_daily_uptime, avg_daily_uptime$Corridor)
         cdfs <- cdfs[lapply(cdfs, nrow)>0]
 
-        p1 <- uptime_bar_plot(avg_monthly_uptime, month)
+        p1 <- uptime_bar_plot(avg_monthly_uptime, month, tick_format(metric$data_type))
 
         plts <- lapply(seq_along(cdfs), function(i) {
-            uptime_line_plot(cdfs[[i]], names(cdfs)[i], ifelse(i==1, TRUE, FALSE))
+            uptime_line_plot(cdfs[[i]], names(cdfs)[i], ifelse(i==1, TRUE, FALSE), tick_format(metric$data_type))
         })
         s2 <- subplot(plts, nrows = min(length(plts), 4), shareX = TRUE, shareY = TRUE, which_layout = 1)
         subplot(p1, s2, titleX = TRUE, widths = c(0.2, 0.8), margin = 0.03) %>%
