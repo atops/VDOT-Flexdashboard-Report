@@ -21,6 +21,7 @@ output:
 
 <script>
 $("body").on("shown.bs.tab", "a[data-toggle='tab']", function(e) {
+
     /* Set a variable input$active_tab that matches the selected tab based on the url */
     Shiny.setInputValue("active_tab", $(e.target).parent()[0].baseURI.match("section-(.*)")[1]);
 
@@ -117,7 +118,7 @@ conditionalPanel(
 conditionalPanel(
     "input.active_tab == 'before-after' && input.scatter_selected == 'false'",
     selectInput("before_after_metric", "Metric:",
-        choices = c(names(metrics_list)),
+        choices = c(names(metrics_list), names(metrics_list_travel_times)),
         selected = c(names(metrics_list))[1]
     )
 )
@@ -161,7 +162,7 @@ observeEvent(input$before_date_range, {
     updateDateRangeInput(
         session,
         "after_date_range",
-        start = input$before_date_range[2] + days(1), 
+        start = max(input$after_date_range[1], input$before_date_range[2] + days(1)), 
         end = min(input$before_date_range[2] + after_duration + days(1), today()))
     updateDateRangeInput(
         session,
@@ -183,7 +184,7 @@ observeEvent(input$after_date_range, {
         session,
         "before_date_range",
         start = min(input$before_date_range[1], input$before_date_range[2] - before_duration),
-        end = input$after_date_range[1] - days(1))
+        end = min(input$before_date_range[2], input$after_date_range[1] - days(1)))
 }, ignoreInit = TRUE)
 
 
@@ -203,13 +204,7 @@ conditionalPanel(
         selected = c(names(metrics_list))[1])
 )
 
-observeEvent(input$bf_y_axis, {
-    tags$script("let elem=document.getElementById('section-scatter'); let lis=elem.getElementsByTagName('li')")
-})
 
-observeEvent(input$bf_x_axis, {
-
-})
 # --- -------------------------------------------------- ---
 
 
@@ -1685,8 +1680,8 @@ fillCol(
         column(
             width = 4,
             renderUI(selectizeInput("signalid", "Select Signal:",
-                choices = c("Select"),
-                selected = "",
+                choices = c("Select", filtered_signalids()),
+                selected = "Select",
                 width = "800px"
             ))
         ),
