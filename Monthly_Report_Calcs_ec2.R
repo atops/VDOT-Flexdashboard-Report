@@ -599,4 +599,32 @@ if (conf$run$split_failures == TRUE) {
 
 
 
+# # GET TERMINATION TYPES #####################################################
+
+print(glue("{Sys.time()} termination types [11b of 11]"))
+
+get_term_date_range <- function(start_date, end_date) {
+    date_range <- seq(ymd(start_date), ymd(end_date), by = "1 day")
+    
+    lapply(date_range, function(date_) {
+        print(date_)
+        
+        terms <- get_termination_type(date_, conf, signals_list)
+        
+        s3_upload_parquet_date_split(
+            terms,
+            bucket = conf$bucket,
+            prefix = "term",
+            table_name = "termination_types",
+            conf = conf
+        )
+    })
+}
+
+if (conf$run$termination_types == TRUE) {
+    # Utah method, based on green, start-of-red occupancies
+    get_term_date_range(start_date, end_date)
+}
+
+
 print("\n--------------------- End Monthly Report calcs -----------------------\n")
