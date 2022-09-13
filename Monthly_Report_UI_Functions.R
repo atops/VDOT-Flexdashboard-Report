@@ -45,6 +45,7 @@ if (interactive()) {
 source("Utilities.R")
 source("Classes.R")
 source("Database_Functions.R")
+source("Before-After.R")
 
 usable_cores <- get_usable_cores()
 doParallel::registerDoParallel(cores = usable_cores)
@@ -126,6 +127,24 @@ yes.color <- "green"
 no.color <- "red"
 
 
+metrics_list <- list(
+    "Vehicles Per Day" = vpd,
+    "Throughput" = throughput,
+    "Arrivals on Green" = arrivals_on_green,
+    "Progression Ratio" = progression_ratio,
+    "Queue Spillback" = queue_spillback_rate,
+    "Peak Split Failures" = peak_period_split_failures,
+    "Off-Peak Split Failures" = off_peak_split_failures,
+    "Pedestrian Actuations Per Day" = daily_pedestrian_pushbuttons,
+    "Detector Uptime" = detector_uptime,
+    "Pedestrian Pushbutton Uptime" = ped_button_uptime,
+    # "Cameras Uptime" = cctv_uptime,
+    "Communications Uptime" = comm_uptime,
+    # TODO: Need a class for this metric. Add to Classes.R (not used elsewhere on the site?)
+    #"Pedestrian Delay" = NULL
+    "Detection Level" = detection_level
+)
+
 as_int <- function(x) {scales::comma_format()(as.integer(x))}
 as_2dec <- function(x) {sprintf(x, fmt = "%.2f")}
 as_pct <- function(x) {sprintf(x * 100, fmt = "%.1f%%")}
@@ -143,7 +162,7 @@ data_format <- function(data_type) {
 tick_format <- function(data_type) {
     switch(
         data_type,
-        "integer" = ",.0",
+        "integer" = ",.0r",
         "decimal" = ".2f",
         "percent" = ".0%",
         "currency" = "$,.2f")

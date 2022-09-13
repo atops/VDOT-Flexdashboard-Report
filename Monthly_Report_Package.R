@@ -654,7 +654,7 @@ tryCatch(
             mutate(
                 SignalID = factor(AssetNum),
                 CallPhase = 0,
-                uptime = AvgQuality,
+                uptime = AvgQuality/100,
                 CallPhase = factor(CallPhase),
                 Date = date(Date),
                 DOW = wday(Date),
@@ -829,12 +829,23 @@ tryCatch(
         addtoRDS(sub_weekly_vph, "sub_weekly_vph.rds", "vph", report_start_date, wk_calcs_start_date)
         addtoRDS(sub_monthly_vph, "sub_monthly_vph.rds", "vph", report_start_date, calcs_start_date)
 
-        addtoRDS(weekly_vph_peak, "weekly_vph_peak.rds", "vph", report_start_date, wk_calcs_start_date)
-        addtoRDS(monthly_vph_peak, "monthly_vph_peak.rds", "vph", report_start_date, calcs_start_date)
-        addtoRDS(cor_weekly_vph_peak, "cor_weekly_vph_peak.rds", "vph", report_start_date, wk_calcs_start_date)
-        addtoRDS(cor_monthly_vph_peak, "cor_monthly_vph_peak.rds", "vph", report_start_date, calcs_start_date)
-        addtoRDS(sub_weekly_vph_peak, "sub_weekly_vph_peak.rds", "vph", report_start_date, wk_calcs_start_date)
-        addtoRDS(sub_monthly_vph_peak, "sub_monthly_vph_peak.rds", "vph", report_start_date, calcs_start_date)
+        addtoRDS(weekly_vph_peak$am, "weekly_vph_am.rds", "vph", report_start_date, wk_calcs_start_date)
+        addtoRDS(weekly_vph_peak$pm, "weekly_vph_pm.rds", "vph", report_start_date, wk_calcs_start_date)
+
+        addtoRDS(monthly_vph_peak$am, "monthly_vph_am.rds", "vph", report_start_date, calcs_start_date)
+        addtoRDS(monthly_vph_peak$pm, "monthly_vph_pm.rds", "vph", report_start_date, calcs_start_date)
+
+        addtoRDS(cor_weekly_vph_peak$am, "cor_weekly_vph_am.rds", "vph", report_start_date, wk_calcs_start_date)
+        addtoRDS(cor_weekly_vph_peak$pm, "cor_weekly_vph_pm.rds", "vph", report_start_date, wk_calcs_start_date)
+
+        addtoRDS(cor_monthly_vph_peak$am, "cor_monthly_vph_am.rds", "vph", report_start_date, calcs_start_date)
+        addtoRDS(cor_monthly_vph_peak$pm, "cor_monthly_vph_pm.rds", "vph", report_start_date, calcs_start_date)
+
+        addtoRDS(sub_weekly_vph_peak$am, "sub_weekly_vph_am.rds", "vph", report_start_date, wk_calcs_start_date)
+        addtoRDS(sub_weekly_vph_peak$pm, "sub_weekly_vph_pm.rds", "vph", report_start_date, wk_calcs_start_date)
+
+        addtoRDS(sub_monthly_vph_peak$am, "sub_monthly_vph_am.rds", "vph", report_start_date, calcs_start_date)
+        addtoRDS(sub_monthly_vph_peak$pm, "sub_monthly_vph_pm.rds", "vph", report_start_date, calcs_start_date)
 
         rm(vph)
         rm(weekly_vph)
@@ -843,12 +854,20 @@ tryCatch(
         rm(sub_weekly_vph)
         rm(cor_monthly_vph)
         rm(sub_monthly_vph)
-        rm(weekly_vph_peak)
-        rm(monthly_vph_peak)
-        rm(cor_weekly_vph_peak)
-        rm(cor_monthly_vph_peak)
-        rm(sub_weekly_vph_peak)
-        rm(sub_monthly_vph_peak)
+        
+        rm(weekly_vph_am)
+        rm(monthly_vph_am)
+        rm(cor_weekly_vph_am)
+        rm(cor_monthly_vph_am)
+        rm(sub_weekly_vph_am)
+        rm(sub_monthly_vph_am)
+       
+        rm(weekly_vph_pm)
+        rm(monthly_vph_pm)
+        rm(cor_weekly_vph_pm)
+        rm(cor_monthly_vph_pm)
+        rm(sub_weekly_vph_pm)
+        rm(sub_monthly_vph_pm)
     },
     error = function(e) {
         print("ENCOUNTERED AN ERROR:")
@@ -1566,8 +1585,8 @@ tryCatch(
         cor$wk <- list(
             "vpd" = readRDS("cor_weekly_vpd.rds"),
             # "vph" = readRDS("cor_weekly_vph.rds"),
-            "vphpa" = readRDS("cor_weekly_vph_peak.rds")$am,
-            "vphpp" = readRDS("cor_weekly_vph_peak.rds")$pm,
+            "vphpa" = readRDS("cor_weekly_vph_am.rds"),
+            "vphpp" = readRDS("cor_weekly_vph_pm.rds"),
             "papd" = readRDS("cor_weekly_papd.rds"),
             # "paph" = readRDS("cor_weekly_paph.rds"),
             "pd" = readRDS("cor_weekly_pd_by_day.rds"),
@@ -1585,8 +1604,8 @@ tryCatch(
         cor$mo <- list(
             "vpd" = readRDS("cor_monthly_vpd.rds"),
             # "vph" = readRDS("cor_monthly_vph.rds"),
-            "vphpa" = readRDS("cor_monthly_vph_peak.rds")$am,
-            "vphpp" = readRDS("cor_monthly_vph_peak.rds")$pm,
+            "vphpa" = readRDS("cor_monthly_vph_am.rds"),
+            "vphpp" = readRDS("cor_monthly_vph_pm.rds"),
             "papd" = readRDS("cor_monthly_papd.rds"),
             # "paph" = readRDS("cor_monthly_paph.rds"),
             "pd" = readRDS("cor_monthly_pd_by_day.rds"),
@@ -1658,9 +1677,9 @@ tryCatch(
         sub$wk <- list(
             "vpd" = readRDS("sub_weekly_vpd.rds") %>%
                 select(Zone_Group, Corridor, Date, vpd),
-            "vphpa" = readRDS("sub_weekly_vph_peak.rds")$am %>%
+            "vphpa" = readRDS("sub_weekly_vph_am.rds") %>%
                 select(Zone_Group, Corridor, Date, vph),
-            "vphpp" = readRDS("sub_weekly_vph_peak.rds")$pm %>%
+            "vphpp" = readRDS("sub_weekly_vph_pm.rds") %>%
                 select(Zone_Group, Corridor, Date, vph),
             "papd" = readRDS("sub_weekly_papd.rds") %>%
                 select(Zone_Group, Corridor, Date, papd),
@@ -1691,8 +1710,8 @@ tryCatch(
         sub$mo <- list(
             "vpd" = readRDS("sub_monthly_vpd.rds"),
             # "vph" = readRDS("sub_monthly_vph.rds"),
-            "vphpa" = readRDS("sub_monthly_vph_peak.rds")$am,
-            "vphpp" = readRDS("sub_monthly_vph_peak.rds")$pm,
+            "vphpa" = readRDS("sub_monthly_vph_am.rds"),
+            "vphpp" = readRDS("sub_monthly_vph_pm.rds"),
             "papd" = readRDS("sub_monthly_papd.rds"),
             #"paph" = readRDS("sub_monthly_paph.rds"),
             #"pd" = readRDS("sub_monthly_pd_by_day.rds"),
@@ -1756,9 +1775,9 @@ tryCatch(
         sig$wk <- list(
             "vpd" = sigify(readRDS("weekly_vpd.rds"), cor$wk$vpd, corridors) %>%
                 select(Zone_Group, Corridor, Date, vpd),
-            "vphpa" = sigify(readRDS("weekly_vph_peak.rds")$am, cor$wk$vphpa, corridors) %>%
+            "vphpa" = sigify(readRDS("weekly_vph_am.rds"), cor$wk$vphpa, corridors) %>%
                 select(Zone_Group, Corridor, Date, vph),
-            "vphpp" = sigify(readRDS("weekly_vph_peak.rds")$pm, cor$wk$vphpp, corridors) %>%
+            "vphpp" = sigify(readRDS("weekly_vph_pm.rds"), cor$wk$vphpp, corridors) %>%
                 select(Zone_Group, Corridor, Date, vph),
             "papd" = sigify(readRDS("weekly_papd.rds"), cor$wk$papd, corridors) %>%
                 select(Zone_Group, Corridor, Date, papd),
@@ -1789,9 +1808,9 @@ tryCatch(
         sig$mo <- list(
             "vpd" = sigify(readRDS("monthly_vpd.rds"), cor$mo$vpd, corridors) %>%
                 select(-c(Name, ones)),
-            "vphpa" = sigify(readRDS("monthly_vph_peak.rds")$am, cor$mo$vphpa, corridors) %>%
+            "vphpa" = sigify(readRDS("monthly_vph_am.rds"), cor$mo$vphpa, corridors) %>%
                 select(-c(Name, ones)),
-            "vphpp" = sigify(readRDS("monthly_vph_peak.rds")$pm, cor$mo$vphpp, corridors) %>%
+            "vphpp" = sigify(readRDS("monthly_vph_pm.rds"), cor$mo$vphpp, corridors) %>%
                 select(-c(Name, ones)),
             "papd" = sigify(readRDS("monthly_papd.rds"), cor$mo$papd, corridors) %>%
                 select(-c(Name, ones)),

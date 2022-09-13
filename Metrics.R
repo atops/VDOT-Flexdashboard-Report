@@ -810,15 +810,15 @@ get_detection_levels_by_signal <- function(date_) {
     dc[((llc & sbp) | sbp) & !dc$CallPhase %in% c(2,6), "Level"] <- 1
     dc[((llc & adv) | adv) & dc$CallPhase %in% c(2,6), "Level"] <- 1
 
-    dc %>% 
-        group_by(SignalID) %>% 
+    dc %>%
+        group_by(SignalID) %>%
         summarize(Level = max(Level), .groups = "drop")
 }
 
 
 
 get_termination_type <- function(date_, conf, signals_list = NULL) {
-    
+
     df <- arrow::open_dataset(glue("s3://{conf$bucket}/cycles/date={date_}")) %>%
         select(SignalID, CallPhase=Phase, EventCode, TermType) %>%
         filter(EventCode==1, TermType != 0) %>%
