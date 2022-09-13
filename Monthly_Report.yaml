@@ -30,6 +30,7 @@ run:
     queue_spillback: TRUE
     ped_delay: TRUE
     split_failures: TRUE
+    termination_types: TRUE
 
 
 start_date: yesterday

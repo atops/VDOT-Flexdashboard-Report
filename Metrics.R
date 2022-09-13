@@ -835,7 +835,7 @@ get_termination_type <- function(date_, conf, signals_list = NULL) {
         select(-n) %>%
         pivot_wider(values_from = "pct", names_from = "TermType", values_fill = 0) %>%
         rename(GapOut = `4`, MaxOut = `5`, ForceOff = `6`)
-
+    
     if (!is.null(signals_list)) {
         df <- filter(df, SignalID %in% signals_list)
     }
