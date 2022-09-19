@@ -142,16 +142,16 @@ tryCatch(
             summarize(papd = sum(vol, na.rm = TRUE), .groups = "drop") %>%
             complete(
                 Date = seq(ymd(pau_start_date), ymd(report_end_date), by = "1 day"),
-                nesting(SignalID, Detector, CallPhase), 
+                nesting(SignalID, Detector, CallPhase),
                 fill = list("papd"=0)
             ) %>%
             transmute(
-                SignalID, 
-                Date, 
-                DOW = wday(Date), 
-                Week = week(Date), 
-                Detector, 
-                CallPhase, 
+                SignalID,
+                Date,
+                DOW = wday(Date),
+                Week = week(Date),
+                Detector,
+                CallPhase,
                 papd)
 
         papd <- counts_ped_daily
@@ -349,9 +349,9 @@ tryCatch(
                 Alert = factor("Bad Vehicle Detection"),
                 Name = factor(if_else(Corridor == "Ramp Meter", sub("@", "-", Name), Name)),
                 ApproachDesc = if_else(
-                	is.na(ApproachDesc), 
-                	"", 
-                	as.character(glue("{trimws(ApproachDesc)} Lane {LaneNumber}"))
+                    is.na(ApproachDesc),
+                    "",
+                    as.character(glue("{trimws(ApproachDesc)} Lane {LaneNumber}"))
                 )
             )
 
@@ -375,24 +375,24 @@ tryCatch(
             function(date_) {
                 key <- glue("mark/bad_ped_detectors/date={date_}/bad_ped_detectors_{date_}.parquet")
                 tryCatch(
-                	{
-                    	if (length(get_bucket(bucket = conf$bucket, prefix = key))) {
-                        	s3read_using(read_parquet, bucket = conf$bucket, object = key) %>%
-                            	mutate(Date = date_)
-                    	}
-                	},
-                	error = function(e) {
-                    	data.frame()
-                	}
+                    {
+                        if (length(get_bucket(bucket = conf$bucket, prefix = key))) {
+                            s3read_using(read_parquet, bucket = conf$bucket, object = key) %>%
+                            mutate(Date = date_)
+                        }
+                    },
+                    error = function(e) {
+                        data.frame()
+                    }
                 )
             }) %>%
             bind_rows()
-       
+
         if (nrow(bad_ped)) {
             bad_ped %>%
                 mutate(SignalID = factor(SignalID),
                        Detector = factor(Detector)) %>%
-        
+
                 left_join(
                     dplyr::select(corridors, Zone_Group, Zone, Corridor, SignalID, Name),
                     by = c("SignalID")
@@ -434,7 +434,7 @@ tryCatch(
                 left_join(
                     dplyr::select(corridors, Zone_Group, Zone, Corridor, SignalID, Name),
                     by = c("SignalID")
-                ) %>% 
+                ) %>%
                 filter(
                     !is.na(Corridor),
                     AvgQuality < 90) %>%
@@ -659,9 +659,9 @@ tryCatch(
                 Date = date(Date),
                 DOW = wday(Date),
                 Week = week(Date)
-            ) %>% 
-            filter(SignalID %in% corridors$SignalID, Date == as_date(CSDATE)) %>% 
-            left_join(select(corridors, SignalID, Asof), by = "SignalID") %>% 
+            ) %>%
+            filter(SignalID %in% corridors$SignalID, Date == as_date(CSDATE)) %>%
+            left_join(select(corridors, SignalID, Asof), by = "SignalID") %>%
             filter(Date >= Asof)
 
         daily_comm_uptime <- get_daily_avg(cu, "uptime", peak_only = FALSE)
@@ -854,14 +854,14 @@ tryCatch(
         rm(sub_weekly_vph)
         rm(cor_monthly_vph)
         rm(sub_monthly_vph)
-        
+
         rm(weekly_vph_am)
         rm(monthly_vph_am)
         rm(cor_weekly_vph_am)
         rm(cor_monthly_vph_am)
         rm(sub_weekly_vph_am)
         rm(sub_monthly_vph_am)
-       
+
         rm(weekly_vph_pm)
         rm(monthly_vph_pm)
         rm(cor_weekly_vph_pm)
@@ -1456,7 +1456,7 @@ tryCatch(
 
 
 
-# DAILY DETECTION LEVELS ##################################################### 
+# DAILY DETECTION LEVELS #####################################################
 
 tryCatch(
     {
@@ -1468,7 +1468,7 @@ tryCatch(
             start_date = wk_calcs_start_date,
             end_date = report_end_date,
             signals_list = signals_list,
-            callback = function(x) 
+            callback = function(x)
                 mutate(x, CallPhase = 0, Week = week(Date), DOW = wday(Date))
         ) %>%
             transmute(
@@ -1514,109 +1514,125 @@ tryCatch(
 )
 
 
+write_aggregations <- function(conn, td) {
 
-# DAILY THROUGHPUT ############################################################
+    # conn is aurora database connection
+    # td is a tibble with columns: data|fn|var|rsd|csd
+    #   data = aggregated metrics dataframe to write
+    #   fn = RDS or parquet filename
+    #   var = metric$variable
+    #   rsd = report_start_date
+    #   csd = calcs_start_date (wk_calcs_start_date for weekly calcs)
+
+    # addtoRDS and write to database row-by-row
+    for (row in 1:nrow(td)) {
+        this_row <- td[row, ]
+        print(this_row$fn)
+
+        addtoRDS(
+            this_row$data[[1]], this_row$fn, this_row$var, this_row$rsd, this_row$csd)
+
+        write_parquet_to_db(
+            conn, this_row$fn, FALSE, this_row$csd, this_row$rsd, report_end_date)
+    }
+}
+
+
+# GREEN PHASE TERMINATIONS ############################################################ 
 
 print(glue("{Sys.time()} Termination Types [21 of 23]"))
+        
+#-----------------------------------------
+# This is the future. Need to test.
 
 tryCatch(
     {
-        terms <- s3_read_parquet_parallel(
-            bucket = conf$bucket,
-            table_name = "termination_types",
-            start_date = wk_calcs_start_date,
-            end_date = report_end_date,
-            signals_list = signals_list,
-            callback = function(x) 
-                mutate(x, Week = week(Date), DOW = wday(Date))
-        ) %>%
-            mutate(
-                SignalID = factor(SignalID),
-                CallPhase = factor(as.integer(CallPhase)),
-                Date = date(Date)
-            )
+        conn <- keep_trying(get_aurora_connection, n_tries = 5)
         
-        weekly_gos <- get_weekly_avg_by_day(terms, "GapOut", peak_only = FALSE)
-        weekly_mos <- get_weekly_avg_by_day(terms, "MaxOut", peak_only = FALSE)
-        weekly_fos <- get_weekly_avg_by_day(terms, "ForceOff", peak_only = FALSE)
-        
-        monthly_gos <- get_monthly_avg_by_day(terms, "GapOut", peak_only = FALSE)
-        monthly_mos <- get_monthly_avg_by_day(terms, "MaxOut", peak_only = FALSE)
-        monthly_fos <- get_monthly_avg_by_day(terms, "ForceOff", peak_only = FALSE)
-        
-        # Weekly throughput - Group into corridors ---------------------------------
-        cor_weekly_gos <- get_cor_weekly_avg_by_day(weekly_gos, corridors, "GapOut")
-        cor_weekly_mos <- get_cor_weekly_avg_by_day(weekly_mos, corridors, "MaxOut")
-        cor_weekly_fos <- get_cor_weekly_avg_by_day(weekly_fos, corridors, "ForceOff")
-        
-        sub_weekly_gos <- get_cor_weekly_avg_by_day(weekly_gos, subcorridors, "GapOut") %>%
-            filter(!is.na(Corridor))
-        sub_weekly_mos <- get_cor_weekly_avg_by_day(weekly_mos, subcorridors, "MaxOut") %>%
-            filter(!is.na(Corridor))
-        sub_weekly_fos <- get_cor_weekly_avg_by_day(weekly_fos, subcorridors, "ForceOff") %>%
-            filter(!is.na(Corridor))
-        
-        # Monthly throughput - Group into corridors
-        cor_monthly_gos <- get_cor_monthly_avg_by_day(monthly_gos, corridors, "GapOut")
-        cor_monthly_mos <- get_cor_monthly_avg_by_day(monthly_mos, corridors, "MaxOut")
-        cor_monthly_fos <- get_cor_monthly_avg_by_day(monthly_fos, corridors, "ForceOff")
-        
-        sub_monthly_gos <- get_cor_monthly_avg_by_day(monthly_gos, subcorridors, "GapOut") %>%
-            filter(!is.na(Corridor))
-        sub_monthly_mos <- get_cor_monthly_avg_by_day(monthly_mos, subcorridors, "MaxOut") %>%
-            filter(!is.na(Corridor))
-        sub_monthly_fos <- get_cor_monthly_avg_by_day(monthly_fos, subcorridors, "ForceOff") %>%
-            filter(!is.na(Corridor))
-        
-        
-        addtoRDS(weekly_gos, "weekly_gos.rds", "GapOut", report_start_date, wk_calcs_start_date)
-        addtoRDS(monthly_gos, "monthly_gos.rds", "GapOut", report_start_date, calcs_start_date)
-        addtoRDS(cor_weekly_gos, "cor_weekly_gos.rds", "GapOut", report_start_date, wk_calcs_start_date)
-        addtoRDS(cor_monthly_gos, "cor_monthly_gos.rds", "GapOut", report_start_date, calcs_start_date)
-        addtoRDS(sub_weekly_gos, "sub_weekly_gos.rds", "GapOut", report_start_date, wk_calcs_start_date)
-        addtoRDS(sub_monthly_gos, "sub_monthly_gos.rds", "GapOut", report_start_date, calcs_start_date)
-        
-        addtoRDS(weekly_mos, "weekly_mos.rds", "MaxOut", report_start_date, wk_calcs_start_date)
-        addtoRDS(monthly_mos, "monthly_mos.rds", "MaxOut", report_start_date, calcs_start_date)
-        addtoRDS(cor_weekly_mos, "cor_weekly_mos.rds", "MaxOut", report_start_date, wk_calcs_start_date)
-        addtoRDS(cor_monthly_mos, "cor_monthly_mos.rds", "MaxOut", report_start_date, calcs_start_date)
-        addtoRDS(sub_weekly_mos, "sub_weekly_mos.rds", "MaxOut", report_start_date, wk_calcs_start_date)
-        addtoRDS(sub_monthly_mos, "sub_monthly_mos.rds", "MaxOut", report_start_date, calcs_start_date)
-        
-        addtoRDS(weekly_fos, "weekly_fos.rds", "ForceOff", report_start_date, wk_calcs_start_date)
-        addtoRDS(monthly_fos, "monthly_fos.rds", "ForceOff", report_start_date, calcs_start_date)
-        addtoRDS(cor_weekly_fos, "cor_weekly_fos.rds", "ForceOff", report_start_date, wk_calcs_start_date)
-        addtoRDS(cor_monthly_fos, "cor_monthly_fos.rds", "ForceOff", report_start_date, calcs_start_date)
-        addtoRDS(sub_weekly_fos, "sub_weekly_fos.rds", "ForceOff", report_start_date, wk_calcs_start_date)
-        addtoRDS(sub_monthly_fos, "sub_monthly_fos.rds", "ForceOff", report_start_date, calcs_start_date)
+        for (metric in c(gap_outs, max_outs, force_offs)) {
 
-        rm(weekly_gos)
-        rm(monthly_gos)     
-        rm(cor_weekly_gos)
-        rm(cor_monthly_gos)
-        rm(sub_weekly_gos)
-        rm(sub_monthly_gos)
-        
-        rm(weekly_mos)
-        rm(monthly_mos)     
-        rm(cor_weekly_mos)
-        rm(cor_monthly_mos)
-        rm(sub_weekly_mos)
-        rm(sub_monthly_mos)
-        
-        rm(weekly_fos)
-        rm(monthly_fos)     
-        rm(cor_weekly_fos)
-        rm(cor_monthly_fos)
-        rm(sub_weekly_fos)
-        rm(sub_monthly_fos)
-        
+            daily <- s3_read_parquet_parallel(
+                bucket = conf$bucket,
+                table_name = metric$s3table,
+                start_date = wk_calcs_start_date,
+                end_date = report_end_date,
+                signals_list = signals_list
+            ) %>%
+                mutate(
+                    SignalID = factor(SignalID),
+                    CallPhase = factor(CallPhase),
+                    Week = week(Date)
+                )
+    
+            weekly <- get_weekly_avg_by_day(daily, metric$variable, metric$weight, metric$peak_only)
+            monthly <- get_monthly_avg_by_day(daily, metric$variable, metric$weight, metric$peak_only)
+    
+            sub_daily <- get_cor_weekly_avg_by_day(
+                daily, subcorridors, metric$variable, metric$weight)
+            cor_daily <- get_cor_weekly_avg_by_day(
+                daily, corridors, metric$variable, metric$weight)
+            avg_daily <- sigify(daily, cor_daily, corridors) %>%
+                select(Zone_Group, Corridor, Date, !!as.name(metric$variable), delta) %>%
+                filter(!is.na(Zone_Group))
+    
+            sub_weekly <- get_cor_weekly_avg_by_day(weekly, subcorridors, metric$variable, metric$weight)
+            cor_weekly <- get_cor_weekly_avg_by_day(weekly, corridors, metric$variable, metric$weight)
+            avg_weekly <- sigify(weekly, cor_weekly, corridors) %>%
+                select(Zone_Group, Corridor, Date, !!as.name(metric$variable), delta) %>%
+                filter(!is.na(Zone_Group))
+    
+            sub_monthly <- get_cor_monthly_avg_by_day(monthly, subcorridors, metric$variable, metric$weight)
+            cor_monthly <- get_cor_monthly_avg_by_day(monthly, corridors, metric$variable, metric$weight)
+            avg_monthly <- sigify(monthly, cor_monthly, corridors) %>%
+                select(Zone_Group, Corridor, Month, !!as.name(metric$variable), delta) %>%
+                filter(!is.na(Zone_Group))
+    
+            tabl <- metric$table
+    
+            td <- tibble(
+                data = list(avg_daily, sub_daily, cor_daily,
+                            avg_weekly, sub_weekly, cor_weekly,
+                            avg_monthly, sub_monthly, cor_monthly),
+                fn = sapply(c("sig/dy/{tabl}.parquet", "sub/dy/{tabl}.parquet", "cor/dy/{tabl}.parquet",
+                              "sig/wk/{tabl}.parquet", "sub/wk/{tabl}.parquet", "cor/wk/{tabl}.parquet",
+                              "sig/mo/{tabl}.parquet", "sub/mo/{tabl}.parquet", "cor/mo/{tabl}.parquet"),
+                            glue),
+                var = metric$variable,
+                rsd = report_start_date,
+                csd = c(rep(as_date(calcs_start_date), 3),
+                        rep(wk_calcs_start_date, 3),
+                        rep(as_date(calcs_start_date), 3))
+            )
+    
+            write_aggregations(conn, td)
+    
+    
+            quarterly_detector_uptime <- get_quarterly(read_parquet("sig/mo/du.parquet"), "uptime")
+            sub_quarterly_detector_uptime <- get_quarterly(read_parquet("sub/mo/du.parquet"), "uptime")
+            cor_quarterly_detector_uptime <- get_quarterly(read_parquet("cor/mo/du.parquet"), "uptime")
+    
+            td <- tibble(
+                data = list(
+                    quarterly_detector_uptime,
+                    sub_quarterly_detector_uptime,
+                    cor_quarterly_detector_uptime),
+                fn = sapply(c("sig/qu/du.parquet", "sub/qu/du.parquet", "cor/qu/du.parquet"),
+                            glue),
+                var = "uptime",
+                rsd = report_start_date,
+                csd = report_start_date
+            )
+    
+            write_aggregations(conn, td)
+        }
     },
     error = function(e) {
         print("ENCOUNTERED AN ERROR:")
         print(e)
     }
 )
+
+
 
 
 
@@ -2051,14 +2067,13 @@ print(glue("{Sys.time()} Write to Database [29 of 29]"))
 source("write_sigops_to_db.R")
 
 # Update Aurora Nightly
-conn <- keep_trying(get_aurora_connection, n_tries = 5)
 # recreate_database(conn, cor, "cor")
 # recreate_database(conn, sub, "sub")
 # recreate_database(conn, sub, "sub")
 
 # append_to_database(
-#    conn, cor, sub, sig, 
-#    calcs_start_date = report_start_date, 
+#    conn, cor, sub, sig,
+#    calcs_start_date = report_start_date,
 #    report_start_date = report_start_date)
 
 append_to_database(

@@ -820,22 +820,30 @@ get_detection_levels_by_signal <- function(date_) {
 get_termination_type <- function(date_, conf, signals_list = NULL) {
 
     df <- arrow::open_dataset(glue("s3://{conf$bucket}/cycles/date={date_}")) %>%
-        select(SignalID, CallPhase=Phase, EventCode, TermType) %>%
-        filter(EventCode==1, TermType != 0) %>%
-        group_by(SignalID, CallPhase, TermType) %>%
+        select(
+            SignalID, CallPhase=Phase, EventCode, TermType) %>%
+        filter(
+            EventCode==1, TermType != 0) %>%
+        group_by(
+            SignalID, CallPhase, TermType) %>%
         count() %>%
         collect() %>%
         mutate(
             SignalID = factor(SignalID),
-            CallPhase = factor(CallPhase),
-            Date = as_date(date_)) %>%
-        group_by(SignalID, CallPhase) %>%
-        mutate(pct = as.numeric(n)/sum(as.numeric(n))) %>%
-        ungroup() %>%
-        select(-n) %>%
-        pivot_wider(values_from = "pct", names_from = "TermType", values_fill = 0) %>%
-        rename(GapOut = `4`, MaxOut = `5`, ForceOff = `6`)
-    
+            CallPhase = factor(CallPhase)) %>%
+        group_by(
+            SignalID, CallPhase) %>%
+        mutate(
+            pct = as.numeric(n)/sum(as.numeric(n))) %>%
+        pivot_wider(
+            values_from = "pct", names_from = "TermType", values_fill = 0) %>%
+        rename(
+            Cycles = n, GapOut = `4`, MaxOut = `5`, ForceOff = `6`) %>%
+        summarize(
+            across(where(is.numeric), sum), .groups = "drop") %>%
+        tibble::add_column(
+            Date = as_date(date_), .after = "CallPhase")
+
     if (!is.null(signals_list)) {
         df <- filter(df, SignalID %in% signals_list)
     }

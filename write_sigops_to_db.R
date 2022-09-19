@@ -4,7 +4,7 @@ library(qs)
 
 
 load_bulk_data <- function(conn, table_name, df_) {
-    
+
     if (class(conn) == "MySQLConnection" | class(conn)[[1]] == "MariaDBConnection") { # Aurora
         filename <- tempfile(pattern = table_name, fileext = ".csv")
         filename <- gsub("\\\\", "/", filename)
@@ -15,89 +15,94 @@ load_bulk_data <- function(conn, table_name, df_) {
         arrow::write_parquet(df_, filename)
         dbExecute(conn, glue("INSERT INTO {table_name} SELECT * FROM parquet_scan('{filename}');"))
     }
-    
+
     file.remove(filename)
 }
 
 
-write_sigops_to_db <- function(
-    conn, df, dfname, recreate = FALSE, 
-        calcs_start_date = NULL, 
-        report_start_date = NULL,
-        report_end_date = NULL) {
-    
-    # Aggregation periods: qu, mo, wk, dy, ...
-    pers <- names(df)
-    pers <- pers[pers != "summary_data"]
 
-    table_names <- c()
-    for (per in pers) {
-        for (tab in names(df[[per]])) { 
-            
-            table_name <- glue("{dfname}_{per}_{tab}")
-            table_names <- append(table_names, table_name)
-            df_ <- df[[per]][[tab]]
-            datefield <- intersect(names(df_), c("Month", "Date", "Hour", "Timeperiod"))
+write_dataframe_to_db <- function(conn, df, table_name, recreate, calcs_start_date, report_start_date, report_end_date) {
 
-            if (per == "wk") {
-                start_date <- round_to_tuesday(calcs_start_date)
-            } else {
-                start_date <- calcs_start_date
-            }
-            
-            
-            tryCatch({
-                if (recreate) {
-                    print(glue("{Sys.time()} Writing {table_name} | 3 | recreate = {recreate}"))
-                    # Overwrite to create initial data types
-                    DBI::dbWriteTable(
-                        conn, 
-                        table_name, 
-                        head(df_, 3), 
-                        overwrite = TRUE,
-                        row.names = FALSE)
-                    dbExecute(conn, glue("TRUNCATE TABLE {table_name}"))
-                } else {
-                    if (table_name %in% dbListTables(conn)) {
-                        # Clear head of table prior to report start date
-                        if (!is.null(report_start_date) & length(datefield) == 1) {
-                            dbExecute(conn, glue(paste(
-                                "DELETE from {table_name} WHERE {datefield} < '{report_start_date}'")))
-                        }
-                        # Clear Tail Prior to Append
-                        if (!is.null(start_date) & length(datefield) == 1) {
-                            dbExecute(conn, glue(paste(
-                                "DELETE from {table_name} WHERE {datefield} >= '{start_date}'")))
-                        } else {
-                            dbSendQuery(conn, glue("DELETE from {table_name}"))
-                        }
-                        # Filter Dates and Append
-                        if (!is.null(start_date) & length(datefield) == 1) {
-                            df_ <- filter(df_, !!as.name(datefield) >= start_date)
-                        }
-                        if (!is.null(report_end_date) & length(datefield) == 1) {
-                            df_ <- filter(df_, !!as.name(datefield) < ymd(report_end_date) + months(1))
-                        }
-                        
-                        print(glue("{Sys.time()} Writing {table_name} | {scales::comma_format()(nrow(df_))} | recreate = {recreate}"))
-                        load_bulk_data(conn, table_name, df_)
-                    }
-                }
-                
-            }, error = function(e) {
-                print(glue("{Sys.time()} {e}"))
-            })
-        }
+    per <- str_split(table_name, "_")[[1]][2]
+    datefield <- intersect(names(df), c("Month", "Date", "Hour", "Timeperiod"))
+
+    if (per == "wk") {
+        start_date <- round_to_tuesday(calcs_start_date)
+    } else {
+        start_date <- calcs_start_date
     }
-    invisible(table_names)
+
+    tryCatch({
+        if (recreate) {
+            print(glue("{Sys.time()} Writing {table_name} | 3 | recreate = {recreate}"))
+            # Overwrite to create initial data types
+            DBI::dbWriteTable(
+                conn,
+                table_name,
+                head(df, 3),
+                overwrite = TRUE,
+                row.names = FALSE)
+            dbExecute(conn, glue("TRUNCATE TABLE {table_name}"))
+        } else {
+            if (table_name %in% dbListTables(conn)) {
+                # Clear head of table prior to report start date
+                if (!is.null(report_start_date) & length(datefield) == 1) {
+                    dbExecute(conn, glue(paste(
+                        "DELETE from {table_name} WHERE {datefield} < '{report_start_date}'")))
+                }
+                # Clear Tail Prior to Append
+                if (!is.null(start_date) & length(datefield) == 1) {
+                    dbExecute(conn, glue(paste(
+                        "DELETE from {table_name} WHERE {datefield} >= '{start_date}'")))
+                } else {
+                    dbSendQuery(conn, glue("DELETE from {table_name}"))
+                }
+                # Filter Dates and Append
+                if (!is.null(start_date) & length(datefield) == 1) {
+                    df <- filter(df, !!as.name(datefield) >= start_date)
+                }
+                if (!is.null(report_end_date) & length(datefield) == 1) {
+                    df <- filter(df, !!as.name(datefield) < ymd(report_end_date) + months(1))
+                }
+
+                print(glue("{Sys.time()} Writing {table_name} | {scales::comma_format()(nrow(df))} | recreate = {recreate}"))
+                load_bulk_data(conn, table_name, df)
+            }
+        }
+
+    }, error = function(e) {
+        print(glue("{Sys.time()} {e}"))
+    })
 }
 
-write_to_db_once_off <- function(conn, df, dfname, recreate = FALSE, calcs_start_date = NULL, report_end_date = NULL) {
+
+
+
+write_parquet_to_db <- function(
+        conn,
+        parquet_path,
+        recreate = FALSE,
+        calcs_start_date = NULL,
+        report_start_date = NULL,
+        report_end_date = NULL) {
+
+    df <- read_parquet(parquet_path)
+    table_name <- str_split(table_name, "\\.")[[1]][1] %>% str_replace_all("/", "_")
     
+    if (!table_name %in% dbListTables(conn)) {
+        recreate_table(conn, df, table_name)
+    }
+    write_dataframe_to_db(conn, df, table_name, recreate, calcs_start_date, report_start_date, report_end_date)
+}
+
+
+
+write_to_db_once_off <- function(conn, df, dfname, recreate = FALSE, calcs_start_date = NULL, report_end_date = NULL) {
+
     table_name <- dfname
     datefield <- intersect(names(df), c("Month", "Date", "Hour", "Timeperiod"))
     start_date <- calcs_start_date
-    
+
     tryCatch({
         if (recreate) {
             print(glue("{Sys.time()} Writing {table_name} | 3 | recreate = {recreate}"))
@@ -117,10 +122,10 @@ write_to_db_once_off <- function(conn, df, dfname, recreate = FALSE, calcs_start
                 if (!is.null(report_end_date) & length(datefield) == 1) {
                     df <- filter(df, !!as.name(datefield) < ymd(report_end_date) + months(1))
                 }
-               
+
                 print(glue("{Sys.time()} Writing {table_name} | {scales::comma_format()(nrow(df))} | recreate = {recreate}"))
                 # load_bulk_data(conn, table_name, df)
-           
+
                 DBI::dbWriteTable(
                     conn,
                     table_name,
@@ -131,30 +136,31 @@ write_to_db_once_off <- function(conn, df, dfname, recreate = FALSE, calcs_start
                 )
             }
         }
-        
+
     }, error = function(e) {
         print(glue("{Sys.time()} {e}"))
     })
 }
 
 
+
 set_index_duckdb <- function(conn, table_name) {
     if (table_name %in% dbListTables(conn)) {
         fields <- dbListFields(conn, table_name)
         period <- intersect(fields, c("Month", "Date", "Hour", "Timeperiod", "Quarter"))
-        
+
         if (length(period) > 1) {
             print("More than one possible period in table fields")
             return(0)
         }
         tryCatch({
             dbSendStatement(conn, glue(paste(
-                "CREATE INDEX idx_{table_name}_zone_period", 
+                "CREATE INDEX idx_{table_name}_zone_period",
                 "on {table_name} (Zone_Group, {period})")))
-            
+
         }, error = function(e) {
             print(glue("{Sys.time()} {e}"))
-            
+
         })
     } else {
         print(glue("Won't create index: table {table_name} does not exist."))
@@ -164,36 +170,36 @@ set_index_duckdb <- function(conn, table_name) {
 
 
 set_index_aurora <- function(aurora, table_name) {
-    
+
     fields <- dbListFields(aurora, table_name)
     period <- intersect(fields, c("Month", "Date", "Hour", "Timeperiod", "Quarter"))
-    
+
     if (length(period) > 1) {
         print("More than one possible period in table fields")
         return(0)
     }
-    
+
     # Indexes on Zone Group and Period
     index_exists <- dbGetQuery(aurora, glue(paste(
-        "SELECT * FROM INFORMATION_SCHEMA.STATISTICS", 
+        "SELECT * FROM INFORMATION_SCHEMA.STATISTICS",
         "WHERE table_schema=DATABASE()",
-        "AND table_name='{table_name}'", 
+        "AND table_name='{table_name}'",
         "AND index_name='idx_{table_name}_zone_period';")))
     if (nrow(index_exists) == 0) {
         dbSendStatement(aurora, glue(paste(
-            "CREATE INDEX idx_{table_name}_zone_period", 
+            "CREATE INDEX idx_{table_name}_zone_period",
             "on {table_name} (Zone_Group, {period})")))
-    } 
-    
+    }
+
     # Indexes on Corridor and Period
     index_exists <- dbGetQuery(aurora, glue(paste(
-        "SELECT * FROM INFORMATION_SCHEMA.STATISTICS", 
+        "SELECT * FROM INFORMATION_SCHEMA.STATISTICS",
         "WHERE table_schema=DATABASE()",
-        "AND table_name='{table_name}'", 
+        "AND table_name='{table_name}'",
         "AND index_name='idx_{table_name}_corridor_period';")))
     if (nrow(index_exists) == 0) {
         dbSendStatement(aurora, glue(paste(
-            "CREATE INDEX idx_{table_name}_corridor_period", 
+            "CREATE INDEX idx_{table_name}_corridor_period",
             "on {table_name} (Corridor, {period})")))
     }
 }
@@ -202,16 +208,54 @@ set_index_aurora <- function(aurora, table_name) {
 
 convert_to_key_value_df <- function(key, df) {
     data.frame(
-        key = key, 
-        data = rjson::toJSON(df), 
+        key = key,
+        data = rjson::toJSON(df),
         stringsAsFactors = FALSE)
+
+}
+
+
+
+recreate_table <- function (conn, df, table_name) {
+    write_dataframe_to_db(conn, df, table_name, recreate=TRUE, calcs_start_date=NULL, report_start_date=NULL, report_end_date=NULL)
+    create_statement <- dbGetQuery(conn, glue("show create table {table_name};"))[["Create Table"]]
     
+    # Modify CREATE TABLE Statements
+    # To change text to VARCHAR with fixed size because this is required for indexing these fields
+    # This is needed for Aurora
+    for (swap in list(
+        c("bigint[^ ,]+", "INT"),
+        c("varchar[^ ,]+", "VARCHAR(128)"),
+        c("`Zone_Group` [^ ,]+", "`Zone_Group` VARCHAR(128)"),
+        c("`Corridor` [^ ,]+", "`Corridor` VARCHAR(128)"),
+        c("`Quarter` [^ ,]+", "`Quarter` VARCHAR(8)"),
+        c("`Date` [^ ,]+", "`Date` DATE"),
+        c("`Month` [^ ,]+", "`Month` DATE"),
+        c("`Hour` [^ ,]+", "`Hour` DATETIME"),
+        c("`Timeperiod` [^ ,]+", "`Timeperiod` DATETIME"),
+        c( "delta` [^ ,]+", "delta` DOUBLE"),
+        c("`ones` [^ ,]+", "`ones` DOUBLE"),
+        c("`data` [^ ,]+", "`data` mediumtext"),
+        c("`Description` [^ ,]+", "`Description` VARCHAR(128)"),
+        c( "Score` [^ ,]+", "Score` DOUBLE")
+    )
+    ) {
+        create_statement <- stringr::str_replace_all(create_statement, swap[1], swap[2])
+    }
+    
+    # Delete and recreate with proper data types
+    try(dbRemoveTable(conn, table_name))
+    
+    try(dbSendStatement(conn, create_statement))
+    
+    # Create Indexes
+    try(set_index_aurora(conn, table_name))
 }
 
 
 
 recreate_database <- function(conn, df, dfname) {
-
+    
     # Prep before writing to db. These come from Health_Metrics.R
     if ("maint" %in% names(df$mo)) {
         df$mo$maint <- mutate(df$mo$maint, Zone_Group = Zone)
@@ -228,7 +272,8 @@ recreate_database <- function(conn, df, dfname) {
         df$mo$udc_trend_table <- convert_to_key_value_df("udc", df$mo$udc_trend_table)
     }
     
-    table_names <- write_sigops_to_db(conn, df, dfname, recreate = TRUE)
+    table_names <- dbListTables(conn)
+    table_names <- table_names[grepl("^(cor_|sub_|sig_)", table_names)]
     
     if ("udc_trend_table" %in% names(df$mo)) {
         write_to_db_once_off(conn, df$mo$udc_trend_table, glue("{dfname}_mo_udc_trend"), recreate = TRUE)
@@ -244,69 +289,45 @@ recreate_database <- function(conn, df, dfname) {
         print(glue("{Sys.time()} Aurora Database Connection"))
         
         # Get CREATE TABLE Statements for each Table
-        create_dfs <- lapply(
-            table_names, 
-            function(table_name) {
-                tryCatch({
-                    dbGetQuery(conn, glue("show create table {table_name};"))
-                }, error = function(e) {
-                    NULL
-                })
+        lapply(table_names, function(table_name) {
+            tryCatch({
+                recreate_table(conn, df, table_name)
+            }, error = function(e) {
+                NULL
             })
-        
-        create_statements <- bind_rows(create_dfs) %>% 
-            as_tibble()
-        
-        # Modify CREATE TABLE Statements 
-        # To change text to VARCHAR with fixed size because this is required for indexing these fields
-        # This is needed for Aurora
-        for (swap in list(
-            c("bigint[^ ,]+", "INT"),
-            c("varchar[^ ,]+", "VARCHAR(128)"),
-            c("`Zone_Group` [^ ,]+", "`Zone_Group` VARCHAR(128)"), 
-            c("`Corridor` [^ ,]+", "`Corridor` VARCHAR(128)"),
-            c("`Quarter` [^ ,]+", "`Quarter` VARCHAR(8)"),
-            c("`Date` [^ ,]+", "`Date` DATE"),
-            c("`Month` [^ ,]+", "`Month` DATE"),
-            c("`Hour` [^ ,]+", "`Hour` DATETIME"),
-            c("`Timeperiod` [^ ,]+", "`Timeperiod` DATETIME"),
-            c( "delta` [^ ,]+", "delta` DOUBLE"),
-            c("`ones` [^ ,]+", "`ones` DOUBLE"),
-            c("`data` [^ ,]+", "`data` mediumtext"),
-            c("`Description` [^ ,]+", "`Description` VARCHAR(128)"), 
-            c( "Score` [^ ,]+", "Score` DOUBLE")
-        )
-        ) {
-            create_statements[["Create Table"]] <- stringr::str_replace_all(create_statements[["Create Table"]], swap[1], swap[2])
-        }
-        
-        # Delete and recreate with proper data types
-        lapply(create_statements$Table, function(x) {
-            try(
-                dbRemoveTable(conn, x)
-            )
-        })
-        lapply(create_statements[["Create Table"]], function(x) {
-            try(
-                dbSendStatement(conn, x)
-            )
-        })
-        # Create Indexes
-        lapply(create_statements$Table, function(x) {
-            try(
-                set_index_aurora(conn, x)
-            )
-        })
-        
-    # Can probably remove this since we're not using duckdb for the new site
-    } else if (class(conn) == "duckdb_connection") {
-        print("DuckDB Database Connection")
-        
-        # Create Indexes
-        lapply(table_names, function(x) {
-            set_index_duckdb(conn, x)
         })
     }
+}
+
+
+
+
+
+# This and append_to_database are legacy functions for cor/sub/sig data structures.
+write_sigops_to_db <- function(
+        conn, df, dfname, recreate = FALSE,
+        calcs_start_date = NULL,
+        report_start_date = NULL,
+        report_end_date = NULL) {
+    
+    # Aggregation periods: qu, mo, wk, dy, ...
+    pers <- names(df)
+    pers <- pers[pers != "summary_data"]
+    
+    table_names <- c()
+    for (per in pers) {
+        for (tab in names(df[[per]])) {
+            
+            table_name <- glue("{dfname}_{per}_{tab}")
+            table_names <- append(table_names, table_name)
+            df_ <- df[[per]][[tab]]
+            
+            write_dataframe_to_db(
+                conn, df_, table_name, recreate, 
+                calcs_start_date, report_start_date, report_end_date)
+        }
+    }
+    invisible(table_names)
 }
 
 

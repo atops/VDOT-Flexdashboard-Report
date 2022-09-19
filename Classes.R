@@ -61,6 +61,15 @@ planning_time_index <- structure(
 average_speed <- structure(
     metrics[["average_speed"]], class = "metric"
 )
+gap_outs <- structure(
+    inherit(metrics[["terminations"]], metrics[["gap_outs"]], class = "metric"
+)
+max_outs <- structure(
+    inherit(metrics[["terminations"]], metrics[["max_outs"]], class = "metric"
+)
+force_offs <- structure(
+    inherit(metrics[["terminations"]], metrics[["force_offs"]], class = "metric"
+)
 daily_pedestrian_pushbuttons <- structure(
     metrics[["daily_pedestrian_pushbuttons"]], class = "metric"
 )
