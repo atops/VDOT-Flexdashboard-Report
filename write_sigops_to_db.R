@@ -87,7 +87,7 @@ write_parquet_to_db <- function(
         report_end_date = NULL) {
 
     df <- read_parquet(parquet_path)
-    table_name <- str_split(table_name, "\\.")[[1]][1] %>% str_replace_all("/", "_")
+    table_name <- str_split(parquet_path, "\\.")[[1]][1] %>% str_replace_all("/", "_")
     
     if (!table_name %in% dbListTables(conn)) {
         recreate_table(conn, df, table_name)

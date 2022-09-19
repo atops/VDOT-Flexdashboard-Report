@@ -1514,29 +1514,6 @@ tryCatch(
 )
 
 
-write_aggregations <- function(conn, td) {
-
-    # conn is aurora database connection
-    # td is a tibble with columns: data|fn|var|rsd|csd
-    #   data = aggregated metrics dataframe to write
-    #   fn = RDS or parquet filename
-    #   var = metric$variable
-    #   rsd = report_start_date
-    #   csd = calcs_start_date (wk_calcs_start_date for weekly calcs)
-
-    # addtoRDS and write to database row-by-row
-    for (row in 1:nrow(td)) {
-        this_row <- td[row, ]
-        print(this_row$fn)
-
-        addtoRDS(
-            this_row$data[[1]], this_row$fn, this_row$var, this_row$rsd, this_row$csd)
-
-        write_parquet_to_db(
-            conn, this_row$fn, FALSE, this_row$csd, this_row$rsd, report_end_date)
-    }
-}
-
 
 # GREEN PHASE TERMINATIONS ############################################################ 
 
@@ -1640,54 +1617,6 @@ tryCatch(
 # Package up for Flexdashboard
 
 print(glue("{Sys.time()} Package for Monthly Report [22 of 23]"))
-
-sigify <- function(df, cor_df, corridors, identifier = "SignalID") {
-    if (identifier == "SignalID") {
-        df_ <- df %>%
-            left_join(distinct(corridors, SignalID, Corridor, Name), by = c("SignalID")) %>%
-            rename(Zone_Group = Corridor, Corridor = SignalID) %>%
-            ungroup() %>%
-            mutate(Corridor = factor(Corridor))
-    } else if (identifier == "CameraID") {
-        corridors <- rename(corridors, Name = Location)
-        df_ <- df %>%
-            select(
-                -matches("Subcorridor"),
-                -matches("Zone_Group")
-            ) %>%
-            left_join(distinct(corridors, CameraID, Corridor, Name), by = c("Corridor", "CameraID")) %>%
-            rename(
-                Zone_Group = Corridor,
-                Corridor = CameraID
-            ) %>%
-            ungroup() %>%
-            mutate(Corridor = factor(Corridor))
-    } else {
-        stop("bad identifier. Must be SignalID (default) or CameraID")
-    }
-
-    cor_df_ <- cor_df %>%
-        filter(Corridor %in% unique(df_$Zone_Group)) %>%
-        mutate(Zone_Group = Corridor) %>%
-        select(-matches("Subcorridor"))
-
-    br <- bind_rows(df_, cor_df_) %>%
-        mutate(Corridor = factor(Corridor))
-
-    if ("Zone_Group" %in% names(br)) {
-        br <- br %>%
-            mutate(Zone_Group = factor(Zone_Group))
-    }
-
-    if ("Month" %in% names(br)) {
-        br %>% arrange(Zone_Group, Corridor, Month)
-    } else if ("Hour" %in% names(br)) {
-        br %>% arrange(Zone_Group, Corridor, Hour)
-    } else if ("Date" %in% names(br)) {
-        br %>% arrange(Zone_Group, Corridor, Date)
-    }
-}
-
 
 
 tryCatch(

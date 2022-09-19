@@ -5,6 +5,7 @@ library(yaml)
 library(glue)
 library(future)
 
+source("write_sigops_to_db.R")
 
 print(glue("{Sys.time()} Starting Package Script"))
 
