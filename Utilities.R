@@ -210,21 +210,26 @@ addtoRDS <- function(df, fn, delta_var, rsd, csd) {
         if (class(csd) == "character") csd <- as_date(csd)
 
         # Extract aggregation period from the data fields
-        periods <- intersect(c("Month", "Date", "Hour"), names(df0))
-        per_ <- as.name(periods)
+        periods <- intersect(c("Quarter", "Month", "Date", "Hour"), names(df0))
 
-        # Remove everything after calcs_start_date (csd) in original df
-        df0 <- df0 %>% filter(!!per_ >= rsd, !!per_ < csd)
+        if (periods == "Quarter") {
+            # For quarterly data, always replace the whole thing with the new data.
+            df0 = df0[0, ]
+        } else {
+            per_ <- as.name(periods)
 
-        # Make sure new data starts on csd
-        # This is especially important for when csd is the start of the month
-        # and we've run calcs going back to the start of the week, which is in
-        # the previous month, e.g., 3/31/2020 is a Tuesday.
-        df <- df %>% filter(!!per_ >= csd)
+            # Remove everything after calcs_start_date (csd) in original df
+            df0 <- df0 %>% filter(!!per_ >= rsd, !!per_ < csd)
+
+            # Make sure new data starts on csd
+            # This is especially important for when csd is the start of the month
+            # and we've run calcs going back to the start of the week, which is in
+            # the previous month, e.g., 3/31/2020 is a Tuesday.
+            df <- df %>% filter(!!per_ >= csd)
+        }
 
         # Extract aggregation groupings from the data fields
         # to calculate period-to-period deltas
-
         groupings <- intersect(c("Zone_Group", "Corridor", "SignalID"), names(df0))
         groups_ <- sapply(groupings, as.name)
 
@@ -246,6 +251,7 @@ addtoRDS <- function(df, fn, delta_var, rsd, csd) {
 
         x
     }
+
     if (tools::file_ext(fn)=="rds") {
         read_func <- readRDS
         write_func <- saveRDS
@@ -633,7 +639,6 @@ write_aggregations <- function(conn, td) {
     # addtoRDS and write to database row-by-row
     for (row in 1:nrow(td)) {
         this_row <- td[row, ]
-        print(this_row$fn)
 
         addtoRDS(
             this_row$data[[1]], this_row$fn, this_row$var, this_row$rsd, this_row$csd)

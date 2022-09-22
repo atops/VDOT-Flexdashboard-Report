@@ -246,7 +246,7 @@ rsu_uptime:
 terminations:
     label: NULL
     table: NULL
-    s3table: termination_types
+    s3table: phase_termination
     variable: NULL
     weight: Cycles
     data_type: percent

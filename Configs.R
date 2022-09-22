@@ -76,7 +76,7 @@ get_det_config_  <- function(bucket, folder) {
                        Detector = as.integer(Detector),
                        CallPhase = as.integer(CallPhase))
         }, error = function(e) {
-            stop(glue("Problem getting detector config file for {date_}"))
+            stop(glue("Problem getting detector config file for {date_}: {e}"))
             print(e)
         })
     }

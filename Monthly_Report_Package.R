@@ -1515,18 +1515,18 @@ tryCatch(
 
 
 
-# GREEN PHASE TERMINATIONS ############################################################ 
+# GREEN PHASE TERMINATIONS ############################################################
 
 print(glue("{Sys.time()} Termination Types [21 of 23]"))
-        
+
 #-----------------------------------------
 # This is the future. Need to test.
 
 tryCatch(
     {
         conn <- keep_trying(get_aurora_connection, n_tries = 5)
-        
-        for (metric in c(gap_outs, max_outs, force_offs)) {
+
+        for (metric in list(gap_outs, max_outs, force_offs)) {
 
             daily <- s3_read_parquet_parallel(
                 bucket = conf$bucket,
@@ -1540,10 +1540,10 @@ tryCatch(
                     CallPhase = factor(CallPhase),
                     Week = week(Date)
                 )
-    
+
             weekly <- get_weekly_avg_by_day(daily, metric$variable, metric$weight, metric$peak_only)
             monthly <- get_monthly_avg_by_day(daily, metric$variable, metric$weight, metric$peak_only)
-    
+
             sub_daily <- get_cor_weekly_avg_by_day(
                 daily, subcorridors, metric$variable, metric$weight)
             cor_daily <- get_cor_weekly_avg_by_day(
@@ -1551,21 +1551,21 @@ tryCatch(
             avg_daily <- sigify(daily, cor_daily, corridors) %>%
                 select(Zone_Group, Corridor, Date, !!as.name(metric$variable), delta) %>%
                 filter(!is.na(Zone_Group))
-    
+
             sub_weekly <- get_cor_weekly_avg_by_day(weekly, subcorridors, metric$variable, metric$weight)
             cor_weekly <- get_cor_weekly_avg_by_day(weekly, corridors, metric$variable, metric$weight)
             avg_weekly <- sigify(weekly, cor_weekly, corridors) %>%
                 select(Zone_Group, Corridor, Date, !!as.name(metric$variable), delta) %>%
                 filter(!is.na(Zone_Group))
-    
+
             sub_monthly <- get_cor_monthly_avg_by_day(monthly, subcorridors, metric$variable, metric$weight)
             cor_monthly <- get_cor_monthly_avg_by_day(monthly, corridors, metric$variable, metric$weight)
             avg_monthly <- sigify(monthly, cor_monthly, corridors) %>%
                 select(Zone_Group, Corridor, Month, !!as.name(metric$variable), delta) %>%
                 filter(!is.na(Zone_Group))
-    
+
             tabl <- metric$table
-    
+
             td <- tibble(
                 data = list(avg_daily, sub_daily, cor_daily,
                             avg_weekly, sub_weekly, cor_weekly,
@@ -1580,26 +1580,26 @@ tryCatch(
                         rep(wk_calcs_start_date, 3),
                         rep(as_date(calcs_start_date), 3))
             )
-    
+
             write_aggregations(conn, td)
-    
-    
-            quarterly_detector_uptime <- get_quarterly(read_parquet("sig/mo/du.parquet"), "uptime")
-            sub_quarterly_detector_uptime <- get_quarterly(read_parquet("sub/mo/du.parquet"), "uptime")
-            cor_quarterly_detector_uptime <- get_quarterly(read_parquet("cor/mo/du.parquet"), "uptime")
-    
+
+
+            avg_quarterly <- get_quarterly(read_parquet(glue("sig/mo/{tabl}.parquet")), metric$variable)
+            sub_quarterly <- get_quarterly(read_parquet(glue("sub/mo/{tabl}.parquet")), metric$variable)
+            cor_quarterly <- get_quarterly(read_parquet(glue("cor/mo/{tabl}.parquet")), metric$variable)
+
             td <- tibble(
                 data = list(
-                    quarterly_detector_uptime,
-                    sub_quarterly_detector_uptime,
-                    cor_quarterly_detector_uptime),
-                fn = sapply(c("sig/qu/du.parquet", "sub/qu/du.parquet", "cor/qu/du.parquet"),
+                    avg_quarterly,
+                    sub_quarterly,
+                    cor_quarterly),
+                fn = sapply(c("sig/qu/{tabl}.parquet", "sub/qu/{tabl}.parquet", "cor/qu/{tabl}.parquet"),
                             glue),
-                var = "uptime",
+                var = metric$variable,
                 rsd = report_start_date,
                 csd = report_start_date
             )
-    
+
             write_aggregations(conn, td)
         }
     },
