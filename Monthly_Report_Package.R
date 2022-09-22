@@ -1519,9 +1519,6 @@ tryCatch(
 
 print(glue("{Sys.time()} Termination Types [21 of 23]"))
 
-#-----------------------------------------
-# This is the future. Need to test.
-
 tryCatch(
     {
         conn <- keep_trying(get_aurora_connection, n_tries = 5)
@@ -1582,7 +1579,6 @@ tryCatch(
             )
 
             write_aggregations(conn, td)
-
 
             avg_quarterly <- get_quarterly(read_parquet(glue("sig/mo/{tabl}.parquet")), metric$variable)
             sub_quarterly <- get_quarterly(read_parquet(glue("sub/mo/{tabl}.parquet")), metric$variable)

@@ -88,7 +88,7 @@ write_parquet_to_db <- function(
 
     df <- read_parquet(parquet_path)
     table_name <- str_split(parquet_path, "\\.")[[1]][1] %>% str_replace_all("/", "_")
-    
+
     if (!table_name %in% dbListTables(conn)) {
         recreate_table(conn, df, table_name)
     }
@@ -219,7 +219,7 @@ convert_to_key_value_df <- function(key, df) {
 recreate_table <- function (conn, df, table_name) {
     write_dataframe_to_db(conn, df, table_name, recreate=TRUE, calcs_start_date=NULL, report_start_date=NULL, report_end_date=NULL)
     create_statement <- dbGetQuery(conn, glue("show create table {table_name};"))[["Create Table"]]
-    
+
     # Modify CREATE TABLE Statements
     # To change text to VARCHAR with fixed size because this is required for indexing these fields
     # This is needed for Aurora
@@ -242,12 +242,12 @@ recreate_table <- function (conn, df, table_name) {
     ) {
         create_statement <- stringr::str_replace_all(create_statement, swap[1], swap[2])
     }
-    
+
     # Delete and recreate with proper data types
     try(dbRemoveTable(conn, table_name))
-    
+
     try(dbSendStatement(conn, create_statement))
-    
+
     # Create Indexes
     try(set_index_aurora(conn, table_name))
 }
@@ -255,7 +255,7 @@ recreate_table <- function (conn, df, table_name) {
 
 
 recreate_database <- function(conn, df, dfname) {
-    
+
     # Prep before writing to db. These come from Health_Metrics.R
     if ("maint" %in% names(df$mo)) {
         df$mo$maint <- mutate(df$mo$maint, Zone_Group = Zone)
@@ -266,15 +266,15 @@ recreate_database <- function(conn, df, dfname) {
     if ("safety" %in% names(df$mo)) {
         df$mo$safety <- mutate(df$mo$safety, Zone_Group = Zone)
     }
-    
+
     # This is a more complex data structure. Convert to a JSON string that can be unwound on query.
     if ("udc_trend_table" %in% names(df$mo)) {
         df$mo$udc_trend_table <- convert_to_key_value_df("udc", df$mo$udc_trend_table)
     }
-    
+
     table_names <- dbListTables(conn)
     table_names <- table_names[grepl("^(cor_|sub_|sig_)", table_names)]
-    
+
     if ("udc_trend_table" %in% names(df$mo)) {
         write_to_db_once_off(conn, df$mo$udc_trend_table, glue("{dfname}_mo_udc_trend"), recreate = TRUE)
     }
@@ -284,10 +284,10 @@ recreate_database <- function(conn, df, dfname) {
     if ("summary_data" %in% names(df)) {
         write_to_db_once_off(conn, df$summary_data, glue("{dfname}_summary_data"), recreate = TRUE)
     }
-    
+
     if (class(conn) == "MySQLConnection" | class(conn)[[1]] == "MariaDBConnection") { # Aurora
         print(glue("{Sys.time()} Aurora Database Connection"))
-        
+
         # Get CREATE TABLE Statements for each Table
         lapply(table_names, function(table_name) {
             tryCatch({
@@ -309,21 +309,21 @@ write_sigops_to_db <- function(
         calcs_start_date = NULL,
         report_start_date = NULL,
         report_end_date = NULL) {
-    
+
     # Aggregation periods: qu, mo, wk, dy, ...
     pers <- names(df)
     pers <- pers[pers != "summary_data"]
-    
+
     table_names <- c()
     for (per in pers) {
         for (tab in names(df[[per]])) {
-            
+
             table_name <- glue("{dfname}_{per}_{tab}")
             table_names <- append(table_names, table_name)
             df_ <- df[[per]][[tab]]
-            
+
             write_dataframe_to_db(
-                conn, df_, table_name, recreate, 
+                conn, df_, table_name, recreate,
                 calcs_start_date, report_start_date, report_end_date)
         }
     }
