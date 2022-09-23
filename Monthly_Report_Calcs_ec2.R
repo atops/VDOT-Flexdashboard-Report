@@ -601,7 +601,7 @@ if (conf$run$split_failures == TRUE) {
 
 print(glue("{Sys.time()} phase terminations [11b of 11]"))
 
-get_term_date_range <- function(start_date, end_date) {
+if (conf$run$phase_termination == TRUE) {
     date_range <- seq(ymd(start_date), ymd(end_date), by = "1 day")
 
     lapply(date_range, function(date_) {
@@ -617,11 +617,6 @@ get_term_date_range <- function(start_date, end_date) {
             conf = conf
         )
     })
-}
-
-if (conf$run$phase_termination == TRUE) {
-    # Utah method, based on green, start-of-red occupancies
-    get_term_date_range(start_date, end_date)
 }
 
 
