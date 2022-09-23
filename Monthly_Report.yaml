@@ -32,12 +32,11 @@ run:
     split_failures: TRUE
     phase_termination: TRUE
 
-
-start_date: yesterday
+start_date: 2 days ago
 end_date: yesterday
 
+calcs_start_date: auto 
 report_end_date: yesterday
-calcs_start_date: auto
 
 corridors_filename_s3: VDOT_Corridors_Latest.xlsx
 corridors_TMCs_filename_s3: Corridor_TMCs_Virginia.xlsx
