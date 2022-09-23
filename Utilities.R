@@ -37,18 +37,18 @@ get_date_from_string <- function(x) {
 get_usable_cores <- function(GB=8) {
     # Usable cores is one per 8 GB of RAM.
     # Get RAM from system file and divide
-    
+
     if (Sys.info()["sysname"] == "Windows") {
         1
     } else if (Sys.info()["sysname"] == "Linux") {
         x <- readLines('/proc/meminfo')
-        
+
         memline <- x[grepl("MemTotal", x)]
         mem <- stringr::str_extract(string =  memline, pattern = "\\d+")
         mem <- as.integer(mem)
         mem <- round(mem, -6)
         min(max(floor(mem/(GB*1e6)), 1), parallel::detectCores() - 1)
-        
+
     } else {
         stop("Unknown operating system.")
     }
@@ -57,9 +57,9 @@ get_usable_cores <- function(GB=8) {
 
 
 split_wrapper <- function(FUN) {
-    
+
     # Creates a function that runs a function, splits by signalid and recombines
-    
+
     f <- function(df, split_size, ...) {
         # Define temporary directory and file names
         temp_dir <- tempdir()
@@ -69,8 +69,8 @@ split_wrapper <- function(FUN) {
         temp_file_root <- stringi::stri_rand_strings(1,8)
         temp_path_root <- file.path(temp_dir, temp_file_root)
         print(temp_path_root)
-        
-        
+
+
         print("Writing to temporary files by SignalID...")
         signalids <- as.character(unique(df$SignalID))
         splits <- split(signalids, ceiling(seq_along(signalids)/split_size))
@@ -83,9 +83,9 @@ split_wrapper <- function(FUN) {
                     write_fst(paste0(temp_path_root, "_", i, ".fst"))
             })
         cat('.', sep='\n')
-        
+
         file_names <- paste0(temp_path_root, "_", names(splits), ".fst")
-        
+
         # Read in each temporary file and run adjusted counts in parallel. Afterward, clean up.
         print("Running for each SignalID...")
         df <- mclapply(file_names, mc.cores = usable_cores, FUN = function(fn) {
@@ -93,9 +93,9 @@ split_wrapper <- function(FUN) {
             FUN(read_fst(fn), ...)
         }) %>% bind_rows()
         cat('.', sep='\n')
-        
+
         lapply(file_names, FUN = file.remove)
-        
+
         df
     }
 }
@@ -141,13 +141,13 @@ readRDS_multiple <- function(pattern) {
 # where R wants to convert UTC to local time zone on read
 # Switch date or datetime fields back to UTC. Run on read.
 convert_to_utc <- function(df) {
-    
+
     # -- This may be a more elegant alternative. Needs testing. --
     #df %>% mutate_if(is.POSIXct, ~with_tz(., "UTC"))
-    
+
     is_datetime <- sapply(names(df), function(x) sum(class(df[[x]]) == "POSIXct"))
     datetimes <- names(is_datetime[is_datetime==1])
-    
+
     for (col in datetimes) {
         df[[col]] <- with_tz(df[[col]], "UTC")
     }
@@ -166,7 +166,7 @@ get_month_abbrs <- function(start_date, end_date) {
     start_date <- ymd(start_date)
     day(start_date) <- 1
     end_date <- ymd(end_date)
-    
+
     sapply(seq(start_date, end_date, by = "1 month"), function(d) { format(d, "%Y-%m")} )
 }
 
@@ -189,7 +189,7 @@ match_type <- function(val, val_type_to_match) {
 
 
 addtoRDS <- function(df, fn, delta_var, rsd, csd) {
-    
+
     #' combines data frame in local rds file with newly calculated data
     #' trimming the current data and appending the new data to prevent overlaps
     #' and/or duplicates. Used throughout Monthly_Report_Package code
@@ -203,39 +203,44 @@ addtoRDS <- function(df, fn, delta_var, rsd, csd) {
     #' @return a combined data frame
     #' @examples
     #' addtoRDS(avg_daily_detector_uptime, "avg_daily_detector_uptime.rds", report_start_date, calc_start_date)
-    
+
     combine_dfs <- function(df0, df, delta_var, rsd, csd) {
-        
+
         if (class(rsd) == "character") rsd <- as_date(rsd)
         if (class(csd) == "character") csd <- as_date(csd)
 
         # Extract aggregation period from the data fields
-        periods <- intersect(c("Month", "Date", "Hour"), names(df0))
-        per_ <- as.name(periods)
-        
-        # Remove everything after calcs_start_date (csd) in original df
-        df0 <- df0 %>% filter(!!per_ >= rsd, !!per_ < csd)
-        
-        # Make sure new data starts on csd
-        # This is especially important for when csd is the start of the month
-        # and we've run calcs going back to the start of the week, which is in
-        # the previous month, e.g., 3/31/2020 is a Tuesday.
-        df <- df %>% filter(!!per_ >= csd)
-        
+        periods <- intersect(c("Quarter", "Month", "Date", "Hour"), names(df0))
+
+        if (periods == "Quarter") {
+            # For quarterly data, always replace the whole thing with the new data.
+            df0 = df0[0, ]
+        } else {
+            per_ <- as.name(periods)
+
+            # Remove everything after calcs_start_date (csd) in original df
+            df0 <- df0 %>% filter(!!per_ >= rsd, !!per_ < csd)
+
+            # Make sure new data starts on csd
+            # This is especially important for when csd is the start of the month
+            # and we've run calcs going back to the start of the week, which is in
+            # the previous month, e.g., 3/31/2020 is a Tuesday.
+            df <- df %>% filter(!!per_ >= csd)
+        }
+
         # Extract aggregation groupings from the data fields
         # to calculate period-to-period deltas
-        
         groupings <- intersect(c("Zone_Group", "Corridor", "SignalID"), names(df0))
         groups_ <- sapply(groupings, as.name)
-        
+
         group_arrange <- c(periods, groupings) %>%
             sapply(as.name)
-        
+
         var_ <- as.name(delta_var)
-        
+
         # Combine old and new
         x <- bind_rows_keep_factors(list(df0, df)) %>%
-            
+
             # Recalculate deltas from prior periods over combined df
             group_by(!!!groups_) %>%
             arrange(!!!group_arrange) %>%
@@ -243,14 +248,25 @@ addtoRDS <- function(df, fn, delta_var, rsd, csd) {
                    delta = ((!!var_) - lag_)/lag_) %>%
             ungroup() %>%
             dplyr::select(-lag_)
-        
+
         x
     }
-    
+
+    if (tools::file_ext(fn)=="rds") {
+        read_func <- readRDS
+        write_func <- saveRDS
+	} else if (tools::file_ext(fn)=="parquet") {
+        read_func <- read_parquet
+	    write_func <- write_parquet
+	}
+
     if (!file.exists(fn)) {
-        saveRDS(df, fn)
+        if (!file.exists(dirname(fn))) {
+            dir.create(dirname(fn), recursive=T)
+        }
+        write_func(df, fn)
     } else {
-        df0 <- readRDS(fn)
+        df0 <- read_func(fn)
         if (is.list(df) && is.list(df0) &&
             !is.data.frame(df) && !is.data.frame(df0) &&
             (names(df) == names(df0))) {
@@ -258,20 +274,20 @@ addtoRDS <- function(df, fn, delta_var, rsd, csd) {
         } else {
             x <- combine_dfs(df0, df, delta_var, rsd, csd)
         }
-        saveRDS(x, fn)
+        write_func(x, fn)
         x
     }
-    
+
 }
 
 
 write_fst_ <- function(df, fn, append = FALSE) {
     if (append == TRUE & file.exists(fn)) {
-        
+
         factors <- unique(unlist(
             map(list(df), ~ select_if(df, is.factor) %>% names())
         ))
-        
+
         df_ <- read_fst(fn)
         df_ <- bind_rows(df, df_) %>%
             mutate_at(vars(one_of(factors)), factor)
@@ -285,7 +301,7 @@ write_fst_ <- function(df, fn, append = FALSE) {
 get_unique_timestamps <- function(df) {
     df %>%
         dplyr::select(Timestamp) %>%
-        
+
         distinct() %>%
         mutate(SignalID = 0) %>%
         dplyr::select(SignalID, Timestamp)
@@ -293,13 +309,13 @@ get_unique_timestamps <- function(df) {
 
 
 multicore_decorator <- function(FUN) {
-    
+
     usable_cores <- get_usable_cores()
-    
+
     function(x) {
         x %>%
             split(.$SignalID) %>%
-            mclapply(FUN, mc.cores = usable_cores) %>% 
+            mclapply(FUN, mc.cores = usable_cores) %>%
             bind_rows()
     }
 }
@@ -308,10 +324,10 @@ multicore_decorator <- function(FUN) {
 get_Tuesdays <- function(df) {
     dates_ <- seq(min(df$Date) - days(6), max(df$Date) + days(6), by = "days")
     tuesdays <- dates_[wday(dates_) == 3]
-    
+
     tuesdays <- pmax(min(df$Date), tuesdays) # unsure of this. need to test
     #tuesdays <- tuesdays[between(tuesdays, min(df$Date), max(df$Date))]
-    
+
     data.frame(Week = week(tuesdays), Date = tuesdays)
 }
 
@@ -325,7 +341,7 @@ walk_nested_list <- function(df, src, name=deparse(substitute(df)), indent=0) {
     if (!is.null(names(df))) {
         if (is.null(names(df[[1]]))) {
             print(head(df, 3))
-            
+
             if (startsWith(name, "sub") & "Zone_Group" %in% names(df)) {
                 dfp <- df %>% rename(Subcorridor = Corridor, Corridor = Zone_Group)
             } else {
@@ -354,7 +370,7 @@ walk_nested_list <- function(df, src, name=deparse(substitute(df)), indent=0) {
 
     	    aws.s3::s3write_using(dfp, qsave, bucket = conf$bucket, object = glue("{src}/{name}.qs"))
     	    #readr::write_csv(dfp, paste0(name, ".csv"))
-        
+
     	}
         for (n in names(df)) {
             if (!is.null(names(df[[n]]))) {
@@ -371,14 +387,14 @@ walk_nested_list <- function(df, src, name=deparse(substitute(df)), indent=0) {
 
 compare_dfs <- function(df1, df2) {
     x <- dplyr::all_equal(df1, df2)
-    y <- str_split(x, "\n")[[1]] %>% 
-        str_extract(pattern = "\\d+.*") %>% 
-        str_split(", ") %>% 
+    y <- str_split(x, "\n")[[1]] %>%
+        str_extract(pattern = "\\d+.*") %>%
+        str_split(", ") %>%
         lapply(as.integer)
-    
+
     rows_in_x_but_not_in_y <- y[[1]]
     rows_in_y_but_not_in_x <- y[[2]]
-    
+
     list(
         rows_in_x_but_not_in_y = df1[rows_in_x_but_not_in_y,],
         rows_in_y_but_not_in_x = df2[rows_in_y_but_not_in_x,]
@@ -387,15 +403,15 @@ compare_dfs <- function(df1, df2) {
 
 
 get_corridor_summary_data <- function(cor) {
-    
+
     #' Converts cor data set to a single data frame for the current_month
     #' for use in get_corridor_summary_table function
     #'
     #' @param cor cor data
     #' @param current_month Current month in date format
     #' @return A data frame, monthly data of all metrics by Zone and Corridor
-    
-    
+
+
     data <- list(
         rename(cor$mo$du, du = uptime, du.delta = delta), # detector uptime - note that zone group is factor not character
         rename(cor$mo$pau, pau = uptime, pau.delta = delta),
@@ -426,69 +442,69 @@ write_signal_details <- function(plot_date, conf, signals_list = NULL) {
     print(plot_date)
     #--- This takes approx one minute per day -----------------------
     rc <- s3_read_parquet(
-        bucket = conf$bucket, 
-        object = glue("mark/counts_1hr/date={plot_date}/counts_1hr_{plot_date}.parquet")) %>% 
+        bucket = conf$bucket,
+        object = glue("mark/counts_1hr/date={plot_date}/counts_1hr_{plot_date}.parquet")) %>%
         convert_to_utc() %>%
         select(
             SignalID, Date, Timeperiod, Detector, CallPhase, vol)
-    
+
     fc <- s3_read_parquet(
-        bucket = conf$bucket, 
-        object = glue("mark/filtered_counts_1hr/date={plot_date}/filtered_counts_1hr_{plot_date}.parquet")) %>% 
+        bucket = conf$bucket,
+        object = glue("mark/filtered_counts_1hr/date={plot_date}/filtered_counts_1hr_{plot_date}.parquet")) %>%
         convert_to_utc() %>%
         select(
             SignalID, Date, Timeperiod, Detector, CallPhase, Good_Day)
-    
+
     ac <- s3_read_parquet(
-        bucket = conf$bucket, 
-        object = glue("mark/adjusted_counts_1hr/date={plot_date}/adjusted_counts_1hr_{plot_date}.parquet")) %>% 
+        bucket = conf$bucket,
+        object = glue("mark/adjusted_counts_1hr/date={plot_date}/adjusted_counts_1hr_{plot_date}.parquet")) %>%
         convert_to_utc() %>%
         select(
             SignalID, Date, Timeperiod, Detector, CallPhase, vol)
-    
-    if (!is.null(signals_list)) { 
-        rc <- rc %>% 
+
+    if (!is.null(signals_list)) {
+        rc <- rc %>%
             filter(as.character(SignalID) %in% signals_list)
-        fc <- fc %>% 
+        fc <- fc %>%
             filter(as.character(SignalID) %in% signals_list)
-        ac <- ac %>% 
+        ac <- ac %>%
             filter(as.character(SignalID) %in% signals_list)
     }
-    
+
     df <- list(
         rename(rc, vol_rc = vol),
         fc,
         rename(ac, vol_ac = vol)) %>%
         reduce(full_join, by = c("SignalID", "Date", "Timeperiod", "Detector", "CallPhase")
         ) %>%
-        mutate(bad_day = if_else(Good_Day==0, TRUE, FALSE)) %>% 
+        mutate(bad_day = if_else(Good_Day==0, TRUE, FALSE)) %>%
         transmute(
-            SignalID = as.integer(SignalID), 
-            Timeperiod = Timeperiod, 
+            SignalID = as.integer(SignalID),
+            Timeperiod = Timeperiod,
             Detector = as.integer(Detector),
             CallPhase = as.integer(CallPhase),
             vol_rc = as.integer(vol_rc),
             vol_ac = ifelse(bad_day, as.integer(vol_ac), NA),
             bad_day) %>%
         arrange(
-            SignalID, 
-            Detector, 
+            SignalID,
+            Detector,
             Timeperiod)
     #----------------------------------------------------------------
-    
+
     df <- df %>% mutate(
-        Hour = hour(Timeperiod)) %>% 
+        Hour = hour(Timeperiod)) %>%
         select(-Timeperiod) %>%
         relocate(Hour) %>%
         nest(data = -c(SignalID))
-            
+
     s3write_using(
-        df, 
-        write_parquet, 
-        bucket = conf$bucket, 
+        df,
+        write_parquet,
+        bucket = conf$bucket,
         object = glue("mark/signal_details/date={plot_date}/sg_{plot_date}.parquet"),
         opts = list(multipart=TRUE))
-            
+
     add_partition(conf, "signal_details", plot_date)
 }
 
@@ -504,7 +520,7 @@ cleanup_cycle_data <- function(date_) {
 
 # Get chunks of size 'rows' from a data source that answers to 'collect()'
 get_signals_chunks <- function(df, rows = 1e6) {
-    
+
     chunk <- function(d, n) {
         split(d, ceiling(seq_along(d)/n))
     }
@@ -531,11 +547,11 @@ get_signals_chunks <- function(df, rows = 1e6) {
 
 # Get chunks of size 'rows' from an arrow data source
 get_signals_chunks_arrow <- function(df, rows = 1e6) {
-    
+
     chunk <- function(d, n) {
         split(d, ceiling(seq_along(d)/n))
     }
-    
+
     extract <- df %>% select(SignalID) %>% collect()
     records <- nrow(extract)
 
@@ -560,3 +576,74 @@ show_largest_objects <- function(n=20) {
     df %>% arrange(desc(Size)) %>% head(n)
 }
 
+
+
+sigify <- function(df, cor_df, corridors, identifier = "SignalID") {
+    if (identifier == "SignalID") {
+        df_ <- df %>%
+            left_join(distinct(corridors, SignalID, Corridor, Name), by = c("SignalID")) %>%
+            rename(Zone_Group = Corridor, Corridor = SignalID) %>%
+            ungroup() %>%
+            mutate(Corridor = factor(Corridor))
+    } else if (identifier == "CameraID") {
+        corridors <- rename(corridors, Name = Location)
+        df_ <- df %>%
+            select(
+                -matches("Subcorridor"),
+                -matches("Zone_Group")
+            ) %>%
+            left_join(distinct(corridors, CameraID, Corridor, Name), by = c("Corridor", "CameraID")) %>%
+            rename(
+                Zone_Group = Corridor,
+                Corridor = CameraID
+            ) %>%
+            ungroup() %>%
+            mutate(Corridor = factor(Corridor))
+    } else {
+        stop("bad identifier. Must be SignalID (default) or CameraID")
+    }
+
+    cor_df_ <- cor_df %>%
+        filter(Corridor %in% unique(df_$Zone_Group)) %>%
+        mutate(Zone_Group = Corridor) %>%
+        select(-matches("Subcorridor"))
+
+    br <- bind_rows(df_, cor_df_) %>%
+        mutate(Corridor = factor(Corridor))
+
+    if ("Zone_Group" %in% names(br)) {
+        br <- br %>%
+            mutate(Zone_Group = factor(Zone_Group))
+    }
+
+    if ("Month" %in% names(br)) {
+        br %>% arrange(Zone_Group, Corridor, Month)
+    } else if ("Hour" %in% names(br)) {
+        br %>% arrange(Zone_Group, Corridor, Hour)
+    } else if ("Date" %in% names(br)) {
+        br %>% arrange(Zone_Group, Corridor, Date)
+    }
+}
+
+
+write_aggregations <- function(conn, td) {
+
+    # conn is aurora database connection
+    # td is a tibble with columns: data|fn|var|rsd|csd
+    #   data = aggregated metrics dataframe to write
+    #   fn = RDS or parquet filename
+    #   var = metric$variable
+    #   rsd = report_start_date
+    #   csd = calcs_start_date (wk_calcs_start_date for weekly calcs)
+
+    # addtoRDS and write to database row-by-row
+    for (row in 1:nrow(td)) {
+        this_row <- td[row, ]
+
+        addtoRDS(
+            this_row$data[[1]], this_row$fn, this_row$var, this_row$rsd, this_row$csd)
+
+        write_parquet_to_db(
+            conn, this_row$fn, FALSE, this_row$csd, this_row$rsd, report_end_date)
+    }
+}

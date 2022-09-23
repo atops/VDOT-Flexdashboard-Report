@@ -103,8 +103,8 @@ if (conf$run$cctv == TRUE) {
     # Run python scripts asynchronously
     system("c:/users/ATSPM/miniconda3/python.exe parse_cctvlog.py", wait = FALSE)
     system("c:/users/ATSPM/miniconda3/python.exe parse_cctvlog_encoders.py", wait = FALSE)
-    system("~/miniconda3/bin/python parse_cctvlog.py", wait = FALSE)
-    system("~/miniconda3/bin/python parse_cctvlog_encoders.py", wait = FALSE)
+    system("~/miniconda3/bin/conda run -n vdot-flexdashboard-report python parse_cctvlog.py", wait = FALSE)
+    system("~/miniconda3/bin/conda run -n vdot-flexdashboard-report python parse_cctvlog_encoders.py", wait = FALSE)
 }
 
 # # GET RSU UPTIMES ###########################################################
@@ -118,8 +118,8 @@ print(glue("{Sys.time()} travel times [3 of 11]"))
 if (conf$run$travel_times == TRUE) {
     # Run python script asynchronously
     # system("c:/users/ATSPM/miniconda3/python.exe get_travel_times_1hr.py", wait = FALSE)
-    system("~/miniconda3/bin/python get_travel_times.py travel_times_1hr.yaml", wait = FALSE)
-    # system("~/miniconda3/bin/python get_travel_times.py travel_times_15min.yaml", wait = FALSE)
+    system("~/miniconda3/bin/conda run -n vdot-flexdashboard-report python get_travel_times.py travel_times_1hr.yaml", wait = FALSE)
+    # system("~/miniconda3/bin/conda run -n vdot-flexdashboard-report python get_travel_times.py travel_times_15min.yaml", wait = FALSE)
 }
 
 # # COUNTS ####################################################################
@@ -479,8 +479,7 @@ print(glue("{Sys.time()} etl [7 of 11]"))
 if (conf$run$etl == TRUE) {
 
     # run python script and wait for completion
-    # system2("etl_dashboard.bat", args = c(start_date, end_date))
-    system2("./etl_dashboard.sh", args = c(start_date, end_date))
+    system(glue("~/miniconda3/bin/conda run -n vdot-flexdashboard-report python etl_dashboard.py {start_date} {end_date}"), wait = TRUE)
 }
 
 # --- ----------------------------- -----------
@@ -491,8 +490,7 @@ print(glue("{Sys.time()} aog [8 of 11]"))
 if (conf$run$arrivals_on_green == TRUE) {
 
     # run python script and wait for completion
-    # system2("get_aog.bat", args = c(start_date, end_date))
-    system2("./get_aog.sh", args = c(start_date, end_date))
+    system(glue("~/miniconda3/bin/conda run -n vdot-flexdashboard-report python get_aog.py {start_date} {end_date}"), wait = TRUE)
 }
 gc()
 
@@ -601,11 +599,11 @@ if (conf$run$split_failures == TRUE) {
 
 # # GET TERMINATION TYPES #####################################################
 
-print(glue("{Sys.time()} termination types [11b of 11]"))
+print(glue("{Sys.time()} phase terminations [11b of 11]"))
 
-f <- function(start_date, end_date) {
+if (conf$run$phase_termination == TRUE) {
     date_range <- seq(ymd(start_date), ymd(end_date), by = "1 day")
-
+    
     lapply(date_range, function(date_) {
         print(date_)
 
@@ -615,15 +613,10 @@ f <- function(start_date, end_date) {
             terms,
             bucket = conf$bucket,
             prefix = "term",
-            table_name = "termination_types",
+            table_name = "phase_termination",
             conf = conf
         )
     })
-}
-
-if (conf$run$split_failures == TRUE) {
-    # Utah method, based on green, start-of-red occupancies
-    f(start_date, end_date)
 }
 
 

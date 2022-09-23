@@ -8,7 +8,9 @@ library(future)
 
 print(glue("{Sys.time()} Starting Package Script"))
 
+source("write_sigops_to_db.R")
 source("Monthly_Report_Functions.R")
+source("Classes.R")
 
 if (interactive()) {
     plan(multisession)

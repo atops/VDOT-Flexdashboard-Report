@@ -8,23 +8,22 @@ echo $(date)
 # Run in parallel with VDOT-Flexdashboard-Report local code, until stable.
 
 echo ---------------------------------------
-echo --- RUN R SCRIPTS - NEWER VDOT CODE --- 
+echo --- RUN R SCRIPTS --------------------- 
 echo
 
-echo --- Pull ATSPM DATA
+# echo --- Pull ATSPM DATA
 # This is done on the local VDOT server and pushed to S3
 # ~/miniconda3/bin/python pull_atspm_data.py
 
 
-echo --- R Scripts
+echo --- R Scripts -------------------------
 cd /home/atoppen/Code/VDOT/scheduled_tasks
 Rscript Monthly_Report_Calcs_ec2.R
 Rscript Monthly_Report_Package.R
 
 
-echo --- Watchdog
-# Ideally this would run at 7am or so to capture today's ATSPM watchdogs.
-# This is run on local VDOT server and pushed to S3
+# echo --- Watchdog
+# This is run on each local VDOT server and pushed to S3
 #~/miniconda3/bin/python get_watchdog_alerts.py
-Rscript get_alerts.R
+# Rscript get_alerts.R
 
