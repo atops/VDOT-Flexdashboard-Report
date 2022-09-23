@@ -603,7 +603,7 @@ print(glue("{Sys.time()} phase terminations [11b of 11]"))
 
 if (conf$run$phase_termination == TRUE) {
     date_range <- seq(ymd(start_date), ymd(end_date), by = "1 day")
-    
+
     lapply(date_range, function(date_) {
         print(date_)
 
