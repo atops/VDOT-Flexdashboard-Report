@@ -146,21 +146,19 @@ query_before_after_data <- function(
 
 get_before_after_line_plot <- function(before_df, after_df, metric, line_chart = "weekly", accent_average = TRUE) {
     
-    var_ <- as.name(metric$variable)
+    # var_ <- as.name(metric$variable)
     zone_group <- before_df$Zone_Group[1]
 
     
-    # Before Line Chart
-    before_df <- before_df %>%
-        mutate(var = !!var_,
-               col = factor(ifelse(accent_average & Corridor == Zone_Group, 1, 0), levels = c(0, 1)),
-               Corridor = factor(Corridor)) %>%
-        filter(!is.na(var)) %>%
-        group_by(Corridor)
+    # # Before Line Chart
+    # before_df <- before_df %>%
+    #     mutate(var = !!var_,
+    #            col = factor(ifelse(accent_average & Corridor == Zone_Group, 1, 0), levels = c(0, 1)),
+    #            Corridor = factor(Corridor)) %>%
+    #     filter(!is.na(var)) %>%
+    #     group_by(Corridor)
     
-    sd1 <- SharedData$new(before_df, ~Corridor, group = "grp")
-    
-    before_chart <- plot_ly(sd1,
+    before_chart <- plot_ly(before_df,
                             type = "scatter",
                             mode = "lines",
                             x = ~Date, 
@@ -175,7 +173,7 @@ get_before_after_line_plot <- function(before_df, after_df, metric, line_chart =
                             hovertemplate = "%{customdata}",
                             hoverlabel = list(font = list(family = "Source Sans Pro"))
     ) %>% layout(xaxis = list(title = "Before"),
-                 yaxis = list(tickformat = ",",   #tickformat = tick_format(metric$data_type),
+                 yaxis = list(tickformat = tick_format(metric$data_type),
                               hoverformat = tick_format(metric$data_type)),
                  title = "__plot1_title__",
                  showlegend = FALSE,
@@ -184,17 +182,15 @@ get_before_after_line_plot <- function(before_df, after_df, metric, line_chart =
         
 
     
-    # Before Line Chart
-    after_df <- after_df %>%
-        mutate(var = !!var_,
-               col = factor(ifelse(accent_average & Corridor == Zone_Group, 1, 0), levels = c(0, 1)),
-               Corridor = factor(Corridor)) %>%
-        filter(!is.na(var)) %>%
-        group_by(Corridor)
+    # # Before Line Chart
+    # after_df <- after_df %>%
+    #     mutate(var = !!var_,
+    #            col = factor(ifelse(accent_average & Corridor == Zone_Group, 1, 0), levels = c(0, 1)),
+    #            Corridor = factor(Corridor)) %>%
+    #     filter(!is.na(var)) %>%
+    #     group_by(Corridor)
     
-    sd2 <- SharedData$new(after_df, ~Corridor, group = "grp")
-    
-    after_chart <- plot_ly(sd2,
+    after_chart <- plot_ly(after_df,
                            type = "scatter",
                            mode = "lines",
                            x = ~Date, 
