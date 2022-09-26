@@ -1797,13 +1797,34 @@ fluidRow(
     column(7, renderPlotly({
         req(nrow(df()$before) > 1)
         metric <- metrics_list[[input$before_after_metric]]
-        get_before_after_line_plot(df()$before, df()$after, metric)
+        var_ <- as.name(metric$variable)
+        
+        before_df <- df()$before %>%
+            mutate(var = !!var_,
+                   col = factor(ifelse(Corridor == Zone_Group, 1, 0), levels = c(0, 1)),
+                   Corridor = factor(Corridor)) %>%
+            filter(!is.na(var)) %>%
+            group_by(Corridor) %>%
+            SharedData$new(~Corridor, group = "bf_line")
+        
+        print(before_df)
+        
+        after_df <- df()$after %>%
+            mutate(var = !!var_,
+                   col = factor(ifelse(Corridor == Zone_Group, 1, 0), levels = c(0, 1)),
+                   Corridor = factor(Corridor)) %>%
+            filter(!is.na(var)) %>%
+            group_by(Corridor) %>%
+            SharedData$new(~Corridor, group = "bf_line")
+
+            print(after_df)
+        
+        get_before_after_line_plot(before_df, after_df, metric)
     })),
     column(5, renderDT({
         req(nrow(df()$compare) > 1)
         datatable(
-            SharedData$new(df()$compare, ~Corridor, group = "grp"), 
-            #df()$compare,
+            SharedData$new(df()$compare, ~Corridor, group = "bf_line"), 
             extensions="Scroller", style="bootstrap", class="compact", width="100%", 
             selection = list(mode = 'single'),
             options = list(
