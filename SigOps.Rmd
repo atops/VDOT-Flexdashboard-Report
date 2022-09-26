@@ -1685,8 +1685,8 @@ fillCol(
         column(
             width = 4,
             renderUI(selectizeInput("signalid", "Select Signal:",
-                choices = c("Select"),
-                selected = "",
+                choices = c("Select", filtered_signalids()),
+                selected = "Select",
                 width = "800px"
             ))
         ),
