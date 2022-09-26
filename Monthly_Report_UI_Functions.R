@@ -148,6 +148,12 @@ metrics_list <- list(
     "Detection Level" = detection_level
 )
 
+metrics_list_travel_times <- list(
+    "Travel Time Index" = travel_time_index,
+    #"Planning Time Index" = planning_time_index, # Monthly only. Not as useful for before/after.
+    "Average Speed" = average_speed
+)
+
 as_int <- function(x) {scales::comma_format()(as.integer(x))}
 as_2dec <- function(x) {sprintf(x, fmt = "%.2f")}
 as_pct <- function(x) {sprintf(x * 100, fmt = "%.1f%%")}
