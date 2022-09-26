@@ -19,6 +19,23 @@ output:
 }
 </style>
 
+<script>
+$("body").on("shown.bs.tab", "a[data-toggle='tab']", function(e) {
+    /* Set a variable input$active_tab that matches the selected tab based on the url */
+    Shiny.setInputValue("active_tab", $(e.target).parent()[0].baseURI.match("section-(.*)")[1]);
+
+    /* Set a variable input$scatter_selected returns 'true' if before/after scatter is selected */
+    let before_after = document.getElementById('section-before-after');
+    let scatter = document.getElementById('section-scatter');
+    if (before_after.classList.contains('active') && scatter.classList.contains('active')) {
+        Shiny.setInputValue('scatter_selected', 'true');
+    } else {
+        Shiny.setInputValue('scatter_selected', 'false');
+    }
+})
+</script>
+
+
 
 ```{r global, include = FALSE, warning = TRUE}
 # FLEXDASHBOARD - RTOP_MONTHLY_REPORT
@@ -71,7 +88,7 @@ selectInput("corridor_x", "Corridor:",
 
 observe({
     debug(logger, "observe on input$zone_group: sidebar zone_group dropdown choices")
-    req(input$zone_group)    
+    req(input$zone_group)
     choices_ <- c(
         "All Corridors",
         as.character(unique(filter(corridors, Zone == input$zone_group)$Corridor))
@@ -97,6 +114,102 @@ conditionalPanel(
 )
 
 
+conditionalPanel(
+    "input.active_tab == 'before-after' && input.scatter_selected == 'false'",
+    selectInput("before_after_metric", "Metric:",
+        choices = c(names(metrics_list)),
+        selected = c(names(metrics_list))[1]
+    )
+)
+
+conditionalPanel(
+    "input.active_tab == 'before-after'",
+    dateRangeInput(
+        "before_date_range", "Before Period:",
+        start = today() - days(84),
+        end = today() - days(43),
+        min = today() - days(365),
+        max = today(),
+        format = "mm/dd/yy",
+        startview = "month",
+        weekstart = 0,
+        separator = " - "
+    )
+)
+
+conditionalPanel(
+    "input.active_tab == 'before-after'",
+    dateRangeInput(
+        "after_date_range", "After Period:",
+        start = today() - days(42),
+        end = today(),
+        min = today() - days(365),
+        max = today(),
+        format = "mm/dd/yy",
+        startview = "month",
+        weekstart = 0,
+        separator = " - "
+    )
+)
+
+
+# When changing [before] dates, update others to align
+observeEvent(input$before_date_range, {
+    after_duration = input$after_date_range[2] - input$after_date_range[1]
+
+    print(glue("date range updated, {input$before_date_range}, {after_duration}"))
+    updateDateRangeInput(
+        session,
+        "after_date_range",
+        start = input$before_date_range[2] + days(1), 
+        end = min(input$before_date_range[2] + after_duration + days(1), today()))
+    updateDateRangeInput(
+        session,
+        "before_date_range",
+        start = min(input$before_date_range[1], input$before_date_range[2] - days(1)),
+        end = max(input$before_date_range[1] + days(1), input$before_date_range[2]))
+}, ignoreInit = TRUE)
+
+
+# When changing [after] dates, update others to align
+observeEvent(input$after_date_range, {
+    before_duration = input$before_date_range[2] - input$before_date_range[1]
+
+    updateDateRangeInput(
+        session,
+        "after_date_range",
+        start = min(input$after_date_range[1], input$after_date_range[2] - days(1)))
+    updateDateRangeInput(
+        session,
+        "before_date_range",
+        start = min(input$before_date_range[1], input$before_date_range[2] - before_duration),
+        end = input$after_date_range[1] - days(1))
+}, ignoreInit = TRUE)
+
+
+conditionalPanel(
+    "input.scatter_selected == 'true'",
+    hr(style = "border-top: 1px solid #bdbdbd; margin-top: 20px; margin-bottom: 10px"),
+
+    selectInput(
+        'bf_y_axis', 
+        label = 'Y-axis Metric:',
+        choices = c(names(metrics_list)),
+        selected = c(names(metrics_list))[1]),
+    selectInput(
+        'bf_x_axis',
+        label = 'X-axis Metric:',
+        choices = c(names(metrics_list)),
+        selected = c(names(metrics_list))[1])
+)
+
+observeEvent(input$bf_y_axis, {
+    tags$script("let elem=document.getElementById('section-scatter'); let lis=elem.getElementsByTagName('li')")
+})
+
+observeEvent(input$bf_x_axis, {
+
+})
 # --- -------------------------------------------------- ---
 
 
@@ -1204,25 +1317,6 @@ Map
 
 ```{r Map, echo = FALSE, eval = TRUE}
 
-metrics_list <- list(
-    "Vehicles Per Day" = vpd,
-    "Throughput" = throughput,
-    "Arrivals on Green" = arrivals_on_green,
-    "Progression Ratio" = progression_ratio,
-    "Queue Spillback" = queue_spillback_rate,
-    "Peak Split Failures" = peak_period_split_failures,
-    "Off-Peak Split Failures" = off_peak_split_failures,
-    "Pedestrian Actuations Per Day" = daily_pedestrian_pushbuttons,
-    "Detector Uptime" = detector_uptime,
-    "Pedestrian Pushbutton Uptime" = ped_button_uptime,
-    # "Cameras Uptime" = cctv_uptime,
-    "Communications Uptime" = comm_uptime,
-    # TODO: Need a class for this metric. Add to Classes.R (not used elsewhere on the site?)
-    #"Pedestrian Delay" = NULL
-    "Detection Level" = detection_level
-)
-
-
 map_month_options <- reactive({
     debug(logger, "reactive on ??: map_month_options (doesn't need to be a reactive value")
     format(ymd(rev(month_options)), "%b %Y") # convert format to Jan 2020, for example
@@ -1591,8 +1685,8 @@ fillCol(
         column(
             width = 4,
             renderUI(selectizeInput("signalid", "Select Signal:",
-                choices = c("Select", filtered_signalids()),
-                selected = "Select",
+                choices = c("Select"),
+                selected = "",
                 width = "800px"
             ))
         ),
