@@ -195,7 +195,7 @@ conditionalPanel(
         'bf_y_axis', 
         label = 'Y-axis Metric:',
         choices = c(names(metrics_list)),
-        selected = c(names(metrics_list))[1]),
+        selected = c(names(metrics_list))[3]),
     selectInput(
         'bf_x_axis',
         label = 'X-axis Metric:',
@@ -233,7 +233,6 @@ zone_group <- reactive({
         corridor()
     }
 })
-
 
 
 level <- reactive(
@@ -277,6 +276,8 @@ filtered_signalids <- reactive({
         arrange(as.integer(as.character(SignalID)))
     paste0(x$SignalID, ": ", x$Name)
 })
+
+
 ```
 
 
