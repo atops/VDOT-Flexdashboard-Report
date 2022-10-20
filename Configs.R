@@ -1,3 +1,44 @@
+det_config_arrow_schema <- schema(
+    SignalID = int64(),
+    Detector = int64(),
+    ID = int64(),
+    DetectorID = string(),
+    DistanceFromStopBar = double(),
+    MinSpeedFilter = double(),
+    DateAdded = time64(),
+    DateDisabled = time64(),
+    LaneNumber = int64(),
+    DecisionPoint = double(),
+    MovementDelay = null(),
+    LatencyCorrection = double(),
+    MovementTypeDesc = string(),
+    MovementTypeAbbr = string(),
+    Name = string(),
+    LaneTypeDesc = string(),
+    LaneTypeAbbr = string(),
+    DetectionTypeDesc = string(),
+    ApproachDesc = string(),
+    MPH = double(),
+    ProtectedPhaseNumber = int64(),
+    IsProtectedPhaseOverlap = bool(),
+    PermissivePhaseNumber = double(),
+    IsPermissivePhaseOverlap = bool(),
+    DirectionTypeDesc = string(),
+    DirectionTypeAbbr = string(),
+    Latitude = string(),
+    Longitude = string(),
+    PrimaryName = string(),
+    SecondaryName = string(),
+    IPAddress = string(),
+    RegionID = int64(),
+    ControllerTypeID = int64(),
+    Enabled = bool(),
+    Note = string(),
+    Start = time64(),
+    TimeFromStopBar = double(),
+    CallPhase = int32(),
+    CountPriority = int64(),
+    index = double())
 
 
 get_corridors <- function(corr_fn, filter_signals = TRUE) {
@@ -69,7 +110,7 @@ get_det_config_  <- function(bucket, folder) {
             arrow::open_dataset(
                 sources = glue("s3://{bucket}/{folder}/date={date_}"), 
                 format="feather", 
-                unify_schemas=TRUE
+                schema = det_config_arrow_schema
             ) %>% 
                 collect() %>%
                 mutate(SignalID = as.character(SignalID),
