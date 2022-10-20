@@ -138,6 +138,9 @@ metrics_list <- list(
     "Gap Outs" = gap_outs,
     "Max Outs" = max_outs,
     "Force Offs" = force_offs,
+    "Travel Time Index" = travel_time_index,
+    #"Planning Time Index" = planning_time_index, # Monthly only. Not as useful for before/after.
+    "Average Speed" = average_speed,
     "Pedestrian Actuations Per Day" = daily_pedestrian_pushbuttons,
     "Detector Uptime" = detector_uptime,
     "Pedestrian Pushbutton Uptime" = ped_button_uptime,
