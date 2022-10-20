@@ -1,18 +1,6 @@
 
-@import url('https://fonts.googleapis.com/css?family=Open+Sans');
-@import url('https://fonts.googleapis.com/css?family=Nanum+Gothic:800');
-
-@font-face { 
-  font-family: "Open Sans";
-  src: url(OpenSans-Regular.ttf);
-}
-
-@font-face {  
-  font-family: "Open Sans";
-  src: url(OpenSans-Bold.ttf);
-  font-style: bold;
-  font-weight: bold;
-}
+@import url('https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Source+Sans+Pro&display=swap');
 
 .dropdown-menu{z-index:10000 !important;}
 
