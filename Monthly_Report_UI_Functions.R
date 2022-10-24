@@ -146,8 +146,7 @@ metrics_list <- list(
     "Pedestrian Pushbutton Uptime" = ped_button_uptime,
     # "Cameras Uptime" = cctv_uptime,
     "Communications Uptime" = comm_uptime,
-    # TODO: Need a class for this metric. Add to Classes.R (not used elsewhere on the site?)
-    #"Pedestrian Delay" = NULL
+    #"Pedestrian Delay" = NULL  # TODO: Need a class for this metric. Add to Classes.R (not used elsewhere on the site?)
     "Detection Level" = detection_level
 )
 

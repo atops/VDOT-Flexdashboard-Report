@@ -22,7 +22,11 @@ output:
 <script>
 $("body").on("shown.bs.tab", "a[data-toggle='tab']", function(e) {
     /* Set a variable input$active_tab that matches the selected tab based on the url */
-    Shiny.setInputValue("active_tab", $(e.target).parent()[0].baseURI.match("section-(.*)")[1]);
+    if ($(e.target).parent()[0].baseURI.endsWith('before-after')) {
+        Shiny.setInputValue("active_tab", 'before-after');
+    } else {
+        Shiny.setInputValue("active_tab", 'other');
+    }
 
     /* Set a variable input$scatter_selected returns 'true' if before/after scatter is selected */
     let before_after = document.getElementById('section-before-after');
@@ -152,39 +156,67 @@ conditionalPanel(
     )
 )
 
+before_start <- reactive(input$before_date_range[1])
+before_end <- reactive(input$before_date_range[2])
+after_start <- reactive(input$after_date_range[1])
+after_end <- reactive(input$after_date_range[2])
 
-# When changing [before] dates, update others to align
-observeEvent(input$before_date_range, {
-    after_duration = input$after_date_range[2] - input$after_date_range[1]
-
-    print(glue("date range updated, {input$before_date_range}, {after_duration}"))
-    updateDateRangeInput(
-        session,
-        "after_date_range",
-        start = input$before_date_range[2] + days(1), 
-        end = min(input$before_date_range[2] + after_duration + days(1), today()))
+observeEvent(before_start(), {
     updateDateRangeInput(
         session,
         "before_date_range",
-        start = min(input$before_date_range[1], input$before_date_range[2] - days(1)),
-        end = max(input$before_date_range[1] + days(1), input$before_date_range[2]))
-}, ignoreInit = TRUE)
-
-
-# When changing [after] dates, update others to align
-observeEvent(input$after_date_range, {
-    before_duration = input$before_date_range[2] - input$before_date_range[1]
-
+        end = max(before_start() + days(1), before_end())
+    )
     updateDateRangeInput(
         session,
         "after_date_range",
-        start = min(input$after_date_range[1], input$after_date_range[2] - days(1)))
+        start = max(after_start(), before_end() + days(1)),
+        end = max(after_end(), after_start() + days(1))
+    )
+}, ignoreInit = TRUE)
+
+observeEvent(before_end(), {
     updateDateRangeInput(
         session,
         "before_date_range",
-        start = min(input$before_date_range[1], input$before_date_range[2] - before_duration),
-        end = input$after_date_range[1] - days(1))
+        start = min(before_start(), before_end() - days(1))
+    )
+    updateDateRangeInput(
+        session,
+        "after_date_range",
+        start = max(after_start(), before_end() + days(1)),
+        end = max(after_end(), after_start() + days(1))
+    )
 }, ignoreInit = TRUE)
+
+observeEvent(after_start(), {
+    updateDateRangeInput(
+        session,
+        "after_date_range",
+        end = max(after_end(), after_start() + days(1))
+    )
+    updateDateRangeInput(
+        session,
+        "before_date_range",
+        start = min(before_start(), before_end() - days(1), after_start() - days(2)),
+        end = min(before_end(), after_start() - days(1))
+    )
+}, ignoreInit = TRUE)
+
+observeEvent(after_end(), {
+    updateDateRangeInput(
+        session,
+        "after_date_range",
+        start = min(after_start() , after_end() - days(1))
+    )
+    updateDateRangeInput(
+        session,
+        "before_date_range",
+        start = min(before_start(), before_end() - days(1), after_start() - days(2)),
+        end = min(before_end(), after_start() - days(1))
+    )
+}, ignoreInit = TRUE)
+
 
 
 conditionalPanel(
@@ -192,7 +224,7 @@ conditionalPanel(
     hr(style = "border-top: 1px solid #bdbdbd; margin-top: 20px; margin-bottom: 10px"),
 
     selectInput(
-        'bf_y_axis', 
+        'bf_y_axis',
         label = 'Y-axis Metric:',
         choices = c(names(metrics_list)),
         selected = c(names(metrics_list))[3]),
@@ -203,13 +235,6 @@ conditionalPanel(
         selected = c(names(metrics_list))[1])
 )
 
-observeEvent(input$bf_y_axis, {
-    tags$script("let elem=document.getElementById('section-scatter'); let lis=elem.getElementsByTagName('li')")
-})
-
-observeEvent(input$bf_x_axis, {
-
-})
 # --- -------------------------------------------------- ---
 
 
@@ -292,7 +317,7 @@ tp_valuebox <- reactive({
             zone_group = input$zone_group, corridor = corridor(), month = current_month(), line_break = TRUE
         ),
         icon = "fa-bar-chart",
-        color = BLUE 
+        color = BLUE
     )
 })
 
@@ -519,7 +544,7 @@ renderValueBox({
     valueBox(
         value = NULL,
         icon = NULL,
-        color = "gray80"
+        color = "#CCCCCC" # "gray80"
     )
 })
 
@@ -610,7 +635,7 @@ fillCol(
         renderPlotly({
             debug(logger, "reactive on level(), zone_group() and current_month(): summary_plot (all)")
             summary_plot(
-                throughput, 
+                throughput,
                 zone_group = input$zone_group, corridor = corridor(), month = current_month()
             )
         }),
@@ -620,7 +645,7 @@ fillCol(
         div("Arrivals on Green", style = styl),
         renderPlotly({
             summary_plot(
-                arrivals_on_green, 
+                arrivals_on_green,
                 zone_group = input$zone_group, corridor = corridor(), month = current_month()
             )
         }),
@@ -630,7 +655,7 @@ fillCol(
         div("Progression Ratio", style = styl),
         renderPlotly({
             summary_plot(
-                progression_ratio, 
+                progression_ratio,
                 zone_group = input$zone_group, corridor = corridor(), month = current_month()
             )
         }),
@@ -640,7 +665,7 @@ fillCol(
         div("Queue Spillback", style = styl),
         renderPlotly({
             summary_plot(
-                queue_spillback_rate, 
+                queue_spillback_rate,
                 zone_group = input$zone_group, corridor = corridor(), month = current_month()
             )
         }),
@@ -650,7 +675,7 @@ fillCol(
         div("Peak Period Split Failure", style = styl),
         renderPlotly({
             summary_plot(
-                peak_period_split_failures, 
+                peak_period_split_failures,
                 zone_group = input$zone_group, corridor = corridor(), month = current_month()
             )
         }),
@@ -660,7 +685,7 @@ fillCol(
         div("Off-Peak Split Failure", style = styl),
         renderPlotly({
             summary_plot(
-                off_peak_split_failures, 
+                off_peak_split_failures,
                 zone_group = input$zone_group, corridor = corridor(), month = current_month()
             )
         }),
@@ -670,7 +695,7 @@ fillCol(
         div("Travel Time Index", style = styl),
         renderPlotly({
             summary_plot(
-                travel_time_index, 
+                travel_time_index,
                 zone_group = input$zone_group, corridor = corridor(), month = current_month()
             )
         }),
@@ -680,7 +705,7 @@ fillCol(
         div("Planning Time Index", style = styl),
         renderPlotly({
             summary_plot(
-                planning_time_index, 
+                planning_time_index,
                 zone_group = input$zone_group, corridor = corridor(), month = current_month()
             )
         }),
@@ -699,7 +724,7 @@ fillCol(
         div("Daily Volume", style = styl),
         renderPlotly({
             summary_plot(
-                vpd, 
+                vpd,
                 zone_group = input$zone_group, corridor = corridor(), month = current_month()
             )
         }),
@@ -710,7 +735,7 @@ fillCol(
         div("AM Hourly Volume", style = styl),
         renderPlotly({
             summary_plot(
-                am_peak_vph, 
+                am_peak_vph,
                 zone_group = input$zone_group, corridor = corridor(), month = current_month()
             )
         }),
@@ -720,7 +745,7 @@ fillCol(
         div("PM Hourly Volume", style = styl),
         renderPlotly({
             summary_plot(
-                pm_peak_vph, 
+                pm_peak_vph,
                 zone_group = input$zone_group, corridor = corridor(), month = current_month()
             )
         }),
@@ -731,7 +756,7 @@ fillCol(
         div("Detector Uptime", style = styl),
         renderPlotly({
             summary_plot(
-                detector_uptime, 
+                detector_uptime,
                 zone_group = input$zone_group, corridor = corridor(), month = current_month()
             )
         }),
@@ -741,7 +766,7 @@ fillCol(
         div("Ped Pushbutton Uptime", style = styl),
         renderPlotly({
             summary_plot(
-                ped_button_uptime, 
+                ped_button_uptime,
                 zone_group = input$zone_group, corridor = corridor(), month = current_month()
             )
         }),
@@ -751,7 +776,7 @@ fillCol(
         div("Comm Uptime", style = styl),
         renderPlotly({
             summary_plot(
-                comm_uptime, 
+                comm_uptime,
                 zone_group = input$zone_group, corridor = corridor(), month = current_month()
             )
         }),
@@ -857,32 +882,32 @@ output$performance <- renderPlotly({
         debug(logger, glue("Performance Trend Multiplot | {input_performance_metric} | {level_} | {zone_group_} | {current_month_}"))
         if (input$performance_metric == "Throughput") {
             get_trend_multiplot(
-                throughput, 
+                throughput,
                 level = level_, zone_group_, current_month_
             )
         } else if (input$performance_metric == "Arrivals on Green") {
             get_trend_multiplot(
-                arrivals_on_green, 
+                arrivals_on_green,
                 level = level_, zone_group_, current_month_
             )
         } else if (input$performance_metric == "Progression Ratio") {
             get_trend_multiplot(
-                progression_ratio, 
+                progression_ratio,
                 level = level_, zone_group_, current_month_
             )
         } else if (input$performance_metric == "Queue Spillback Rate") {
             get_trend_multiplot(
-                queue_spillback_rate, 
+                queue_spillback_rate,
                 level = level_, zone_group_, current_month_
             )
         } else if (input$performance_metric == "Peak Period Split Failures") {
             get_trend_multiplot(
-                peak_period_split_failures, 
+                peak_period_split_failures,
                 level = level_, zone_group_, current_month_
             )
         } else if (input$performance_metric == "Off-Peak Split Failures") {
             get_trend_multiplot(
-                off_peak_split_failures, 
+                off_peak_split_failures,
                 level = level_, zone_group_, current_month_
             )
         } else if (input$performance_metric == "Travel Time Metrics") {
@@ -950,17 +975,17 @@ output$volume <- renderPlotly({
     zone_group_ <- zone_group()
     current_month_ <- current_month()
     input_volume_metric <- input$volume_metric
-    
+
     # future_promise({
         debug(logger, glue("Volumes Trend Multiplot | {input_volume_metric} | {level_} | {zone_group_} | {current_month_}"))
         if (input$volume_metric == "Daily Traffic Volumes") {
             get_trend_multiplot(
-                vpd, 
+                vpd,
                 level = level_, zone_group_, current_month_
             )
         } else if (input$volume_metric == "Daily Pedestrian Pushbutton Activity") {
             get_trend_multiplot(
-                daily_pedestrian_pushbuttons, 
+                daily_pedestrian_pushbuttons,
                 level = level_, zone_group_, current_month_
             )
         }
@@ -1009,7 +1034,7 @@ renderValueBox({
     valueBox(
         value = NULL,
         icon = NULL,
-        color = "gray80"
+        color = "#CCCCCC" # "gray80"
     )
 })
 ```
@@ -1043,54 +1068,54 @@ output$equipment <- renderPlotly({
     ntraces_ <- ntraces()
     input_subcorridors <- input$subcorridors
     input_equipment_metric <- input$equipment_metric
-    
+
     # future_promise({
         debug(logger, glue("Equipment Trend Multiplot | {input_equipment_metric} | {level_} | {zone_group_} | {current_month_}"))
         if (input_equipment_metric == "Detector Uptime") {
             if (zone_group_ == "All RTOP" || ntraces_ > 24) {
                 get_trend_multiplot(
-                    detector_uptime, 
+                    detector_uptime,
                     level = level_, zone_group_, current_month_
                 )
             } else if (corridor_ == "All Corridors" || input_subcorridors == "By Sub-corridor") {
                 uptime_multiplot(
-                    detector_uptime, 
+                    detector_uptime,
                     level = level_, zone_group = zone_group_, month = current_month_)
             } else {
                 get_trend_multiplot(
-                    detector_uptime, 
+                    detector_uptime,
                     level = level_, zone_group_, current_month_
                 )
             }
         } else if (input_equipment_metric == "Pedestrian Pushbutton Uptime") {
             if (zone_group_ == "All RTOP" || ntraces_ > 24) {
                 get_trend_multiplot(
-                    ped_button_uptime, 
+                    ped_button_uptime,
                     level = level_, zone_group_, current_month_
                 )
             } else if (corridor_ == "All Corridors" || input_subcorridors == "By Sub-corridor") {
                 uptime_multiplot(
-                    ped_button_uptime, 
+                    ped_button_uptime,
                     level = level_, zone_group = zone_group_, month = current_month_)
             } else {
                 get_trend_multiplot(
-                    ped_button_uptime, 
+                    ped_button_uptime,
                     level = level_, zone_group_, current_month_
                 )
             }
         } else if (input_equipment_metric == "Communications Uptime") {
             if (zone_group_ == "All RTOP" || ntraces_ > 24) {
                 get_trend_multiplot(
-                    comm_uptime, 
+                    comm_uptime,
                     level = level_, zone_group_, current_month_
                 )
             } else if (corridor_ == "All Corridors" || input_subcorridors == "By Sub-corridor") {
                 uptime_multiplot(
-                    comm_uptime, 
+                    comm_uptime,
                     level = level_, zone_group = zone_group_, month = current_month_)
             } else {
                 get_trend_multiplot(
-                    comm_uptime, 
+                    comm_uptime,
                     level = level_, zone_group_, current_month_
                 )
             }
@@ -1407,7 +1432,7 @@ shinyApp(
     server = function(input, output, session) {
 
         output$SigOpsMap <- renderLeaflet({
-            
+
             debug(logger, "renderLeaflet on []: output$SigOpsMap")
             isolate({
                 pal <- colorBin(
@@ -1461,8 +1486,8 @@ shinyApp(
                     )
             })
         })
-        
-        
+
+
         map_metric <- reactive({
             debug(logger, "reactive on input$metric_input: map_metric")
             metrics_list[[input$metric_input]]
@@ -1473,28 +1498,29 @@ shinyApp(
             debug(logger, "reactive on zone_group(), corridors: map_data")
 
             query_data(
-                map_metric(), 
-                level = "signal", 
-                resolution = "monthly", 
+                map_metric(),
+                level = "signal",
+                resolution = "monthly",
                 zone_group = "All", # special case for the map. all signals.
-                month = current_month(), 
+                month = current_month(),
                 upto = FALSE
             ) %>%
                 rename(SignalID = Corridor) %>%
+                select(-any_of(c("Description"))) %>%
                 left_join(
-                    corridors[c("SignalID", "Latitude", "Longitude")],
+                    corridors[c("SignalID", "Latitude", "Longitude", "Description")],
                     by = c("SignalID")
                 ) %>%
                 subset(!is.na(Latitude))
         })
 
 
-        
+
         table_data <- reactive({
             debug(logger, "reactive on map_metric(), filtered_corridors(), input$filter_input: table_data")
-            
+
             v <- as.name(map_metric()$variable)
-            
+
             data_ <- if (map_metric()$variable == "uptime") {
                 map_data() %>% arrange(!!v)
             } else {
@@ -1514,12 +1540,12 @@ shinyApp(
                 data_ <- data_ %>%
                     subset(as.character(Corridor) %in% unique(as.character(filtered_corridors()$Corridor)))
             }
-            
+
             data_ %>% head(10)
         })
 
-        
-        
+
+
         output$top10_table <- renderDataTable({
             debug(logger, "renderDataTable on table_data(): output$top10_table")
 
@@ -1535,8 +1561,8 @@ shinyApp(
                 formatStyle(3, textAlign = "right")
         }, server = TRUE)
 
-        
-        
+
+
         observe({
             debug(logger, "observe on table_data(): top10_table proxy")
             dataTableProxy("top10_table") %>%
@@ -1545,9 +1571,9 @@ shinyApp(
                         rename(value = ncol(table_data()) - 1),
                     clearSelection = "all")
         })
-        
-        
-        
+
+
+
         observe({
             debug(logger, "observe on map_data(): SigOpsMap_proxy")
             debug(logger, paste(glue("{names(map_data())}"), collapse = "|"))
@@ -1563,7 +1589,7 @@ shinyApp(
                 leafletProxy("SigOpsMap") %>%
                     clearGroup(group = "the_group") %>%
                     clearControls()
-                
+
                 leafletProxy("SigOpsMap") %>%
                     addCircleMarkers(
                         data = map_data(),
@@ -1591,7 +1617,7 @@ shinyApp(
                         title = input$metric_input,
                         opacity = 1
                     )
-            }            
+            }
         })
 
 
@@ -1610,7 +1636,7 @@ shinyApp(
             # prev_row(data_selected)
         })
 
-        
+
         observeEvent(input$top10_table_rows_selected, {
             debug(logger, "observe event on input$top10_table_rows_selected: SigOpsMap_proxy")
 
@@ -1625,7 +1651,7 @@ shinyApp(
                         sep = "<br/>",
                         glue("Signal {data_selected$Description}"),
                         glue(paste(
-                            "<b>{input$metric_input}:</b>", 
+                            "<b>{input$metric_input}:</b>",
                             "{data_format(map_metric()$data_type)(data_selected[[map_metric()$variable]])}"))
                     ),
                     layerId = as.character(data_selected$SignalID),
@@ -1643,15 +1669,15 @@ shinyApp(
             # set new value to reactiveVal
             prev_row(data_selected)
         })
-        
-        
+
+
         observeEvent(zone_group(), {
             req(zone_group())
             debug(logger, glue("Map center reactive on zone_group(): {zone_group()}"))
             if (zone_group() %in% names(conf$map_center)) {
                 coords <- conf$map_center[[zone_group()]]
                 leafletProxy("SigOpsMap") %>%
-                    # Would prefer to do this, but after flying, using the scrollwheel 
+                    # Would prefer to do this, but after flying, using the scrollwheel
                     # to zoom in/out zooms all the way in for some reason.
                     # flyTo(
                     #     lat = coords[1],
@@ -1741,25 +1767,25 @@ Before-After
 
 df <- reactive({
     metric <- metrics_list[[input$before_after_metric]]
-    
-    print('---')
-    print(level())
-    print(zone_group())
-    print(corridor())
-    print('---')
-        
+
+    # print('---')
+    # print(level())
+    # print(zone_group())
+    # print(corridor())
+    # print('---')
+
     query_before_after_data(
-        metric, level(), zone_group(), corridor(), 
-        input$before_date_range[1], input$before_date_range[2], 
+        metric, level(), zone_group(), corridor(),
+        input$before_date_range[1], input$before_date_range[2],
         input$after_date_range[1], input$after_date_range[2])
 })
 
 df_y <- reactive({
     metric <- metrics_list[[input$bf_y_axis]]
-    
+
     query_before_after_data(
-        metric, level(), zone_group(), corridor(), 
-        input$before_date_range[1], input$before_date_range[2], 
+        metric, level(), zone_group(), corridor(),
+        input$before_date_range[1], input$before_date_range[2],
         input$after_date_range[1], input$after_date_range[2])
 })
 
@@ -1767,8 +1793,8 @@ df_x <- reactive({
     metric <- metrics_list[[input$bf_x_axis]]
 
     query_before_after_data(
-        metric, level(), zone_group(), corridor(), 
-        input$before_date_range[1], input$before_date_range[2], 
+        metric, level(), zone_group(), corridor(),
+        input$before_date_range[1], input$before_date_range[2],
         input$after_date_range[1], input$after_date_range[2])
 })
 
@@ -1799,7 +1825,7 @@ fluidRow(
         req(nrow(df()$before) > 1)
         metric <- metrics_list[[input$before_after_metric]]
         var_ <- as.name(metric$variable)
-        
+
         before_df <- df()$before %>%
             mutate(var = !!var_,
                    col = factor(ifelse(Corridor == Zone_Group, 1, 0), levels = c(0, 1)),
@@ -1807,9 +1833,7 @@ fluidRow(
             filter(!is.na(var)) %>%
             group_by(Corridor) %>%
             SharedData$new(~Corridor, group = "bf_line")
-        
-        print(before_df)
-        
+
         after_df <- df()$after %>%
             mutate(var = !!var_,
                    col = factor(ifelse(Corridor == Zone_Group, 1, 0), levels = c(0, 1)),
@@ -1818,21 +1842,19 @@ fluidRow(
             group_by(Corridor) %>%
             SharedData$new(~Corridor, group = "bf_line")
 
-            print(after_df)
-        
         get_before_after_line_plot(before_df, after_df, metric)
     })),
     column(5, renderDT({
         req(nrow(df()$compare) > 1)
         datatable(
-            SharedData$new(df()$compare, ~Corridor, group = "bf_line"), 
-            extensions="Scroller", style="bootstrap", class="compact", width="100%", 
+            SharedData$new(df()$compare, ~Corridor, group = "bf_line"),
+            extensions="Scroller", style="bootstrap", class="compact", width="100%",
             selection = list(mode = 'single'),
             options = list(
                 dom = 't', deferRender=TRUE, scrollY=700, scroller=TRUE,
                 columnDefs = list(list(visible = FALSE, targets = c(0,1)),
                                   list(className = 'dt-right', targets = 3:5)))
-            
+
         )
     }, server = FALSE))
 )
@@ -1851,14 +1873,14 @@ fluidRow(
         metric_x <- metrics_list[[input$bf_x_axis]]
         get_before_after_scatter_plot(df_x()$scatter, df_y()$scatter, metric_x, metric_y)
     })),
-    column(5, 
+    column(5,
         tabsetPanel(
-            tabPanel("Y-Axis Data", 
+            tabPanel("Y-Axis Data",
                 renderDT({
                     req(nrow(df_y()$compare) > 1)
                     datatable(
-                        df_y()$compare, 
-                        extensions="Scroller", style="bootstrap", class="compact", width="100%", 
+                        df_y()$compare,
+                        extensions="Scroller", style="bootstrap", class="compact", width="100%",
                         selection = list(mode = 'single'),
                         options = list(
                             dom = 't', deferRender=TRUE, scrollY=700, scroller=TRUE,
@@ -1867,12 +1889,12 @@ fluidRow(
                     )
                 }, server = FALSE)
             ),
-            tabPanel("X-Axis Data", 
+            tabPanel("X-Axis Data",
                 renderDT({
                     req(nrow(df_x()$compare) > 1)
                     datatable(
-                        df_x()$compare, 
-                        extensions="Scroller", style="bootstrap", class="compact", width="100%", 
+                        df_x()$compare,
+                        extensions="Scroller", style="bootstrap", class="compact", width="100%",
                         selection = list(mode = 'single'),
                         options = list(
                             dom = 't', deferRender=TRUE, scrollY=700, scroller=TRUE,
