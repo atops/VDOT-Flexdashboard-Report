@@ -1321,132 +1321,124 @@ print(glue("{Sys.time()} Travel Time Indexes [19 of 23]"))
 
 tryCatch(
     {
-        # ------- Corridor Travel Time Metrics ------- #
+        # ------- Corridor/Subcorridor Travel Time Metrics ------- #
 
         tt <- s3_read_parquet_parallel(
             bucket = conf$bucket,
-            table_name = "cor_travel_time_metrics_1hr",
-            start_date = calcs_start_date,
+            table_name = "cor_travel_times_1hr",
+            start_date = wk_calcs_start_date,
             end_date = report_end_date
         ) %>%
-            mutate(
-                Corridor = factor(Corridor)
-            ) %>%
+            mutate(Corridor = factor(Corridor)) %>%
             left_join(distinct(all_corridors, Zone_Group, Zone, Corridor)) %>%
             filter(!is.na(Zone_Group))
 
-        tti <- tt %>%
-            dplyr::select(-c(pti, bi, speed_mph))
 
-        pti <- tt %>%
-            dplyr::select(-c(tti, bi, speed_mph))
+        grouping_cols <- list(
+            cor = c("Zone_Group", "Zone", "Corridor"),
+            sub = c("Zone_Group", "Zone", "Corridor", "Subcorridor"))
 
-        bi <- tt %>%
-            dplyr::select(-c(tti, pti, speed_mph))
+        select_function <- list(
+            cor = function(df) {
+                select(df, Zone_Group, Zone, Corridor, Hour, tti, pti, bi, spd)},
+            sub = function(df) {
+                select(df, Zone_Group = Zone, Zone = Corridor, Corridor = Subcorridor, Hour, tti, pti, bi, spd)})
 
-        spd <- tt %>%
-            dplyr::select(-c(tti, pti, bi))
+        corridors_df <- list(
+            cor = all_corridors,
+            sub = subcorridors)
 
-        cor_monthly_vph <- readRDS("cor_monthly_vph.rds") %>%
-            rename(Zone = Zone_Group) %>%
-            left_join(distinct(corridors, Zone_Group, Zone), by = ("Zone"))
 
-        cor_monthly_tti_by_hr <- get_cor_monthly_ti_by_hr(tti, cor_monthly_vph, all_corridors)
-        cor_monthly_pti_by_hr <- get_cor_monthly_ti_by_hr(pti, cor_monthly_vph, all_corridors)
-        cor_monthly_bi_by_hr <- get_cor_monthly_ti_by_hr(bi, cor_monthly_vph, all_corridors)
-        cor_monthly_spd_by_hr <- get_cor_monthly_ti_by_hr(spd, cor_monthly_vph, all_corridors)
+        round_date_function <- list(
+            monthly = function(df) {
+                mutate(df, Hour = Hour - days(day(Hour) - 1))},
+            weekly = function(df) {
+                tuesdays_df <- transmute(df, Date = Hour) %>% get_Tuesdays()
+                df %>%
+                    left_join(tuesdays_df, by = "Week") %>%
+                    mutate(Hour = Date + hours(hour(Hour)))})
 
-        cor_monthly_tti <- get_cor_monthly_ti_by_day(tti, cor_monthly_vph, all_corridors)
-        cor_monthly_pti <- get_cor_monthly_ti_by_day(pti, cor_monthly_vph, all_corridors)
-        cor_monthly_bi <- get_cor_monthly_ti_by_day(bi, cor_monthly_vph, all_corridors)
-        cor_monthly_spd <- get_cor_monthly_ti_by_day(spd, cor_monthly_vph, all_corridors)
+        convert_date_function <- list(
+            monthly = function(df) {df}, # Do nothing
+            weekly = function(df) {rename(df, Date = Month)})
 
-        addtoRDS(cor_monthly_tti, "cor_monthly_tti.rds", "tti", report_start_date, calcs_start_date)
-        addtoRDS(cor_monthly_tti_by_hr, "cor_monthly_tti_by_hr.rds", "tti", report_start_date, calcs_start_date)
+        calcs_start_date_ <- list(
+            monthly = calcs_start_date,
+            weekly = wk_calcs_start_date
+        )
 
-        addtoRDS(cor_monthly_pti, "cor_monthly_pti.rds", "pti", report_start_date, calcs_start_date)
-        addtoRDS(cor_monthly_pti_by_hr, "cor_monthly_pti_by_hr.rds", "pti", report_start_date, calcs_start_date)
+        period_abbr = list(
+            monthly = "mo",
+            weekly = "wk"
+        )
 
-        addtoRDS(cor_monthly_bi, "cor_monthly_bi.rds", "bi", report_start_date, calcs_start_date)
-        addtoRDS(cor_monthly_bi_by_hr, "cor_monthly_bi_by_hr.rds", "bi", report_start_date, calcs_start_date)
+        aurora <- keep_trying(get_aurora_connection, n_tries = 5)
 
-        addtoRDS(cor_monthly_spd, "cor_monthly_spd.rds", "speed_mph", report_start_date, calcs_start_date)
-        addtoRDS(cor_monthly_spd_by_hr, "cor_monthly_spd_by_hr.rds", "speed_mph", report_start_date, calcs_start_date)
+        vars <- c("tti", "pti", "bi", "spd")
 
-        # ------- Subcorridor Travel Time Metrics ------- #
+        # For every combination of: cor|sub, monthly|weekly, tti|pti|bi|spd
 
-        tt <- s3_read_parquet_parallel(
-            bucket = conf$bucket,
-            table_name = "sub_travel_time_metrics_1hr",
-            start_date = calcs_start_date,
-            end_date = report_end_date
-        ) %>%
-            mutate(
-                Corridor = factor(Corridor),
-                Subcorridor = factor(Subcorridor)
-            ) %>%
-            rename(
-                Zone = Corridor,
-                Corridor = Subcorridor
-            ) %>%
-            left_join(distinct(subcorridors, Zone_Group, Zone))
+        for (corr_level in c("cor", "sub")) {
+            for (period in c("monthly", "weekly")) {
+                # TODO: Add daily if we start collecting the data every day instead of just TWR
 
-        tti <- tt %>%
-            dplyr::select(-c(pti, bi, speed_mph))
+                ti <- tt %>%
+                    group_by(across(all_of(c(grouping_cols[[corr_level]], "Hour")))) %>%
+                    summarize(
+                        travel_time_minutes = sum(travel_time_minutes),
+                        reference_minutes = sum(reference_minutes),
+                        miles = sum(miles),
+                        .groups = "drop") %>%
+                    mutate(Week = week(as_date(Hour))) %>%
 
-        pti <- tt %>%
-            dplyr::select(-c(tti, bi, speed_mph))
+                    round_date_function[[period]]() %>%
+                    group_by(across(all_of(c(grouping_cols[[corr_level]], "Hour")))) %>%
+                    summarize(
+                        tti = mean(travel_time_minutes)/ mean(reference_minutes),
+                        pti = quantile(travel_time_minutes, 0.90)/ mean(reference_minutes),
+                        bi = pti - tti,
+                        spd = max(miles)/mean(travel_time_minutes) * 60,
+                        .groups = "drop"
+                    ) %>%
+                    select_function[[corr_level]]()
 
-        bi <- tt %>%
-            dplyr::select(-c(tti, pti, speed_mph))
 
-        spd <- tt %>%
-            dplyr::select(-c(tti, pti, bi))
+                vph <- readRDS(glue("{corr_level}_{period}_vph.rds")) %>%
+                    rename(Zone = Zone_Group) %>%
+                    left_join(distinct(corridors_df[[corr_level]], Zone_Group, Zone), by = "Zone")
 
-        sub_monthly_vph <- readRDS("sub_monthly_vph.rds") %>%
-            rename(Zone = Zone_Group) %>%
-            left_join(distinct(subcorridors, Zone_Group, Zone), by = ("Zone"))
+                per <- period_abbr[[period]]
 
-        sub_monthly_tti_by_hr <- get_cor_monthly_ti_by_hr(tti, sub_monthly_vph, subcorridors)
-        sub_monthly_pti_by_hr <- get_cor_monthly_ti_by_hr(pti, sub_monthly_vph, subcorridors)
-        sub_monthly_bi_by_hr <- get_cor_monthly_ti_by_hr(bi, sub_monthly_vph, subcorridors)
-        sub_monthly_spd_by_hr <- get_cor_monthly_ti_by_hr(spd, sub_monthly_vph, subcorridors)
+                for (var in vars) {
+                    df <- get_cor_monthly_ti_by_hr(ti, var, vph, corridors_df[[corr_level]])
+                    td <- tibble(
+                        data = list(df),
+                        fn = glue("{corr_level}/{per}/{var}h.parquet"),
+                        var = var,
+                        rsd = report_start_date,
+                        csd = calcs_start_date_[[period]])
+                    # print(td$data)
+                    write_aggregations(aurora, td)
+                    try(print(tbl(aurora, glue("{corr_level}_{per}_{var}h"))))
+                }
 
-        sub_monthly_tti <- get_cor_monthly_ti_by_day(tti, sub_monthly_vph, subcorridors)
-        sub_monthly_pti <- get_cor_monthly_ti_by_day(pti, sub_monthly_vph, subcorridors)
-        sub_monthly_bi <- get_cor_monthly_ti_by_day(bi, sub_monthly_vph, subcorridors)
-        sub_monthly_spd <- get_cor_monthly_ti_by_day(spd, sub_monthly_vph, subcorridors)
+                for (var in vars) {
+                    df <- get_cor_monthly_ti_by_day(ti, var, vph, corridors_df[[corr_level]]) %>%
+                        convert_date_function[[period]]()
+                    td <- tibble(
+                        data = list(df),
+                        fn = glue("{corr_level}/{per}/{var}.parquet"),
+                        var = var,
+                        rsd = report_start_date,
+                        csd = calcs_start_date_[[period]])
+                    # print(td$data)
+                    write_aggregations(aurora, td)
+                    try(print(tbl(aurora, glue("{corr_level}_{per}_{var}"))))
+                }
 
-        addtoRDS(sub_monthly_tti, "sub_monthly_tti.rds", "tti", report_start_date, calcs_start_date)
-        addtoRDS(sub_monthly_tti_by_hr, "sub_monthly_tti_by_hr.rds", "tti", report_start_date, calcs_start_date)
-
-        addtoRDS(sub_monthly_pti, "sub_monthly_pti.rds", "pti", report_start_date, calcs_start_date)
-        addtoRDS(sub_monthly_pti_by_hr, "sub_monthly_pti_by_hr.rds", "pti", report_start_date, calcs_start_date)
-
-        addtoRDS(sub_monthly_bi, "sub_monthly_bi.rds", "bi", report_start_date, calcs_start_date)
-        addtoRDS(sub_monthly_bi_by_hr, "sub_monthly_bi_by_hr.rds", "bi", report_start_date, calcs_start_date)
-
-        addtoRDS(sub_monthly_spd, "sub_monthly_spd.rds", "speed_mph", report_start_date, calcs_start_date)
-        addtoRDS(sub_monthly_spd_by_hr, "sub_monthly_spd_by_hr.rds", "speed_mph", report_start_date, calcs_start_date)
-
-        rm(tt)
-        rm(tti)
-        rm(pti)
-        rm(bi)
-        rm(cor_monthly_vph)
-        rm(cor_monthly_tti)
-        rm(cor_monthly_tti_by_hr)
-        rm(cor_monthly_pti)
-        rm(cor_monthly_pti_by_hr)
-        rm(cor_monthly_bi)
-        rm(cor_monthly_bi_by_hr)
-
-        rm(sub_monthly_tti)
-        rm(sub_monthly_tti_by_hr)
-        rm(sub_monthly_pti)
-        rm(sub_monthly_pti_by_hr)
-        rm(sub_monthly_bi)
-        rm(sub_monthly_bi_by_hr)
+            }
+        }
+        dbDisconnect(aurora)
     },
     error = function(e) {
         print("ENCOUNTERED AN ERROR:")
@@ -1521,7 +1513,7 @@ print(glue("{Sys.time()} Termination Types [21 of 23]"))
 
 tryCatch(
     {
-        conn <- keep_trying(get_aurora_connection, n_tries = 5)
+        aurora <- keep_trying(get_aurora_connection, n_tries = 5)
 
         for (metric in list(gap_outs, max_outs, force_offs)) {
 
@@ -1578,7 +1570,7 @@ tryCatch(
                         rep(as_date(calcs_start_date), 3))
             )
 
-            write_aggregations(conn, td)
+            write_aggregations(aurora, td)
 
             avg_quarterly <- get_quarterly(read_parquet(glue("sig/mo/{tabl}.parquet")), metric$variable)
             sub_quarterly <- get_quarterly(read_parquet(glue("sub/mo/{tabl}.parquet")), metric$variable)
@@ -1596,7 +1588,8 @@ tryCatch(
                 csd = report_start_date
             )
 
-            write_aggregations(conn, td)
+            write_aggregations(aurora, td)
+            dbDisconnect(aurora)
         }
     },
     error = function(e) {

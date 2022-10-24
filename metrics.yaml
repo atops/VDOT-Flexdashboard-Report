@@ -176,7 +176,7 @@ average_speed:
     label: Average Speed [mph]
     table: spd
     s3table:
-    variable: speed_mph
+    variable: spd
     weight: NULL
     data_type: integer
     highlight_color: "#007338"
