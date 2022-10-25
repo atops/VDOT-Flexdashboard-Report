@@ -162,7 +162,7 @@ data_format <- function(data_type) {
 tick_format <- function(data_type) {
     switch(
         data_type,
-        "integer" = ",.0r",
+        "integer" = ",d",
         "decimal" = ".2f",
         "percent" = ".0%",
         "currency" = "$,.2f")

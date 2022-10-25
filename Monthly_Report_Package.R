@@ -1460,7 +1460,7 @@ tryCatch(
 
 tryCatch(
     {
-        print(glue("{Sys.time()} Daily Detection Levels [15 of 23]"))
+        print(glue("{Sys.time()} Daily Detection Levels [20 of 23]"))
 
         dl <- s3_read_parquet_parallel(
             bucket = conf$bucket,
@@ -1958,7 +1958,6 @@ for (tab in c("du", "cu", "pau")) {
 
 
 
-print(glue("{Sys.time()} Upload to AWS [23 of 23]"))
 
 
 
@@ -1987,7 +1986,7 @@ qsave(sub, "sub.qs")
 # )
 
 
-print(glue("{Sys.time()} Write to Database [29 of 29]"))
+print(glue("{Sys.time()} Write to Database [23 of 23]"))
 
 source("write_sigops_to_db.R")
 
