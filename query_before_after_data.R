@@ -4,8 +4,8 @@ source("Before-After.R")
 
 
 
-metric <- vpd
-level <- "signal"
+metric <- travel_time_index
+level <- "corridor"
 zone_group <- "US 50 (Fairfax)"
 corridor <-  "US 50 (Fairfax)"
 before_start_date <- as_date("2022-05-01")

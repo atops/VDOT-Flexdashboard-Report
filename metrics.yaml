@@ -147,7 +147,7 @@ off_peak_split_failures:
 travel_time_index:
     label: Travel Time Index (TTI)
     table: tti
-    s3table:
+    s3table: cor_travel_time_metrics_1hr
     variable: tti
     weight: NULL
     data_type: decimal
@@ -176,7 +176,7 @@ average_speed:
     label: Average Speed [mph]
     table: spd
     s3table:
-    variable: speed_mph
+    variable: spd
     weight: NULL
     data_type: integer
     highlight_color: "#007338"

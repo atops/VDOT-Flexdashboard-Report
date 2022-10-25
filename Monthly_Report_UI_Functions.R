@@ -135,14 +135,25 @@ metrics_list <- list(
     "Queue Spillback" = queue_spillback_rate,
     "Peak Split Failures" = peak_period_split_failures,
     "Off-Peak Split Failures" = off_peak_split_failures,
+    "Gap Outs" = gap_outs,
+    "Max Outs" = max_outs,
+    "Force Offs" = force_offs,
+    "Travel Time Index" = travel_time_index,
+    #"Planning Time Index" = planning_time_index, # Monthly only. Not as useful for before/after.
+    "Average Speed" = average_speed,
     "Pedestrian Actuations Per Day" = daily_pedestrian_pushbuttons,
     "Detector Uptime" = detector_uptime,
     "Pedestrian Pushbutton Uptime" = ped_button_uptime,
     # "Cameras Uptime" = cctv_uptime,
     "Communications Uptime" = comm_uptime,
-    # TODO: Need a class for this metric. Add to Classes.R (not used elsewhere on the site?)
-    #"Pedestrian Delay" = NULL
+    #"Pedestrian Delay" = NULL  # TODO: Need a class for this metric. Add to Classes.R (not used elsewhere on the site?)
     "Detection Level" = detection_level
+)
+
+metrics_list_travel_times <- list(
+    "Travel Time Index" = travel_time_index,
+    #"Planning Time Index" = planning_time_index, # Monthly only. Not as useful for before/after.
+    "Average Speed" = average_speed
 )
 
 as_int <- function(x) {scales::comma_format()(as.integer(x))}
