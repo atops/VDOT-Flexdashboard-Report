@@ -23,15 +23,17 @@ query_before_after_data <- function(
         after_end_date - after_start_date
     )
     
-    if (period_duration < days(3)) {
-        resolution <- "daily"  
-        # "hourly" -- for future if we want to add hourly calcs to the mix. 
-        # Probably better to focus on timing plans.
-    } else if (period_duration < weeks(6)) {
-        resolution <- "daily"
-    } else {
-        resolution <- "weekly"
-    }
+    # if (period_duration < days(3)) {
+    #     resolution <- "daily"
+    #     # "hourly" -- for future if we want to add hourly calcs to the mix.
+    #     # Probably better to focus on timing plans.
+    # } else if (period_duration < weeks(6)) {
+    #     resolution <- "daily"
+    # } else {
+    #     resolution <- "weekly"
+    # }
+
+    resolution <- "weekly"
     
     per <- switch(
         resolution,
