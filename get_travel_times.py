@@ -131,10 +131,9 @@ def get_corridor_travel_times(df, corr_grouping, bucket, table_name):
     
     # -- Raw Hourly Travel Time Data --
     def uf(df):
-        date_string = df.date.values[0]
+        date_string = df['date'].values[0]
         filename = 'travel_times_{}.parquet'.format(date_string)
-        df = df.drop(columns=['date'])
-        df.to_parquet(f's3://{bucket}/mark/{table_name}/date={date_string}/{filename}')
+        df.drop(columns=['date']).to_parquet(f's3://{bucket}/mark/{table_name}/date={date_string}/{filename}')
          
     # Write to parquet files and upload to S3
     df.groupby(['date']).apply(uf)

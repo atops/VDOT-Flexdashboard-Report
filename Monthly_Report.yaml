@@ -45,17 +45,24 @@ AM_PEAK_HOURS: [6, 7, 8, 9]
 PM_PEAK_HOURS: [15, 16, 17, 18, 19]
 
 zone_groups:
-    - Northern Region
-    - Northwest Region
-    - Southwest Region
-    - Eastern Region
-    - Central Region
-    - Fredericksburg District
+    - Northern Virginia
+    - Fredericksburg
+    - Culpeper
+    - Staunton
+    - Salem
+    - Bristol
+    - Lynchburg
+    - Richmond
+    - Hampton Roads
 
 map_center:
-    Northern Region: [38.8375682589661, -77.5332641601563, 10]
-    Northwest Region: [38.15589575605525, -79.06788915404293, 10]
-    Southwest Region: [37.1734487120096, -80.5380249023438, 10]
-    Eastern Region: [37.2860725770286, -76.8576049804688, 10]
-    Central Region: [37.5545857581022, -77.46923076416782, 10]
-    Fredericksburg District: [38.30679772237872, -77.48709379600896, 10]
+    Bristol: [36.6161024,-82.1290933, 10]
+    Salem: [37.2996924,-80.0494047, 10]
+    Lynchburg: [37.3756183,-79.1289053, 10]
+    Richmond: [37.2903284,-77.4082598, 10]
+    Hampton Roads: [36.8833178,-76.4228342, 10]
+    Fredericksburg: [38.3174021,-77.4494158, 10]
+    Culpeper: [38.4593396,-77.9997405, 10]
+    Staunton: [38.1613373,-79.049259, 10]
+    Northern Virginia: [38.849359,-77.3766611, 10]
+
