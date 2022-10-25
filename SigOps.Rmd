@@ -1422,7 +1422,7 @@ shinyApp(
             )
         ),
         absolutePanel(
-            top = 110, left = 50,
+            top = 110, left = 30,
             div(dataTableOutput("top10_table"),
                 style = "font-family: Source Sans Pro; font-size: 14px;"
             )
