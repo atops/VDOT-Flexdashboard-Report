@@ -147,7 +147,7 @@ off_peak_split_failures:
 travel_time_index:
     label: Travel Time Index (TTI)
     table: tti
-    s3table: cor_travel_time_metrics_1hr
+    s3table:
     variable: tti
     weight: NULL
     data_type: decimal
