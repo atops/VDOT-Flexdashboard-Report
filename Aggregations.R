@@ -291,19 +291,19 @@ get_cor_period_avg <- function(df, corridors, var_, per_, wt_ = "ones") {
 }
 
 
-get_cor_weekly_avg_by_day <- function(df, corridors, wt_ = "ones") {
-    get_cor_period_avg(df, corridors, var_, per_ = "Date", wt_ = "ones") %>%
+get_cor_weekly_avg_by_day <- function(df, corridors, var_, wt_ = "ones") {
+    get_cor_period_avg(df, corridors, var_, per_ = "Date", wt_) %>%
         mutate(Week = week(Date))
 }
 
 
 get_cor_monthly_avg_by_day <- function(df, corridors, var_, wt_="ones") {
-    get_cor_period_avg(df, corridors, var_, per_ = "Month", wt_ = "ones")
+    get_cor_period_avg(df, corridors, var_, per_ = "Month", wt_)
 }
 
 
 get_cor_weekly_avg_by_hr <- function(df, corridors, var_, wt_ = "ones") {
-    get_cor_period_avg(df, corridors, var_, per_ = "Hour", wt_ = "ones")
+    get_cor_period_avg(df, corridors, var_, per_ = "Hour", wt_)
 }
 
 get_cor_monthly_avg_by_hr <- get_cor_weekly_avg_by_hr
