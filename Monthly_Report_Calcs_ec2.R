@@ -73,7 +73,7 @@ if (as_datetime(xlsx_last_modified) > as_datetime(qs_last_modified)) {
         bucket = conf$bucket
     )
     qs_all_filename <- sub("\\..*", ".qs", paste0("all_", conf$corridors_filename_s3))
-    qsave(all_corridors, qs_filename)
+    qsave(all_corridors, qs_all_filename)
     aws.s3::put_object(
         file = qs_all_filename,
         object = qs_all_filename,
