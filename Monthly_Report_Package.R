@@ -1419,7 +1419,6 @@ tryCatch(
                         csd = calcs_start_date_[[period]])
                     # print(td$data)
                     write_aggregations(aurora, td)
-                    try(print(tbl(aurora, glue("{corr_level}_{per}_{var}h"))))
                 }
 
                 for (var in vars) {
@@ -1433,7 +1432,6 @@ tryCatch(
                         csd = calcs_start_date_[[period]])
                     # print(td$data)
                     write_aggregations(aurora, td)
-                    try(print(tbl(aurora, glue("{corr_level}_{per}_{var}"))))
                 }
 
             }
@@ -1982,6 +1980,8 @@ qsave(sub, "sub.qs")
 print(glue("{Sys.time()} Write to Database [23 of 23]"))
 
 source("write_sigops_to_db.R")
+        
+aurora <- keep_trying(get_aurora_connection, n_tries = 5)
 
 # Update Aurora Nightly
 # recreate_database(conn, cor, "cor")
@@ -1994,12 +1994,13 @@ source("write_sigops_to_db.R")
 #    report_start_date = report_start_date)
 
 append_to_database(
-    conn, cor, "cor",
+    aurora, cor, "cor",
     calcs_start_date, report_start_date, report_end_date = NULL)
 append_to_database(
-    conn, sub, "sub",
+    aurora, sub, "sub",
     calcs_start_date, report_start_date, report_end_date = NULL)
 append_to_database(
-    conn, sig, "sig",
+    aurora, sig, "sig",
     calcs_start_date, report_start_date, report_end_date = NULL)
 
+dbDisconnect(aurora)
