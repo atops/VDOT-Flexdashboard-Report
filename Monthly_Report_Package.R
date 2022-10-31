@@ -1334,15 +1334,17 @@ tryCatch(
             filter(!is.na(Zone_Group))
 
 
+        vars <- c("tti", "pti", "tt", "spd")
+
         grouping_cols <- list(
             cor = c("Zone_Group", "Zone", "Corridor"),
             sub = c("Zone_Group", "Zone", "Corridor", "Subcorridor"))
 
         select_function <- list(
             cor = function(df) {
-                select(df, Zone_Group, Zone, Corridor, Hour, tti, pti, bi, spd)},
+                select(df, Zone_Group, Zone, Corridor, Hour, all_of(vars))},
             sub = function(df) {
-                select(df, Zone_Group = Zone, Zone = Corridor, Corridor = Subcorridor, Hour, tti, pti, bi, spd)})
+                select(df, Zone_Group = Zone, Zone = Corridor, Corridor = Subcorridor, Hour, all_of(vars))})
 
         corridors_df <- list(
             cor = all_corridors,
@@ -1374,8 +1376,6 @@ tryCatch(
 
         aurora <- keep_trying(get_aurora_connection, n_tries = 5)
 
-        vars <- c("tti", "pti", "bi", "spd")
-
         # For every combination of: cor|sub, monthly|weekly, tti|pti|bi|spd
 
         for (corr_level in c("cor", "sub")) {
@@ -1396,7 +1396,7 @@ tryCatch(
                     summarize(
                         tti = mean(travel_time_minutes)/ mean(reference_minutes),
                         pti = quantile(travel_time_minutes, 0.90)/ mean(reference_minutes),
-                        bi = pti - tti,
+                        tt = mean(travel_time_minutes),
                         spd = max(miles)/mean(travel_time_minutes) * 60,
                         .groups = "drop"
                     ) %>%
