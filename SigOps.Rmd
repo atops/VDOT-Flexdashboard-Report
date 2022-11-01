@@ -6,9 +6,9 @@ output:
     css: style.css
     favicon: VDOT_V_Logo.gif
     logo: VDOT_48px.png
-    orientation: rows
-    self_contained: no
-    vertical_layout: scroll
+    #orientation: columns
+    #self_contained: no
+    vertical_layout: fill
 ---
 
 <style>
@@ -621,7 +621,7 @@ output$cu_valuebox <- renderValueBox({
 Summary Trend
 =====================================
 
-Row
+Column
 -------------------------------------
 
 ### Performance
@@ -710,12 +710,16 @@ fillCol(
             )
         }),
         flex = c(2, 10)
-    ),
-    height = 800
+    )
 )
 ```
 
+
+Column
+-------------------------------------
+
 ### Volumes and Equipment
+
 
 ```{r summary_right, eval = TRUE, warning = FALSE}
 
@@ -781,8 +785,7 @@ fillCol(
             )
         }),
         flex = c(2, 10)
-    ),
-    height = 800
+    )
 )
 ```
 
@@ -792,7 +795,7 @@ fillCol(
 
 
 
-Performance
+Performance {data-orientation=rows}
 =====================================
 
 Row
@@ -927,7 +930,7 @@ output$performance <- renderPlotly({
 
 
 
-Volumes
+Volumes {data-orientation=rows}
 =====================================
 
 Row
@@ -999,7 +1002,7 @@ output$volume <- renderPlotly({
 
 
 
-Equipment
+Equipment {data-orientation=rows}
 =====================================
 
 Row
@@ -1130,7 +1133,7 @@ output$equipment <- renderPlotly({
 
 
 
-Watchdog
+Watchdog {data-orientation=rows}
 =====================================
 
 Row {data-height = 92}
@@ -1382,316 +1385,315 @@ line_labels <- function(corridor, subcorridor) {
 }
 
 
-
-shinyApp(
-    ui = fluidPage(
-        tags$head(
-            tags$link(rel = "stylesheet", type = "text/css", href = "style.css")
-        ),
-
-        leafletOutput("SigOpsMap", height = "800px"),
-
-        absolutePanel(
-            top = 10, left = 100, # 260,
-            div(selectInput(
-                inputId = "metric_input",
-                label = "Select Metric",
-                choices = names(metrics_list),
-                width = "300px"
+fillCol(
+    shinyApp(
+        ui = fluidPage(
+            tags$head(
+                tags$link(rel = "stylesheet", type = "text/css", href = "style.css")
             ),
-            style = "font-family: Source Sans Pro;"
-            )
-        ),
-        # absolutePanel(top = 10, left = 570,
-        #               selectInput(inputId = "period_input",
-        #                           label = "Select Period",
-        #                           choices = format(today(), "%B %Y"),
-        #                           selected = 1,
-        #                           width = "150px")),
-        absolutePanel(
-            top = 10, left = 430,
-            div(radioButtons("filter_input",
-                label = "Filter by",
-                choices = list(
-                    "View all signals" = 1,
-                    "Filter by signal group in sidebar" = 2
+    
+            leafletOutput("SigOpsMap", height = "800px"),
+    
+            absolutePanel(
+                top = 10, left = 100, # 260,
+                div(selectInput(
+                    inputId = "metric_input",
+                    label = "Select Metric",
+                    choices = names(metrics_list),
+                    width = "300px"
                 ),
-                selected = 1
+                style = "font-family: Source Sans Pro;"
+                )
             ),
-            style = "font-family: Source Sans Pro"
+            # absolutePanel(top = 10, left = 570,
+            #               selectInput(inputId = "period_input",
+            #                           label = "Select Period",
+            #                           choices = format(today(), "%B %Y"),
+            #                           selected = 1,
+            #                           width = "150px")),
+            absolutePanel(
+                top = 10, left = 430,
+                div(radioButtons("filter_input",
+                    label = "Filter by",
+                    choices = list(
+                        "View all signals" = 1,
+                        "Filter by signal group in sidebar" = 2
+                    ),
+                    selected = 1
+                ),
+                style = "font-family: Source Sans Pro"
+                )
+            ),
+            absolutePanel(
+                top = 110, left = 30,
+                div(dataTableOutput("top10_table"),
+                    style = "font-family: Source Sans Pro; font-size: 14px;"
+                )
             )
         ),
-        absolutePanel(
-            top = 110, left = 30,
-            div(dataTableOutput("top10_table"),
-                style = "font-family: Source Sans Pro; font-size: 14px;"
-            )
-        )
-    ),
-
-    server = function(input, output, session) {
-
-        output$SigOpsMap <- renderLeaflet({
-
-            debug(logger, "renderLeaflet on []: output$SigOpsMap")
-            isolate({
-                pal <- colorBin(
-                    palette = "YlGnBu",
-                    domain = map_data()[[map_metric()$variable]],
-                    bins = 5,
-                    pretty = TRUE
-                )
-
-                leaflet() %>%
-                    addProviderTiles(providers$CartoDB.Positron, group = "Light") %>%
-                    addProviderTiles(providers$CartoDB.DarkMatter, group = "Dark") %>%
-                    addProviderTiles(providers$Esri.WorldImagery, group = "Satellite") %>%
-                    addProviderTiles(providers$Esri.WorldTopoMap, group = "Topo") %>%
-                    addLayersControl(
-                        baseGroups = c("Light", "Dark", "Satellite", "Topo"),
-                        options = layersControlOptions(collapsed = FALSE)
-                    ) %>%
-                    enableTileCaching() %>%
-                    setView(lat = conf$map_center$`Northern Region`[1],
-                            lng = conf$map_center$`Northern Region`[2],
-                            zoom = conf$map_center$`Northern Region`[3]) %>%
-                    addCircleMarkers(
-                        data = map_data(),
-                        lng = ~ Longitude,
-                        lat = ~ Latitude,
-                        popup = paste(
-                            sep = "<br/>",
-                            glue("Signal {map_data()[['Description']]}"),
-                            glue(
-                                paste(
-                                    "<b>{input$metric_input}:</b>",
-                                    "{data_format(map_metric()$data_type)(map_data()[[map_metric()$variable]])}"
-                                )
-                            )
-                        ),
-                        radius = 5,
-                        fillColor = pal(map_data()[[map_metric()$variable]]),
-                        stroke = "#0C2C84", # FALSE,
-                        weight = 1,
-                        opacity = 1,
-                        fillOpacity = 1,
-                        group = "the_group"
-                    ) %>%
-                    addLegend(
-                        position = "topright",
-                        pal = pal,
-                        values = map_data()[[map_metric()$variable]],
-                        title = input$metric_input,
-                        opacity = 1
+    
+        server = function(input, output, session) {
+    
+            output$SigOpsMap <- renderLeaflet({
+    
+                debug(logger, "renderLeaflet on []: output$SigOpsMap")
+                isolate({
+                    pal <- colorBin(
+                        palette = "YlGnBu",
+                        domain = map_data()[[map_metric()$variable]],
+                        bins = 5,
+                        pretty = TRUE
                     )
+    
+                    leaflet() %>%
+                        addProviderTiles(providers$CartoDB.Positron, group = "Light") %>%
+                        addProviderTiles(providers$CartoDB.DarkMatter, group = "Dark") %>%
+                        addProviderTiles(providers$Esri.WorldImagery, group = "Satellite") %>%
+                        addProviderTiles(providers$Esri.WorldTopoMap, group = "Topo") %>%
+                        addLayersControl(
+                            baseGroups = c("Light", "Dark", "Satellite", "Topo"),
+                            options = layersControlOptions(collapsed = FALSE)
+                        ) %>%
+                        enableTileCaching() %>%
+                        setView(lat = conf$map_center$`Northern Region`[1],
+                                lng = conf$map_center$`Northern Region`[2],
+                                zoom = conf$map_center$`Northern Region`[3]) %>%
+                        addCircleMarkers(
+                            data = map_data(),
+                            lng = ~ Longitude,
+                            lat = ~ Latitude,
+                            popup = paste(
+                                sep = "<br/>",
+                                glue("Signal {map_data()[['Description']]}"),
+                                glue(
+                                    paste(
+                                        "<b>{input$metric_input}:</b>",
+                                        "{data_format(map_metric()$data_type)(map_data()[[map_metric()$variable]])}"
+                                    )
+                                )
+                            ),
+                            radius = 5,
+                            fillColor = pal(map_data()[[map_metric()$variable]]),
+                            stroke = "#0C2C84", # FALSE,
+                            weight = 1,
+                            opacity = 1,
+                            fillOpacity = 1,
+                            group = "the_group"
+                        ) %>%
+                        addLegend(
+                            position = "topright",
+                            pal = pal,
+                            values = map_data()[[map_metric()$variable]],
+                            title = input$metric_input,
+                            opacity = 1
+                        )
+                })
             })
-        })
-
-
-        map_metric <- reactive({
-            debug(logger, "reactive on input$metric_input: map_metric")
-            metrics_list[[input$metric_input]]
-        })
-
-
-        map_data <- reactive({
-            debug(logger, "reactive on zone_group(), corridors: map_data")
-
-            query_data(
-                map_metric(),
-                level = "signal",
-                resolution = "monthly",
-                zone_group = "All", # special case for the map. all signals.
-                month = current_month(),
-                upto = FALSE
-            ) %>%
-                rename(SignalID = Corridor) %>%
-                select(-any_of(c("Description"))) %>%
-                left_join(
-                    corridors[c("SignalID", "Latitude", "Longitude", "Description")],
-                    by = c("SignalID")
+    
+    
+            map_metric <- reactive({
+                debug(logger, "reactive on input$metric_input: map_metric")
+                metrics_list[[input$metric_input]]
+            })
+    
+    
+            map_data <- reactive({
+                debug(logger, "reactive on zone_group(), corridors: map_data")
+    
+                query_data(
+                    map_metric(),
+                    level = "signal",
+                    resolution = "monthly",
+                    zone_group = "All", # special case for the map. all signals.
+                    month = current_month(),
+                    upto = FALSE
                 ) %>%
-                subset(!is.na(Latitude))
-        })
-
-
-
-        table_data <- reactive({
-            debug(logger, "reactive on map_metric(), filtered_corridors(), input$filter_input: table_data")
-
-            v <- as.name(map_metric()$variable)
-
-            data_ <- if (map_metric()$variable == "uptime") {
-                map_data() %>% arrange(!!v)
-            } else {
-                map_data() %>% arrange(desc(!!v))
-            }
-
-            data_ <- data_ %>%
-                transmute(
-                    SignalID,
-                    Signal = Description,
-                    Corridor = Zone_Group,
-                    !!v := data_format(map_metric()$data_type)(!!v)
-                ) %>%
-                distinct()
-
-            if (input$filter_input != 1) {
+                    rename(SignalID = Corridor) %>%
+                    select(-any_of(c("Description"))) %>%
+                    left_join(
+                        corridors[c("SignalID", "Latitude", "Longitude", "Description")],
+                        by = c("SignalID")
+                    ) %>%
+                    subset(!is.na(Latitude))
+            })
+    
+    
+    
+            table_data <- reactive({
+                debug(logger, "reactive on map_metric(), filtered_corridors(), input$filter_input: table_data")
+    
+                v <- as.name(map_metric()$variable)
+    
+                data_ <- if (map_metric()$variable == "uptime") {
+                    map_data() %>% arrange(!!v)
+                } else {
+                    map_data() %>% arrange(desc(!!v))
+                }
+    
                 data_ <- data_ %>%
-                    subset(as.character(Corridor) %in% unique(as.character(filtered_corridors()$Corridor)))
-            }
-
-            data_ %>% head(10)
-        })
-
-
-
-        output$top10_table <- renderDataTable({
-            debug(logger, "renderDataTable on table_data(): output$top10_table")
-
-            datatable(
-                subset(table_data(), select = -c(SignalID)) %>%
-                    rename(value = ncol(table_data())-1),
-                options = list(
-                    dom = "t"
-                ),
-                selection = "single",
-                rownames = FALSE
-            ) %>%
-                formatStyle(3, textAlign = "right")
-        }, server = TRUE)
-
-
-
-        observe({
-            debug(logger, "observe on table_data(): top10_table proxy")
-            dataTableProxy("top10_table") %>%
-                DT::reloadData(
+                    transmute(
+                        SignalID,
+                        Signal = Description,
+                        Corridor = Zone_Group,
+                        !!v := data_format(map_metric()$data_type)(!!v)
+                    ) %>%
+                    distinct()
+    
+                if (input$filter_input != 1) {
+                    data_ <- data_ %>%
+                        subset(as.character(Corridor) %in% unique(as.character(filtered_corridors()$Corridor)))
+                }
+    
+                data_ %>% head(10)
+            })
+    
+    
+    
+            output$top10_table <- renderDataTable({
+                debug(logger, "renderDataTable on table_data(): output$top10_table")
+    
+                datatable(
                     subset(table_data(), select = -c(SignalID)) %>%
-                        rename(value = ncol(table_data()) - 1),
-                    clearSelection = "all")
-        })
-
-
-
-        observe({
-            debug(logger, "observe on map_data(): SigOpsMap_proxy")
-            debug(logger, paste(glue("{names(map_data())}"), collapse = "|"))
-
-            if (nrow(map_data())) {
-                pal <- colorBin(
-                    palette = "YlGnBu",
-                    domain = map_data()[[map_metric()$variable]],
-                    bins = 5,
-                    pretty = TRUE
-                )
-
+                        rename(value = ncol(table_data())-1),
+                    options = list(
+                        dom = "t"
+                    ),
+                    selection = "single",
+                    rownames = FALSE
+                ) %>%
+                    formatStyle(3, textAlign = "right")
+            }, server = TRUE)
+    
+    
+    
+            observe({
+                debug(logger, "observe on table_data(): top10_table proxy")
+                dataTableProxy("top10_table") %>%
+                    DT::reloadData(
+                        subset(table_data(), select = -c(SignalID)) %>%
+                            rename(value = ncol(table_data()) - 1),
+                        clearSelection = "all")
+            })
+    
+    
+    
+            observe({
+                debug(logger, "observe on map_data(): SigOpsMap_proxy")
+                debug(logger, paste(glue("{names(map_data())}"), collapse = "|"))
+    
+                if (nrow(map_data())) {
+                    pal <- colorBin(
+                        palette = "YlGnBu",
+                        domain = map_data()[[map_metric()$variable]],
+                        bins = 5,
+                        pretty = TRUE
+                    )
+    
+                    leafletProxy("SigOpsMap") %>%
+                        clearGroup(group = "the_group") %>%
+                        clearControls()
+    
+                    leafletProxy("SigOpsMap") %>%
+                        addCircleMarkers(
+                            data = map_data(),
+                            lng = ~ Longitude,
+                            lat = ~ Latitude,
+                            popup = paste(
+                                sep = "<br/>",
+                                glue("Signal {map_data()[['Description']]}"),
+                                glue(paste(
+                                    "<b>{input$metric_input}:</b>",
+                                    "{data_format(map_metric()$data_type)(map_data()[[map_metric()$variable]])}"))
+                            ),
+                            radius = 5,
+                            fillColor = pal(map_data()[[map_metric()$variable]]),
+                            stroke = "#0C2C84", # FALSE,
+                            weight = 1,
+                            opacity = 1,
+                            fillOpacity = 1,
+                            group = "the_group"
+                        ) %>%
+                        addLegend(
+                            position = "topright",
+                            pal = pal,
+                            values = map_data()[[map_metric()$variable]],
+                            title = input$metric_input,
+                            opacity = 1
+                        )
+                }
+            })
+    
+    
+            # to keep track of previously selected row
+            prev_row <- reactiveVal()
+    
+    
+            observeEvent(input$SigOpsMap_click, {
+                debug(logger, "observe on prev_row(): SigOpsMap_proxy - remove marker")
+                # Reset previously selected marker
+                if (!is.null(prev_row())) {
+                    leafletProxy("SigOpsMap") %>%
+                        removeMarker(as.character(prev_row()$SignalID))
+                }
+                # set new value to reactiveVal
+                # prev_row(data_selected)
+            })
+    
+    
+            observeEvent(input$top10_table_rows_selected, {
+                debug(logger, "observe event on input$top10_table_rows_selected: SigOpsMap_proxy")
+    
+                signalid <- table_data()[input$top10_table_rows_selected, "SignalID"]
+    
+                data_selected <- map_data() %>% filter(SignalID == signalid)
+    
                 leafletProxy("SigOpsMap") %>%
-                    clearGroup(group = "the_group") %>%
-                    clearControls()
-
-                leafletProxy("SigOpsMap") %>%
+                    flyTo(lat = data_selected$Latitude, lng = data_selected$Longitude, zoom = 14) %>%
                     addCircleMarkers(
-                        data = map_data(),
-                        lng = ~ Longitude,
-                        lat = ~ Latitude,
                         popup = paste(
                             sep = "<br/>",
-                            glue("Signal {map_data()[['Description']]}"),
+                            glue("Signal {data_selected$Description}"),
                             glue(paste(
                                 "<b>{input$metric_input}:</b>",
-                                "{data_format(map_metric()$data_type)(map_data()[[map_metric()$variable]])}"))
+                                "{data_format(map_metric()$data_type)(data_selected[[map_metric()$variable]])}"))
                         ),
-                        radius = 5,
-                        fillColor = pal(map_data()[[map_metric()$variable]]),
-                        stroke = "#0C2C84", # FALSE,
-                        weight = 1,
-                        opacity = 1,
-                        fillOpacity = 1,
-                        group = "the_group"
-                    ) %>%
-                    addLegend(
-                        position = "topright",
-                        pal = pal,
-                        values = map_data()[[map_metric()$variable]],
-                        title = input$metric_input,
-                        opacity = 1
+                        layerId = as.character(data_selected$SignalID),
+                        lng = data_selected$Longitude,
+                        lat = data_selected$Latitude,
+                        stroke = TRUE,
+                        color = "black"
                     )
-            }
-        })
-
-
-        # to keep track of previously selected row
-        prev_row <- reactiveVal()
-
-
-        observeEvent(input$SigOpsMap_click, {
-            debug(logger, "observe on prev_row(): SigOpsMap_proxy - remove marker")
-            # Reset previously selected marker
-            if (!is.null(prev_row())) {
-                leafletProxy("SigOpsMap") %>%
-                    removeMarker(as.character(prev_row()$SignalID))
-            }
-            # set new value to reactiveVal
-            # prev_row(data_selected)
-        })
-
-
-        observeEvent(input$top10_table_rows_selected, {
-            debug(logger, "observe event on input$top10_table_rows_selected: SigOpsMap_proxy")
-
-            signalid <- table_data()[input$top10_table_rows_selected, "SignalID"]
-
-            data_selected <- map_data() %>% filter(SignalID == signalid)
-
-            leafletProxy("SigOpsMap") %>%
-                flyTo(lat = data_selected$Latitude, lng = data_selected$Longitude, zoom = 14) %>%
-                addCircleMarkers(
-                    popup = paste(
-                        sep = "<br/>",
-                        glue("Signal {data_selected$Description}"),
-                        glue(paste(
-                            "<b>{input$metric_input}:</b>",
-                            "{data_format(map_metric()$data_type)(data_selected[[map_metric()$variable]])}"))
-                    ),
-                    layerId = as.character(data_selected$SignalID),
-                    lng = data_selected$Longitude,
-                    lat = data_selected$Latitude,
-                    stroke = TRUE,
-                    color = "black"
-                )
-
-            # Reset previously selected marker
-            if (!is.null(prev_row())) {
-                leafletProxy("SigOpsMap") %>%
-                    removeMarker(as.character(prev_row()$SignalID))
-            }
-            # set new value to reactiveVal
-            prev_row(data_selected)
-        })
-
-
-        observeEvent(zone_group(), {
-            req(zone_group())
-            debug(logger, glue("Map center reactive on zone_group(): {zone_group()}"))
-            if (zone_group() %in% names(conf$map_center)) {
-                coords <- conf$map_center[[zone_group()]]
-                leafletProxy("SigOpsMap") %>%
-                    # Would prefer to do this, but after flying, using the scrollwheel
-                    # to zoom in/out zooms all the way in for some reason.
-                    # flyTo(
-                    #     lat = coords[1],
-                    #     lng = coords[2],
-                    #     zoom = coords[3]) #%>%
-                    setView(lat = coords[1],
-                        lng = coords[2],
-                        zoom = coords[3])
-            }
-        })
-
-    },
-
-    options = list(height = 800)
+    
+                # Reset previously selected marker
+                if (!is.null(prev_row())) {
+                    leafletProxy("SigOpsMap") %>%
+                        removeMarker(as.character(prev_row()$SignalID))
+                }
+                # set new value to reactiveVal
+                prev_row(data_selected)
+            })
+    
+    
+            observeEvent(zone_group(), {
+                req(zone_group())
+                debug(logger, glue("Map center reactive on zone_group(): {zone_group()}"))
+                if (zone_group() %in% names(conf$map_center)) {
+                    coords <- conf$map_center[[zone_group()]]
+                    leafletProxy("SigOpsMap") %>%
+                        # Would prefer to do this, but after flying, using the scrollwheel
+                        # to zoom in/out zooms all the way in for some reason.
+                        # flyTo(
+                        #     lat = coords[1],
+                        #     lng = coords[2],
+                        #     zoom = coords[3]) #%>%
+                        setView(lat = coords[1],
+                            lng = coords[2],
+                            zoom = coords[3])
+                }
+            })
+    
+        }
+    )
 )
 ```
 
