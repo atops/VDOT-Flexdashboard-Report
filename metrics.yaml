@@ -28,6 +28,7 @@ daily_traffic_volume:
     hourly_table: NULL
     has_weekly: True
     peak_only:
+    palette: "YlGnBu"
 
 am_peak_hour_volume:
     label: AM Peak Volume [veh/hr]
@@ -86,6 +87,8 @@ arrivals_on_green:
     hourly_table: aogh
     has_weekly: True
     peak_only:
+    palette: "RdYlGn"
+    domain: [0, 1]
 
 # --- Performance Metrics -----------------------
 progression_ratio:
@@ -101,6 +104,8 @@ progression_ratio:
     hourly_table: prh
     has_weekly: True
     peak_only:
+    palette: "RdYlGn"
+    domain: [0, 2]
 
 queue_spillback_rate:
     label: Queue Spillback Rate [%]
@@ -115,6 +120,8 @@ queue_spillback_rate:
     hourly_table: qsh
     has_weekly: True
     peak_only:
+    palette: "Reds"
+    domain: [0, 1]
 
 peak_period_split_failures:
     label: Peak Period Split Failures Rate [%]
@@ -183,6 +190,20 @@ average_speed:
     fill_color: "#99E6BF"
     goal: NULL
     hourly_table: spdh
+    has_weekly: False
+    peak_only:
+
+travel_time:
+    label: Travel Time [min]
+    table: tt
+    s3table:
+    variable: tt
+    weight: NULL
+    data_type: integer
+    highlight_color: "#007338"
+    fill_color: "#99E6BF"
+    goal: NULL
+    hourly_table: tth
     has_weekly: False
     peak_only:
 

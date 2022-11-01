@@ -1527,9 +1527,9 @@ volplot_plotly <- function(
     title = "title", ymax = 1000) {
 
     if (is.null(ymax)) {
-        yax <- list(rangemode = "tozero", tickformat = ",.0")
+        yax <- list(rangemode = "tozero", tickformat = tick_format(vpd$data_type))
     } else {
-        yax <- list(range = c(0, ymax), tickformat = ",.0")
+        yax <- list(range = c(0, ymax), tickformat = tick_format(vpd$data_type))
     } 
     
     # Works. fill_colr is still an enigma, but it works as is.
@@ -1614,7 +1614,7 @@ volplot_plotly <- function(
     
     withProgress(message = "Loading chart", value = 0, {
         incProgress(amount = 0.1)
-        
+
         conn <- poolCheckout(dbpool_)
         df <- read_signal_data(conn, signalid, plot_start_date, plot_end_date)
         poolReturn(conn)      
@@ -1628,7 +1628,7 @@ volplot_plotly <- function(
             
             plts <- purrr::imap(dfs, ~pl(.x, .y))
             incProgress(amount = 0.3)
-            
+
             subplot(plts, nrows = length(plts), shareX = TRUE) %>%
                 layout(annotations = list(text = title,
                                           xref = "paper",
@@ -1641,8 +1641,8 @@ volplot_plotly <- function(
                                           showarrow = FALSE),
                        showlegend = TRUE,
                        margin = list(l = 120),
-                       xaxis = list(
-                           type = 'date'))
+                       xaxis = list(type = 'date'),
+                       yaxis = yax)
         } else {
             no_data_plot("")
         }

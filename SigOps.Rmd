@@ -6,9 +6,6 @@ output:
     css: style.css
     favicon: VDOT_V_Logo.gif
     logo: VDOT_48px.png
-    #orientation: columns
-    #self_contained: no
-    vertical_layout: fill
 ---
 
 <style>
@@ -44,12 +41,16 @@ $("body").on("shown.bs.tab", "a[data-toggle='tab']", function(e) {
 ```{r global, include = FALSE, warning = TRUE}
 # FLEXDASHBOARD - RTOP_MONTHLY_REPORT
 
+options(shiny.reactlog = TRUE)
+
 source("Monthly_Report_UI_Functions.R")
 
 FIG_WIDTH <- 14
 FIG_HEIGHT <- 7
 
 styl <- "font-family: Source Sans Pro; font-size: 14px; padding-top: 25px"
+plot_height_css <- "calc(93vh - 200px)"
+plot_height_css2 <- "calc(93vh - 165px)"
 ```
 
 
@@ -272,6 +273,7 @@ level <- reactive(
 
 
 filtered_corridors <- reactive({
+    req(input$zone_group)
     debug(logger, "reactive on input$zone_group: filtered_corridors()")
     corr <- corridors %>%
         filter(Zone_Group %in% input$zone_group)
@@ -873,7 +875,7 @@ Row {data-height=700}
 
 ```{r metric plot, fig.width = FIG_WIDTH, fig.height = FIG_HEIGHT}
 
-plotlyOutput("performance", height = "100%", width = "100%")
+plotlyOutput("performance", height = plot_height_css, width = "100%")
 
 output$performance <- renderPlotly({
     level_ <- level()
@@ -971,7 +973,7 @@ Row {data-height=700}
 
 ```{r volumes plot, fig.width = FIG_WIDTH, fig.height = FIG_HEIGHT}
 
-plotlyOutput("volume", height = "100%", width = "100%")
+plotlyOutput("volume", height = plot_height_css2, width = "100%")
 
 output$volume <- renderPlotly({
     level_ <- level()
@@ -1061,7 +1063,7 @@ Row {data-height=700}
 
 ```{r equipment plot, fig.width = FIG_WIDTH, fig.height = FIG_HEIGHT}
 
-plotlyOutput("equipment", height = "100%", width = "100%")
+plotlyOutput("equipment", plot_height_css2, width = "100%")
 
 output$equipment <- renderPlotly({
     level_ <- level()
@@ -1319,18 +1321,28 @@ Row {data-height = 800}
 -------------------------------------
 
 ```{r}
-renderDataTable({
+
+DTOutput("SignalsList")
+
+output$SignalsList <- renderDataTable({
+    req(input$zone_group)
     debug(logger, "renderDataTable on filtered_corridors(): filtered_corridors()")
-    datatable(filter(filtered_corridors(), as.integer(as.character(SignalID)) > 0),
+    datatable(filter(isolate(filtered_corridors()), as.integer(as.character(SignalID)) > 0),
         escape = FALSE,
         extensions = "Scroller",
         options = list(
-            deferRender = TRUE,
+            #deferRender = TRUE,
             scrollY = 800,
             scroller = TRUE,
             searching = TRUE
         )
     )
+})
+
+SignalsListDTProxy <- dataTableProxy("SignalsList")
+
+observe({
+    DT::replaceData(SignalsListDTProxy, filtered_corridors())
 })
 ```
 
@@ -1385,17 +1397,51 @@ line_labels <- function(corridor, subcorridor) {
 }
 
 
+# Move and refactor this once it's working
+getMapPalette <- function(data, metric) {
+    if (identical(metric, arrivals_on_green)) {
+        colorBin(
+            palette = metric$palette,
+            domain = metric$domain,
+            bins = 5,
+            pretty = TRUE
+        )
+    } else if (identical(metric, progression_ratio)) {
+        colorBin(
+            palette = metric$palette,
+            domain = metric$domain,
+            bins = 8,
+            pretty = TRUE
+        )
+    } else if (identical(metric, queue_spillback_rate)) {
+        colorBin(
+            palette = metric$palette,
+            domain = metric$domain,
+            bins = 5,
+            pretty = TRUE
+        )
+    } else {
+        colorBin(
+            palette = "YlGnBu",
+            domain = data[[metric$variable]],
+            bins = 5,
+            pretty = TRUE
+        )
+    }
+}
+
+
 fillCol(
     shinyApp(
         ui = fluidPage(
             tags$head(
-                tags$link(rel = "stylesheet", type = "text/css", href = "style.css")
+                tags$style(type = "text/css", "#SigOpsMap {height: calc(100vh - 10px) !important;}")
             ),
     
-            leafletOutput("SigOpsMap", height = "800px"),
+            leafletOutput("SigOpsMap"),
     
             absolutePanel(
-                top = 10, left = 100, # 260,
+                top = 10, left = 100,
                 div(selectInput(
                     inputId = "metric_input",
                     label = "Select Metric",
@@ -1405,12 +1451,6 @@ fillCol(
                 style = "font-family: Source Sans Pro;"
                 )
             ),
-            # absolutePanel(top = 10, left = 570,
-            #               selectInput(inputId = "period_input",
-            #                           label = "Select Period",
-            #                           choices = format(today(), "%B %Y"),
-            #                           selected = 1,
-            #                           width = "150px")),
             absolutePanel(
                 top = 10, left = 430,
                 div(radioButtons("filter_input",
@@ -1424,12 +1464,12 @@ fillCol(
                 style = "font-family: Source Sans Pro"
                 )
             ),
-            absolutePanel(
-                top = 110, left = 30,
-                div(dataTableOutput("top10_table"),
-                    style = "font-family: Source Sans Pro; font-size: 14px;"
-                )
-            )
+            # absolutePanel(
+            #     top = 110, left = 30,
+            #     div(dataTableOutput("top10_table"),
+            #         style = "font-family: Source Sans Pro; font-size: 14px;"
+            #     )
+            # )
         ),
     
         server = function(input, output, session) {
@@ -1438,12 +1478,13 @@ fillCol(
     
                 debug(logger, "renderLeaflet on []: output$SigOpsMap")
                 isolate({
-                    pal <- colorBin(
-                        palette = "YlGnBu",
-                        domain = map_data()[[map_metric()$variable]],
-                        bins = 5,
-                        pretty = TRUE
-                    )
+                    pal <- getMapPalette(map_data(), map_metric())
+                    # pal <- colorBin(
+                    #     palette = "YlGnBu",
+                    #     domain = map_data()[[map_metric()$variable]],
+                    #     bins = 5,
+                    #     pretty = TRUE
+                    # )
     
                     leaflet() %>%
                         addProviderTiles(providers$CartoDB.Positron, group = "Light") %>%
@@ -1455,9 +1496,9 @@ fillCol(
                             options = layersControlOptions(collapsed = FALSE)
                         ) %>%
                         enableTileCaching() %>%
-                        setView(lat = conf$map_center$`Northern Region`[1],
-                                lng = conf$map_center$`Northern Region`[2],
-                                zoom = conf$map_center$`Northern Region`[3]) %>%
+                        setView(lat = conf$map_center$`Northern Virginia`[1],
+                                lng = conf$map_center$`Northern Virginia`[2],
+                                zoom = conf$map_center$`Northern Virginia`[3]) %>%
                         addCircleMarkers(
                             data = map_data(),
                             lng = ~ Longitude,
@@ -1474,7 +1515,7 @@ fillCol(
                             ),
                             radius = 5,
                             fillColor = pal(map_data()[[map_metric()$variable]]),
-                            stroke = "#0C2C84", # FALSE,
+                            stroke = DARK_GRAY, #  "#0C2C84", # FALSE,
                             weight = 1,
                             opacity = 1,
                             fillOpacity = 1,
@@ -1582,13 +1623,8 @@ fillCol(
                 debug(logger, paste(glue("{names(map_data())}"), collapse = "|"))
     
                 if (nrow(map_data())) {
-                    pal <- colorBin(
-                        palette = "YlGnBu",
-                        domain = map_data()[[map_metric()$variable]],
-                        bins = 5,
-                        pretty = TRUE
-                    )
-    
+                    pal <- getMapPalette(map_data(), map_metric())
+                    
                     leafletProxy("SigOpsMap") %>%
                         clearGroup(group = "the_group") %>%
                         clearControls()
@@ -1703,13 +1739,11 @@ fillCol(
 
 
 
-Signal Details
+Signal Details {data-orientation=rows}
 =====================================
 
 ```{r signal_detail, eval = TRUE}
 fillCol(
-    height = 100,
-
     fluidRow(
         column(
             width = 4,
@@ -1726,8 +1760,12 @@ fillCol(
                 actionButton("signal_details_button", "Plot")
             )
         )
-    )
+    ),
+    plotlyOutput("SignalDetailsPlot"),
+    height = "100%",
+    flex = c(1, 10)
 )
+
 
 observeEvent(zone_group(), {
     req(zone_group())
@@ -1735,16 +1773,14 @@ observeEvent(zone_group(), {
     updateSelectizeInput(session, "signalid", choices = c("Select", filtered_signalids()), server = TRUE)
 })
 
+
 sid <- eventReactive(input$signal_details_button, {
     req(input$signalid)
     gsub(":.+", "", input$signalid)
 })
 
 
-fillCol(
-    height = 700,
-
-    renderPlotly({
+output$SignalDetailsPlot <- renderPlotly({
         req(input$signal_details_button)
         debug(logger, "renderPlotly on sid(), current_month(), endof_current_month(): volplot_plotly")
         volplot_plotly(
@@ -1752,7 +1788,6 @@ fillCol(
             title = "Raw and Filtered Detector Data", ymax = NULL
         )
     })
-)
 ```
 
 
