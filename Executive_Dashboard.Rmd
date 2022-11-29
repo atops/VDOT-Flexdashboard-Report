@@ -1,0 +1,406 @@
+---
+title: "Executive Arterial Performance Dashboard"
+runtime: shiny
+output:
+  flexdashboard::flex_dashboard:
+    css: style.css
+    favicon: VDOT_V_Logo.gif
+    logo: VDOT_48px.png
+    orientation: columns
+    # self_contained: no
+    # vertical_layout: fill
+---
+
+
+
+```{r global, include = FALSE, warning = TRUE}
+# FLEXDASHBOARD - RTOP_MONTHLY_REPORT
+
+source("Monthly_Report_UI_Functions.R")
+
+FIG_WIDTH <- 14
+FIG_HEIGHT <- 7
+
+styl <- "font-family: Source Sans Pro; font-size: 14px; padding-top: 25px"
+```
+
+
+
+
+
+Inputs {.sidebar}
+=====================================
+
+
+```{r sidebar, warning = FALSE}
+# shiny inputs defined here
+
+HTML("<br>")
+
+selectInput("month", "Month:",
+    choices = month_options,
+    selected = month_options[1]
+) # Default to current month
+
+
+selectInput("zone_group", "District:",
+    choices = zone_group_options,
+    selected = NULL
+)
+
+# input$corridor_x <- "All Corridors"
+
+
+# --- -------------------------------------------------- ---
+
+
+current_month <- reactive(lubridate::dmy(paste(1, input$month)))
+endof_current_month <- reactive(lubridate::dmy(paste(1, input$month)) + months(1) - days(1))
+current_quarter <- reactive(as.character(lubridate::quarter(current_month(), with_year = TRUE)))
+
+
+corridor <- function() {"All Corridors"}
+
+
+zone_group <- reactive({
+    input$zone_group
+})
+
+level <- function() {"corridor"}
+
+
+
+filtered_corridors <- reactive({
+    debug(logger, "reactive on input$zone_group: filtered_corridors()")
+    corridors %>%
+        filter(Zone_Group %in% input$zone_group) %>% 
+        select(-Description, -Asof)
+})
+
+
+ntraces <- reactive({
+    debug(logger, "reactive on filtered_corridors(): ntraces()")
+    filtered_corridors() %>%
+        distinct(Corridor) %>%
+        nrow()
+})
+
+
+filtered_signalids <- reactive({
+    debug(logger, "reactive on corridors: filtered_signalids()")
+    x <- filtered_corridors() %>%
+        filter(as.integer(as.character(SignalID)) > 0) %>%
+        arrange(as.integer(as.character(SignalID)))
+    paste0(x$SignalID, ": ", x$Name)
+})
+
+
+```
+
+
+
+_
+=====================================
+
+
+Column {data-width=600}
+-------------------------------------
+
+    
+### Map
+
+```{r Map, echo = FALSE, eval = TRUE}
+line_popups <- function(num, name, corr, subc, tmc) {
+    paste(
+        sep = "<br/>",
+        glue("<b>Corridor: {corr}</b>"),
+        glue("<b>Subcorridor: {subc}</b>"),
+        glue("<b>Route Number:</b> {num}"),
+        glue("<b>Road Name:</b> {name}"),
+        glue("<b>TMC Code:</b> {tmc}")
+    )
+}
+
+
+
+point_popups <- function(signalid, name, corridor) {
+    paste(
+        sep = "<br/>",
+        glue("<b>Signal: {signalid}</b> | {name}"),
+        glue("<b>Corridor:</b> {corridor}")
+    )
+}
+
+
+
+line_labels <- function(corridor, subcorridor) {
+    paste(
+        sep = " | ",
+        glue("Corridor: {corridor}"),
+        glue("Subcorridor: {subcorridor}")
+    )
+}
+
+
+fillCol(
+    shinyApp(
+        ui = fluidPage(
+            tags$head(
+                tags$link(rel = "stylesheet", type = "text/css", href = "style.css"),
+                tags$style(type = "text/css", "#SigOpsMap {height: calc(100vh - 10px) !important;}")
+            ),
+    
+            leafletOutput("SigOpsMap"),
+    
+            absolutePanel(
+                top = 10, left = 100, # 260,
+                div(selectInput(
+                    inputId = "metric_input",
+                    label = "Select Metric",
+                    choices = names(metrics_list),   # TODO: Limit this to just RHS metrics
+                    width = "300px"
+                ),
+                style = "font-family: Source Sans Pro;"
+                )
+            )
+        ),
+    
+        server = function(input, output, session) {
+    
+            output$SigOpsMap <- renderLeaflet({
+    
+                debug(logger, "renderLeaflet on []: output$SigOpsMap")
+                isolate({
+                    pal <- colorBin(
+                        palette = "YlGnBu",
+                        domain = map_data()[[map_metric()$variable]],
+                        bins = 5,
+                        pretty = TRUE
+                    )
+    
+                    leaflet() %>%
+                        addProviderTiles(providers$CartoDB.Positron, group = "Light") %>%
+                        addProviderTiles(providers$CartoDB.DarkMatter, group = "Dark") %>%
+                        addProviderTiles(providers$Esri.WorldImagery, group = "Satellite") %>%
+                        addProviderTiles(providers$Esri.WorldTopoMap, group = "Topo") %>%
+                        addLayersControl(
+                            baseGroups = c("Light", "Dark", "Satellite", "Topo"),
+                            options = layersControlOptions(collapsed = FALSE)
+                        ) %>%
+                        enableTileCaching() %>%
+                        setView(lat = conf$map_center$`Northern Virginia`[1],
+                                lng = conf$map_center$`Northern Virginia`[2],
+                                zoom = conf$map_center$`Northern Virginia`[3]) %>%
+                        addCircleMarkers(
+                            data = map_data(),
+                            lng = ~ Longitude,
+                            lat = ~ Latitude,
+                            popup = paste(
+                                sep = "<br/>",
+                                glue("Signal {map_data()[['Description']]}"),
+                                glue(
+                                    paste(
+                                        "<b>{input$metric_input}:</b>",
+                                        "{data_format(map_metric()$data_type)(map_data()[[map_metric()$variable]])}"
+                                    )
+                                )
+                            ),
+                            radius = 5,
+                            fillColor = pal(map_data()[[map_metric()$variable]]),
+                            stroke = "#0C2C84", # FALSE,
+                            weight = 1,
+                            opacity = 1,
+                            fillOpacity = 1,
+                            group = "the_group"
+                        ) %>%
+                        addLegend(
+                            position = "topright",
+                            pal = pal,
+                            values = map_data()[[map_metric()$variable]],
+                            title = input$metric_input,
+                            opacity = 1
+                        )
+                })
+            })
+    
+    
+            map_metric <- reactive({
+                debug(logger, "reactive on input$metric_input: map_metric")
+                metrics_list[[input$metric_input]]
+            })
+    
+    
+            map_data <- reactive({
+                debug(logger, "reactive on zone_group(), corridors: map_data")
+    
+                query_data(
+                    map_metric(),
+                    level = "signal",
+                    resolution = "monthly",
+                    zone_group = "All", # special case for the map. all signals.
+                    month = current_month(),
+                    upto = FALSE
+                ) %>%
+                    rename(SignalID = Corridor) %>%
+                    select(-any_of(c("Description"))) %>%
+                    left_join(
+                        corridors[c("SignalID", "Latitude", "Longitude", "Description")],
+                        by = c("SignalID")
+                    ) %>%
+                    subset(!is.na(Latitude))
+            })
+    
+            
+            observe({
+                debug(logger, "observe on map_data(): SigOpsMap_proxy")
+                debug(logger, paste(glue("{names(map_data())}"), collapse = "|"))
+    
+                if (nrow(map_data())) {
+                    pal <- colorBin(
+                        palette = "YlGnBu",
+                        domain = map_data()[[map_metric()$variable]],
+                        bins = 5,
+                        pretty = TRUE
+                    )
+    
+                    leafletProxy("SigOpsMap") %>%
+                        clearGroup(group = "the_group") %>%
+                        clearControls()
+    
+                    leafletProxy("SigOpsMap") %>%
+                        addCircleMarkers(
+                            data = map_data(),
+                            lng = ~ Longitude,
+                            lat = ~ Latitude,
+                            popup = paste(
+                                sep = "<br/>",
+                                glue("Signal {map_data()[['Description']]}"),
+                                glue(paste(
+                                    "<b>{input$metric_input}:</b>",
+                                    "{data_format(map_metric()$data_type)(map_data()[[map_metric()$variable]])}"))
+                            ),
+                            radius = 5,
+                            fillColor = pal(map_data()[[map_metric()$variable]]),
+                            stroke = "#0C2C84", # FALSE,
+                            weight = 1,
+                            opacity = 1,
+                            fillOpacity = 1,
+                            group = "the_group"
+                        ) %>%
+                        addLegend(
+                            position = "topright",
+                            pal = pal,
+                            values = map_data()[[map_metric()$variable]],
+                            title = input$metric_input,
+                            opacity = 1
+                        )
+                }
+            })
+
+                        
+            observeEvent(zone_group(), {
+                req(zone_group())
+                debug(logger, glue("Map center reactive on zone_group(): {zone_group()}"))
+                if (zone_group() %in% names(conf$map_center)) {
+                    coords <- conf$map_center[[zone_group()]]
+                    leafletProxy("SigOpsMap") %>%
+                        # Would prefer to do this, but after flying, using the scrollwheel
+                        # to zoom in/out zooms all the way in for some reason.
+                        # flyTo(
+                        #     lat = coords[1],
+                        #     lng = coords[2],
+                        #     zoom = coords[3]) #%>%
+                        setView(lat = coords[1],
+                                lng = coords[2],
+                                zoom = coords[3])
+                }
+            })
+    
+        }
+    )
+)
+```
+
+
+
+
+Column {data-width=400}
+-------------------------------------
+
+
+### Performance
+
+```{r summary_left, eval = TRUE, warning = FALSE, fig.height=450}
+
+fillCol(
+    fillRow(
+        div("Arrivals on Green", style = styl),
+        renderPlotly({
+            summary_plot(
+                arrivals_on_green,
+                zone_group = input$zone_group, corridor = corridor(), month = current_month()
+            )
+        }),
+        flex = c(2, 10)
+    ),
+    fillRow(
+        div("Peak Period Split Failure", style = styl),
+        renderPlotly({
+            summary_plot(
+                peak_period_split_failures,
+                zone_group = input$zone_group, corridor = corridor(), month = current_month()
+            )
+        }),
+        flex = c(2, 10)
+    ),
+    fillRow(
+        div("Travel Time Index", style = styl),
+        renderPlotly({
+            summary_plot(
+                travel_time_index,
+                zone_group = input$zone_group, corridor = corridor(), month = current_month()
+            )
+        }),
+        flex = c(2, 10)
+    ),
+        fillRow(
+        div("Daily Volume", style = styl),
+        renderPlotly({
+            summary_plot(
+                vpd,
+                zone_group = input$zone_group, corridor = corridor(), month = current_month()
+            )
+        }),
+        flex = c(2, 10)
+    )
+)
+```
+
+
+### Maintenance
+
+```{r summary_right, eval = TRUE, warning = FALSE, fig.height=250}
+
+fillCol(
+    fillRow(
+        div("Detector Uptime", style = styl),
+        renderPlotly({
+            summary_plot(
+                detector_uptime,
+                zone_group = input$zone_group, corridor = corridor(), month = current_month()
+            )
+        }),
+        flex = c(2, 10)
+    ),
+    fillRow(
+        div("Comm Uptime", style = styl),
+        renderPlotly({
+            summary_plot(
+                comm_uptime,
+                zone_group = input$zone_group, corridor = corridor(), month = current_month()
+            )
+        }),
+        flex = c(2, 10)
+    )
+)
+```
