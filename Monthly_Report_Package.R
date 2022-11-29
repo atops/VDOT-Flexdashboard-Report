@@ -1551,16 +1551,14 @@ tryCatch(
                 select(Zone_Group, Corridor, Month, !!as.name(metric$variable), delta) %>%
                 filter(!is.na(Zone_Group))
 
-            tabl <- metric$table
+            corr_levels <- c("sig", "sub", "cor")
+            pers <- c("dy", "wk", "mo")
 
             td <- tibble(
                 data = list(avg_daily, sub_daily, cor_daily,
                             avg_weekly, sub_weekly, cor_weekly,
                             avg_monthly, sub_monthly, cor_monthly),
-                fn = sapply(c("sig/dy/{tabl}.parquet", "sub/dy/{tabl}.parquet", "cor/dy/{tabl}.parquet",
-                              "sig/wk/{tabl}.parquet", "sub/wk/{tabl}.parquet", "cor/wk/{tabl}.parquet",
-                              "sig/mo/{tabl}.parquet", "sub/mo/{tabl}.parquet", "cor/mo/{tabl}.parquet"),
-                            glue),
+                fn = apply(expand.grid(corr_levels, pers, metric$table, ".parquet"), 1, paste, collapse="/"),
                 var = metric$variable,
                 rsd = report_start_date,
                 csd = c(rep(as_date(calcs_start_date), 3),
@@ -1570,17 +1568,11 @@ tryCatch(
 
             write_aggregations(aurora, td)
 
-            avg_quarterly <- get_quarterly(read_parquet(glue("sig/mo/{tabl}.parquet")), metric$variable)
-            sub_quarterly <- get_quarterly(read_parquet(glue("sub/mo/{tabl}.parquet")), metric$variable)
-            cor_quarterly <- get_quarterly(read_parquet(glue("cor/mo/{tabl}.parquet")), metric$variable)
-
             td <- tibble(
-                data = list(
-                    avg_quarterly,
-                    sub_quarterly,
-                    cor_quarterly),
-                fn = sapply(c("sig/qu/{tabl}.parquet", "sub/qu/{tabl}.parquet", "cor/qu/{tabl}.parquet"),
-                            glue),
+                data = lapply(glue("{corr_levels}/mo/{metric$table}.parquet"), function(fn) {
+                   get_quarterly(read_parquet(fn), metric$variable)}
+                ),
+                fn = glue("{corr_levels}/qu/{metric$table}.parquet"),
                 var = metric$variable,
                 rsd = report_start_date,
                 csd = report_start_date
