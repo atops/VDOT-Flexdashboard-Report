@@ -1558,7 +1558,7 @@ tryCatch(
                 data = list(avg_daily, sub_daily, cor_daily,
                             avg_weekly, sub_weekly, cor_weekly,
                             avg_monthly, sub_monthly, cor_monthly),
-                fn = apply(expand.grid(corr_levels, pers, metric$table, ".parquet"), 1, paste, collapse="/"),
+                fn = paste0(apply(expand.grid(corr_levels, pers, metric$table), 1, paste, collapse="/"), ".parquet"),
                 var = metric$variable,
                 rsd = report_start_date,
                 csd = c(rep(as_date(calcs_start_date), 3),
