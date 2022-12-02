@@ -20,7 +20,6 @@ suppressMessages({
     library(future)
     library(pool)
     library(httr)
-    library(aws.s3)
     library(sp)
     library(sf)
     library(yaml)
@@ -47,14 +46,6 @@ filter <- dplyr::filter
 options(future.rng.onMisue = "ignore")
 
 conf <- read_yaml("Monthly_Report.yaml")
-aws.signature::use_credentials(profile = conf$profile)
-Sys.setenv(AWS_DEFAULT_REGION = conf$aws_region) # credentials file doesn't store region
-
-cred <- aws.signature::read_credentials()[[conf$profile]]
-conf$athena$uid <- cred$AWS_ACCESS_KEY_ID
-conf$athena$pwd <- cred$AWS_SECRET_ACCESS_KEY
-conf$athena$region <- conf$region
-
 aws_conf <- read_yaml("Monthly_Report_AWS.yaml")
 
 if (Sys.info()["sysname"] == "Windows") {
@@ -95,7 +86,7 @@ Sys.setenv(TZ="America/New_York")
 
 
 source("Utilities.R")
-source("S3ParquetIO.R")
+source("GCSParquetIO.R")
 source("Configs.R")
 source("Counts.R")
 source("Metrics.R")

@@ -368,8 +368,7 @@ walk_nested_list <- function(df, src, name=deparse(substitute(df)), indent=0) {
                 }
             }
 
-    	    aws.s3::s3write_using(dfp, qsave, bucket = conf$bucket, object = glue("{src}/{name}.qs"))
-    	    #readr::write_csv(dfp, paste0(name, ".csv"))
+            s3write_using(dfp, qsave, bucket = conf$bucket, object = glue("{src}/{name}.qs"))
 
     	}
         for (n in names(df)) {

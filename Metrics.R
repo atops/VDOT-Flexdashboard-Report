@@ -271,7 +271,7 @@ get_sf_utah <- function(date_, conf, signals_list = NULL, first_seconds_of_red =
 
     cat('.')
 
-    ds_de <- arrow::open_dataset(glue("s3://{conf$bucket}/detections/date={date_}"))
+    ds_de <- arrow::open_dataset(glue("gs://{conf$bucket}/{conf$key_prefix}/detections/date={date_}"))
     de <- ds_de %>%
         filter(SignalID %in% signals_list,
                Phase %in% c(3, 4, 7, 8)) %>%
@@ -297,7 +297,7 @@ get_sf_utah <- function(date_, conf, signals_list = NULL, first_seconds_of_red =
 
     cat('.')
 
-    ds_cd <- arrow::open_dataset(glue("s3://{conf$bucket}/cycles/date={date_}"))
+    ds_cd <- arrow::open_dataset(glue("gs://{conf$bucket}/{conf$key_prefix}/cycles/date={date_}"))
     cd <- ds_cd %>%
         filter(SignalID %in% signals_list,
                Phase %in% c(3, 4, 7, 8),
@@ -713,10 +713,8 @@ get_ped_delay <- function(date_, conf, signals_list) {
     plan(sequential)
     plan(multisession)
 
-    s3bucket = conf$bucket
-    s3prefix = glue("atspm/date={date_}")
-
-    ds <- arrow::open_dataset(glue("s3://{s3bucket}/{s3prefix}"))
+    conn <- get_atspm_connection()
+    ds <- tbl(conn, "Controller_Event_Log")
 
     pe <- ds %>%
         filter(EventCode %in% c(45, 21, 22, 132)) %>%
@@ -819,7 +817,7 @@ get_detection_levels_by_signal <- function(date_) {
 
 get_termination_type <- function(date_, conf, signals_list = NULL) {
 
-    df <- arrow::open_dataset(glue("s3://{conf$bucket}/cycles/date={date_}")) %>%
+    df <- arrow::open_dataset(glue("gs://{conf$bucket}/{conf$key_prefix}/cycles/date={date_}")) %>%
         select(
             SignalID, CallPhase=Phase, EventCode, TermType) %>%
         filter(

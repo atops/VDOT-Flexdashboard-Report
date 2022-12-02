@@ -58,11 +58,10 @@ if (as_datetime(xlsx_last_modified) > as_datetime(qs_last_modified)) {
         bucket = conf$bucket
     )
     qsave(corridors, qs_filename)
-    aws.s3::put_object(
+    s3_upload_file(
         file = qs_filename,
-        object = qs_filename,
-        bucket = conf$bucket,
-        multipart = TRUE
+        object = file.path(conf$key_prefix, qs_filename, fsep="/"),
+        bucket = conf$bucket
     )
     dbExecute(aurora, "TRUNCATE TABLE Corridors")
     dbWriteTable(aurora, "Corridors", corridors, overwrite = FALSE, append = TRUE, row.names = FALSE)
@@ -74,11 +73,10 @@ if (as_datetime(xlsx_last_modified) > as_datetime(qs_last_modified)) {
     )
     qs_all_filename <- sub("\\..*", ".qs", paste0("all_", conf$corridors_filename_s3))
     qsave(all_corridors, qs_all_filename)
-    aws.s3::put_object(
+    s3_upload_file(
         file = qs_all_filename,
-        object = qs_all_filename,
-        bucket = conf$bucket,
-        multipart = TRUE
+        object = file.path(conf$key_prefix, qs_al_filename, fsep="/"),
+        bucket = conf$bucket
     )
     dbExecute(aurora, "TRUNCATE TABLE AllCorridors")
     dbWriteTable(aurora, "AllCorridors", all_corridors, overwrite = FALSE, append = TRUE, row.names = FALSE)
@@ -103,8 +101,8 @@ if (conf$run$cctv == TRUE) {
     # Run python scripts asynchronously
     system("c:/users/ATSPM/miniconda3/python.exe parse_cctvlog.py", wait = FALSE)
     system("c:/users/ATSPM/miniconda3/python.exe parse_cctvlog_encoders.py", wait = FALSE)
-    system("~/miniconda3/bin/conda run -n vdot-flexdashboard-report python parse_cctvlog.py", wait = FALSE)
-    system("~/miniconda3/bin/conda run -n vdot-flexdashboard-report python parse_cctvlog_encoders.py", wait = FALSE)
+    system("conda run -n tractionmetrics python parse_cctvlog.py", wait = FALSE)
+    system("conda run -n tractionmetrics python parse_cctvlog_encoders.py", wait = FALSE)
 }
 
 # # GET RSU UPTIMES ###########################################################
@@ -117,9 +115,8 @@ print(glue("{Sys.time()} travel times [3 of 11]"))
 
 if (conf$run$travel_times == TRUE) {
     # Run python script asynchronously
-    # system("c:/users/ATSPM/miniconda3/python.exe get_travel_times_1hr.py", wait = FALSE)
-    system("~/miniconda3/bin/conda run -n vdot-flexdashboard-report python get_travel_times.py travel_times_1hr.yaml", wait = FALSE)
-    # system("~/miniconda3/bin/conda run -n vdot-flexdashboard-report python get_travel_times.py travel_times_15min.yaml", wait = FALSE)
+    system("conda run -n tractionmetrics python get_travel_times.py travel_times_1hr.yaml", wait = FALSE)
+    # system("conda run -n tractionmetrics python get_travel_times.py travel_times_15min.yaml", wait = FALSE)
 }
 
 # # COUNTS ####################################################################
@@ -479,7 +476,7 @@ print(glue("{Sys.time()} etl [7 of 11]"))
 if (conf$run$etl == TRUE) {
 
     # run python script and wait for completion
-    system(glue("~/miniconda3/bin/conda run -n vdot-flexdashboard-report python etl_dashboard.py {start_date} {end_date}"), wait = TRUE)
+    system(glue("conda run -n tractionmetrics python etl_dashboard.py {start_date} {end_date}"), wait = TRUE)
 }
 
 # --- ----------------------------- -----------
@@ -490,7 +487,7 @@ print(glue("{Sys.time()} aog [8 of 11]"))
 if (conf$run$arrivals_on_green == TRUE) {
 
     # run python script and wait for completion
-    system(glue("~/miniconda3/bin/conda run -n vdot-flexdashboard-report python get_aog.py {start_date} {end_date}"), wait = TRUE)
+    system(glue("conda run -n tractionmetrics python get_aog.py {start_date} {end_date}"), wait = TRUE)
 }
 gc()
 

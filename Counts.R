@@ -1,19 +1,19 @@
 
 
 get_counts <- function(df, det_config, units = "hours", date_, event_code = 82, TWR_only = FALSE) {
-    
+
     if (lubridate::wday(date_, label = TRUE) %in% c("Tue", "Wed", "Thu") || (TWR_only == FALSE)) {
-        
+
         df <- df %>%
             filter(eventcode == event_code)
-        
+
         # Group by hour using Athena/Presto SQL
         if (units == "hours") {
-            df <- df %>% 
+            df <- df %>%
                 group_by(timeperiod = date_trunc('hour', timestamp),
                          signalid,
                          eventparam)
-            
+
             # Group by 15 minute interval using Athena/Presto SQL
         } else if (units == "15min") {
             df <- df %>%
@@ -25,7 +25,7 @@ get_counts <- function(df, det_config, units = "hours", date_, event_code = 82, 
                          signalid,
                          eventparam)
         }
-        
+
         df <- df %>%
             count() %>%
             ungroup() %>%
@@ -35,7 +35,7 @@ get_counts <- function(df, det_config, units = "hours", date_, event_code = 82, 
                       Detector = factor(eventparam),
                       vol = as.integer(n)) %>%
             left_join(det_config, by = c("SignalID", "Detector")) %>%
-            
+
             dplyr::select(SignalID, Timeperiod, Detector, CallPhase, vol) %>%
             mutate(SignalID = factor(SignalID),
                    Detector = factor(Detector))
@@ -46,59 +46,45 @@ get_counts <- function(df, det_config, units = "hours", date_, event_code = 82, 
 }
 
 
-get_counts2 <- function(date_, bucket, conf, uptime = TRUE, counts = TRUE) {
-    
-    conn <- get_athena_connection(conf)
-    
+get_counts2 <- function(date_, bucket, cred, uptime = TRUE, counts = TRUE) {
+
+    conn <- get_atspm_connection(cred)
+
     end_time <- format(date(date_) + days(1) - seconds(0.1), "%Y-%m-%d %H:%M:%S.9")
-    
+
     if (counts == TRUE) {
         det_config <- get_det_config(date_) %>%
             transmute(SignalID = factor(SignalID),
                       Detector = factor(Detector),
                       CallPhase = factor(CallPhase))
-        
+
         ped_config <- get_ped_config(date_) %>%
             transmute(SignalID = factor(SignalID),
                       Detector = factor(Detector),
                       CallPhase = factor(CallPhase))
     }
-    
+
     atspm_query <- sql(glue(paste(
-        "select distinct timestamp, signalid, eventcode, eventparam", 
-        "from {conf$athena$database}.{conf$athena$atspm_table}", 
-        "where date = '{date_}'")))
-    
+        "SELECT DISTINCT Timestamp, SignalID, EventCode, EventParam",
+        "FROM Controller_Event_Log",
+        "WHERE Timestamp >= '{date_}' AND Timestamp < {date_ + days(1)}")))
+
     df <- tbl(conn, atspm_query) %>%
-        # select(timestamp = Timestamp, signalid = SignalID, eventcode = EventCode, eventparam = EventParam) %>%
-        mutate(signalid = as.integer(signalid)) %>%
-        filter(as_date(timestamp) == as_date(date_))
-    
-    # atspm_ds <- arrow::open_dataset(glue("s3://{bucket}/atspm/date={date_}/"))
-    # atspm_ds %>% 
-    #     mutate(yr = year(Timestamp), mo = month(Timestamp), dy = day(Timestamp), hr = hour(Timestamp)) %>% 
-    #     filter(EventCode == 82) %>% group_by(SignalID, yr, mo, dy, hr, EventParam) %>% 
-    #     count() %>% 
-    #     collect() %>% 
-    #     ungroup() %>%
-    #     transmute(
-    #         SignalID, 
-    #         Timestamp = make_datetime(yr, mo, dy, hr, 0, 0),
-    #         Detector = EventParam,
-    #         vol = as.integer(n)) %>%
-    #     arrange(SignalID, Timestamp, EventParam, vol)
-    
+        select(timestamp = Timestamp, signalid = SignalID, eventcode = EventCode, eventparam = EventParam) %>%
+        mutate(signalid = as.integer(signalid))
+
+
     print(paste("-- Get Counts for:", date_, "-----------"))
-    
+
     if (uptime == TRUE) {
-        
+
         # get uptime$sig, uptime$all
         uptime <- get_uptime(df, date_, end_time)
-        
-        
+
+
         # Reduce to comm uptime for signals_sublist
         print(glue("Communications uptime {date_}"))
-        
+
         cu <- uptime$sig %>%
             ungroup() %>%
             left_join(uptime$all, by = c("Date")) %>%
@@ -110,24 +96,23 @@ get_counts2 <- function(date_, bucket, conf, uptime = TRUE, counts = TRUE) {
                    DOW = wday(start_date),
                    Week = week(start_date)) %>%
             dplyr::select(SignalID, CallPhase, Date, Date_Hour, DOW, Week, uptime)
-        
+
         s3_upload_parquet(cu, date_,
                           fn = glue("cu_{date_}"),
                           bucket = bucket,
-                          table_name = "comm_uptime",
-                          conf = conf)
+                          table_name = "comm_uptime")
     }
-    
+
     if (counts == TRUE) {
-        
+
         counts_1hr_fn <- glue("counts_1hr_{date_}")
         counts_ped_1hr_fn <- glue("counts_ped_1hr_{date_}")
         counts_15min_fn <- glue("counts_15min_{date_}")
         counts_ped_15min_fn <- glue("counts_ped_15min_{date_}")
-        
+
         filtered_counts_1hr_fn <- glue("filtered_counts_1hr_{date_}")
         filtered_counts_15min_fn <- glue("filtered_counts_15min_{date_}")
-        
+
         # get 1hr counts
         print("1-hour counts")
         counts_1hr <- get_counts(
@@ -139,13 +124,12 @@ get_counts2 <- function(date_, bucket, conf, uptime = TRUE, counts = TRUE) {
             TWR_only = FALSE
         ) %>%
             arrange(SignalID, Detector, Timeperiod)
-        
+
         s3_upload_parquet(counts_1hr, date_,
                           fn = counts_1hr_fn,
                           bucket = bucket,
-                          table_name = "counts_1hr",
-                          conf = conf)
-        
+                          table_name = "counts_1hr")
+
         print("1-hr filtered counts")
         if (nrow(counts_1hr) > 0) {
             filtered_counts_1hr <- get_filtered_counts_3stream(
@@ -154,12 +138,11 @@ get_counts2 <- function(date_, bucket, conf, uptime = TRUE, counts = TRUE) {
             s3_upload_parquet(filtered_counts_1hr, date_,
                               fn = filtered_counts_1hr_fn,
                               bucket = bucket,
-                              table_name = "filtered_counts_1hr",
-                              conf = conf)
+                              table_name = "filtered_counts_1hr")
         }
-        
-        
-        
+
+
+
         # get 1hr ped counts
         print("1-hour pedestrian counts")
         counts_ped_1hr <- get_counts(
@@ -171,14 +154,13 @@ get_counts2 <- function(date_, bucket, conf, uptime = TRUE, counts = TRUE) {
             TWR_only = FALSE
         ) %>%
             arrange(SignalID, Detector, Timeperiod)
-        
+
         s3_upload_parquet(counts_ped_1hr, date_,
                           fn = counts_ped_1hr_fn,
                           bucket = bucket,
-                          table_name = "counts_ped_1hr",
-                          conf = conf)
-        
-        
+                          table_name = "counts_ped_1hr")
+
+
         # get 15min counts
         print("15-minute counts")
         counts_15min <- get_counts(
@@ -190,13 +172,12 @@ get_counts2 <- function(date_, bucket, conf, uptime = TRUE, counts = TRUE) {
             TWR_only = FALSE
         ) %>%
             arrange(SignalID, Detector, Timeperiod)
-        
+
         s3_upload_parquet(counts_15min, date_,
                           fn = counts_15min_fn,
                           bucket = bucket,
-                          table_name = "counts_15min",
-                          conf = conf)
-        
+                          table_name = "counts_15min")
+
         # get 15min filtered counts
         print("15-minute filtered counts")
         if (nrow(counts_15min) > 0) {
@@ -208,34 +189,28 @@ get_counts2 <- function(date_, bucket, conf, uptime = TRUE, counts = TRUE) {
                 date_,
                 fn = filtered_counts_15min_fn,
                 bucket = bucket,
-                table_name = "filtered_counts_15min",
-                conf = conf)
+                table_name = "filtered_counts_15min")
         }
-        
-        conn <- get_athena_connection(conf)
 
 	# get 15min ped counts
         print("15-minute pedestrian counts")
         counts_ped_15min <- get_counts(
-            tbl(conn, atspm_query), 
-            ped_config, 
-            "15min", 
-            date_, 
-            event_code = 90, 
+            df,
+            ped_config,
+            "15min",
+            date_,
+            event_code = 90,
             TWR_only = FALSE
-        ) %>% 
+        ) %>%
             arrange(SignalID, Detector, Timeperiod)
-        
-        dbDisconnect(conn)
-        
-        s3_upload_parquet(counts_ped_15min, date_, 
-                          fn = counts_ped_15min_fn, 
+
+        s3_upload_parquet(counts_ped_15min, date_,
+                          fn = counts_ped_15min_fn,
                           bucket = bucket,
-                          table_name = "counts_ped_15min", 
-                          conf = conf)
+                          table_name = "counts_ped_15min")
         rm(counts_ped_15min)
-        
-        
+
+
     }
 }
 
@@ -247,7 +222,7 @@ get_counts2 <- function(date_, bucket, conf, uptime = TRUE, counts = TRUE) {
 #  Five hours exceeding max volume,
 #  Mean Absolute Deviation greater than a threshold
 get_filtered_counts_3stream <- function(counts, interval = "1 hour") { # interval (e.g., "1 hour", "15 min")
-    
+
     if (interval == "1 hour") {
         max_volume <- 1200  # 1000 - increased on 3/19/2020 (down to 2000 on 3/31) to accommodate mainline ramp meters
         max_volume_mainline <- 3000 # New on 5/21/2020
@@ -267,13 +242,13 @@ get_filtered_counts_3stream <- function(counts, interval = "1 hour") { # interva
     } else {
         stop("interval must be '1 hour' or '15 min'")
     }
-    
+
     counts <- counts %>%
         mutate(SignalID = factor(SignalID),
                Detector = factor(Detector),
                CallPhase = factor(CallPhase)) %>%
         filter(!is.na(CallPhase))
-    
+
     # Identify detectors/phases from detector config file. Expand.
     #  This ensures all detectors are included in the bad detectors calculation.
     all_days <- unique(date(counts$Timeperiod))
@@ -288,7 +263,7 @@ get_filtered_counts_3stream <- function(counts, interval = "1 hour") { # interva
                   Detector = factor(Detector),
                   CallPhase = factor(CallPhase),
                   Mainline = grepl("Mainline", ApproachDesc)) ## New
-    
+
     expanded_counts <- full_join(
         det_config,
         counts,
@@ -303,7 +278,7 @@ get_filtered_counts_3stream <- function(counts, interval = "1 hour") { # interva
                   vol = as.double(vol)) %>%
         replace_na(list(vol = 0)) %>%
         arrange(SignalID, CallPhase, Detector, Timeperiod) %>%
-        
+
         group_by(SignalID, Date, CallPhase, Detector) %>%
         mutate(delta_vol = vol - lag(vol),
                mean_abs_delta = as.integer(ceiling(mean(abs(delta_vol), na.rm = TRUE))),
@@ -311,16 +286,16 @@ get_filtered_counts_3stream <- function(counts, interval = "1 hour") { # interva
                flatlined = streak_run(vol_streak),
                flatlined = if_else(hour(Timeperiod) < 5, 0, as.double(flatlined)),
                flat_flag = max(flatlined, na.rm = TRUE) > max_flat,
-               maxvol_flag = if_else(Mainline, 
-                                     sum(vol > max_volume_mainline) > hi_vol_pers, 
+               maxvol_flag = if_else(Mainline,
+                                     sum(vol > max_volume_mainline) > hi_vol_pers,
                                      sum(vol > max_volume) > hi_vol_pers),
                mad_flag = if_else(Mainline,
                                   mean_abs_delta > max_abs_delta_mainline,
                                   mean_abs_delta > max_abs_delta)) %>%
-        
+
         ungroup() %>%
-        select(-Mainline, -vol_streak) 
-    
+        select(-Mainline, -vol_streak)
+
     # bad day = any of the following:
     #    flatlined for at least 5 hours (starting at 5am hour)
     #    vol exceeds maximum allowed over 5 different hours
@@ -329,7 +304,7 @@ get_filtered_counts_3stream <- function(counts, interval = "1 hour") { # interva
     #    flatlined for at least 20 15-min periods (starting at 5am)
     #    vol exceeds maximum over 20 different 15-min periods
     #    mean absolute delta exeeds 125
-    
+
     expanded_counts %>%
         group_by(
             SignalID, Date, Detector, CallPhase) %>%
@@ -355,50 +330,50 @@ get_filtered_counts_3stream <- function(counts, interval = "1 hour") { # interva
 
 
 get_adjusted_counts <- function(df) {
-    fc <- df %>% 
+    fc <- df %>%
         mutate(DOW = wday(Timeperiod),
                vol = as.double(vol))
-    
+
     ph_contr <- fc %>%
-        group_by(SignalID, CallPhase, Timeperiod) %>% 
+        group_by(SignalID, CallPhase, Timeperiod) %>%
         mutate(na.vol = sum(is.na(vol))) %>%
-        ungroup() %>% 
-        filter(na.vol == 0) %>% 
-        dplyr::select(-na.vol) %>% 
-        
+        ungroup() %>%
+        filter(na.vol == 0) %>%
+        dplyr::select(-na.vol) %>%
+
         # phase contribution factors--fraction of phase volume a detector contributes
-        group_by(SignalID, CallPhase, Detector) %>% 
+        group_by(SignalID, CallPhase, Detector) %>%
         summarize(vol = sum(vol, na.rm = TRUE),
-                  .groups = "drop_last") %>% 
+                  .groups = "drop_last") %>%
         mutate(sum_vol = sum(vol, na.rm = TRUE),
-               Ph_Contr = vol/sum_vol) %>% 
-        ungroup() %>% 
+               Ph_Contr = vol/sum_vol) %>%
+        ungroup() %>%
         dplyr::select(-vol, -sum_vol)
-    
+
     # fill in missing detectors from other detectors on that phase
     fc_phc <- left_join(fc, ph_contr, by = c("SignalID", "CallPhase", "Detector")) %>%
         # fill in missing detectors from other detectors on that phase
         group_by(SignalID, Timeperiod, CallPhase) %>%
         mutate(mvol = mean(vol/Ph_Contr, na.rm = TRUE)) %>% ungroup()
-    
+
     fc_phc$mvol[fc_phc$mvol > 3000] <- NA  # Prevent ridiculously high interpolated values
-    
+
     fc_phc$vol[is.na(fc_phc$vol)] <- as.integer(fc_phc$mvol[is.na(fc_phc$vol)] * fc_phc$Ph_Contr[is.na(fc_phc$vol)])
-    
+
     #hourly volumes over the month to fill in missing data for all detectors in a phase
     mo_hrly_vols <- fc_phc %>%
-        group_by(SignalID, CallPhase, Detector, DOW, Month_Hour) %>% 
+        group_by(SignalID, CallPhase, Detector, DOW, Month_Hour) %>%
         summarize(Hourly_Volume = median(vol, na.rm = TRUE), .groups = "drop")
-    
+
     # fill in missing detectors by hour and day of week volume in the month
-    left_join(fc_phc, 
-              mo_hrly_vols, 
-              by = (c("SignalID", "CallPhase", "Detector", "DOW", "Month_Hour"))) %>% 
+    left_join(fc_phc,
+              mo_hrly_vols,
+              by = (c("SignalID", "CallPhase", "Detector", "DOW", "Month_Hour"))) %>%
         ungroup() %>%
         mutate(vol = if_else(is.na(vol), as.integer(Hourly_Volume), as.integer(vol))) %>%
-        
+
         dplyr::select(SignalID, CallPhase, Detector, Timeperiod, vol) %>%
-        
+
         filter(!is.na(vol))
 }
 
@@ -409,9 +384,9 @@ get_adjusted_counts <- function(df) {
 # Arrow implementation on local drive
 
 prep_db_for_adjusted_counts_arrow <- function(table, conf, date_range) {
-    
+
     fc_ds <- arrow::open_dataset(
-        sources = glue("s3://{conf$bucket}/mark/{table}/"),
+        sources = glue("gs://{conf$bucket}/{conf$key_prefix}/mark/{table}/"),
         schema = schema(
             SignalID = string(),
             Timeperiod = timestamp(unit = "ms", timezone = "GMT"),
@@ -429,17 +404,17 @@ prep_db_for_adjusted_counts_arrow <- function(table, conf, date_range) {
     ) %>%
         filter(date %in% format(date_range, "%F"))
     chunks <- get_signals_chunks_arrow(fc_ds)
-    groups <- tibble(group = names(chunks), SignalID = chunks) %>% 
+    groups <- tibble(group = names(chunks), SignalID = chunks) %>%
         unnest(SignalID) %>%
         mutate(SignalID = as.integer(SignalID))
-    
+
     if (dir.exists(table)) unlink(table, recursive = TRUE)
     dir.create(table)
-    
+
     mclapply(date_range, mc.cores = usable_cores, mc.preschedule = FALSE, FUN = function(date_) {
         date_str <- format(date_, "%F")
         cat('.')
-        
+
         fc <- s3_read_parquet_parallel(table, date_, date_, bucket = conf$bucket) %>%
             transmute(
                 SignalID = as.integer(as.character(SignalID)),
@@ -456,8 +431,8 @@ prep_db_for_adjusted_counts_arrow <- function(table, conf, date_range) {
                 CallPhase = as.integer(as.character(CallPhase)),
                 CountPriority) %>%
             filter(!is.na(CountPriority))
-        
-        fc <- left_join(fc, dc, by = c("SignalID", "Detector", "CallPhase", "Date")) %>% 
+
+        fc <- left_join(fc, dc, by = c("SignalID", "Detector", "CallPhase", "Date")) %>%
             filter(!is.na(CountPriority))
         fc <- left_join(fc, groups, by = c("SignalID"))
         lapply(names(chunks), function(grp) {
@@ -474,18 +449,18 @@ prep_db_for_adjusted_counts_arrow <- function(table, conf, date_range) {
 
 
 
-get_adjusted_counts_arrow <- function(fc_table, ac_table, conf, callback = function(x) {x}) { 
+get_adjusted_counts_arrow <- function(fc_table, ac_table, conf, callback = function(x) {x}) {
     # callback would be for get_thruput
-    
+
     fc_ds <- arrow::open_dataset(fc_table)
-    
+
     if (dir.exists(ac_table)) unlink(ac_table, recursive = TRUE)
     dir.create(ac_table)
 
     groups <- (fc_ds %>% select(group) %>% collect() %>% distinct())$group
-    
+
     mclapply(groups, mc.cores = usable_cores, mc.preschedule = FALSE, FUN = function(grp) {
-        ac <- fc_ds %>% 
+        ac <- fc_ds %>%
             filter(group == grp) %>%
             collect() %>%
             get_adjusted_counts() %>%
@@ -496,142 +471,10 @@ get_adjusted_counts_arrow <- function(fc_table, ac_table, conf, callback = funct
             ac_dir <- glue("{ac_table}/date={date_str}")
             if (!dir.exists(ac_dir)) dir.create(ac_dir)
             filename <- tempfile(
-                tmpdir = ac_dir, 
-                pattern = "ac_", 
+                tmpdir = ac_dir,
+                pattern = "ac_",
                 fileext = ".parquet")
             ac %>% filter(Date == date_) %>% write_parquet(filename)
         })
     })
-}
-
-# ==============================================================================
-
-
-
-prep_db_for_adjusted_counts <- function(table, conf, date_range) {
-
-    duckdb_fn <- glue("{table}.duckdb")
-    if (file.exists(duckdb_fn)) {
-        file.remove(duckdb_fn)
-    }
-    
-    
-    conn <- get_duckdb_connection(duckdb_fn)
-
-    # conn <- get_aurora_connection()
-    # dbExecute(conn, glue("DELETE FROM {table}"))
-    
-    # Read in filtered_counts_15 and write to db
-    lapply(date_range, function(date_) {
-        date_ <- as.character(date_)
-        print(date_)
-        df <- s3_read_parquet_parallel(table, date_, date_, bucket = conf$bucket) %>%
-            transmute(
-                SignalID = as.integer(as.character(SignalID)),
-                Date, Timeperiod, Month_Hour,
-                Detector = as.integer(as.character(Detector)),
-                CallPhase = as.integer(as.character(CallPhase)),
-                vol)
-        dbWriteTable(conn, table, df, overwrite = FALSE, append = TRUE)
-    })
-    dbDisconnect(conn, shutdown = TRUE)
-    
-    conn <- get_duckdb_connection(duckdb_fn)
-    # Create index to join with det_config later
-    dbSendStatement(conn, glue(paste(
-        glue("CREATE INDEX idx_{table}"), 
-        glue("on {table} (SignalID, Detector, CallPhase, Date)"))))
-
-    
-    # Read in det_config and write to db
-    det_config <- lapply(date_range, get_det_config_vol) %>% 
-        bind_rows() %>%
-        transmute(
-            SignalID = as.integer(as.character(SignalID)),
-            Date,
-            Detector = as.integer(as.character(Detector)),
-            CallPhase = as.integer(as.character(CallPhase)),
-            CountPriority) %>%
-        filter(!is.na(CountPriority))
-
-    dbWriteTable(conn, "dc", det_config, overwrite = FALSE, append = TRUE)
-
-    # Create index to join with filtered_counts later
-    dbSendStatement(conn, glue(paste(
-        "CREATE INDEX idx_dc", 
-        "on dc (SignalID, Detector, CallPhase, Date)")))
-    return (TRUE)
-}
-
-
-
-get_adjusted_counts_duckdb <- function(fc_table, ac_table, conf, callback = function(x) {x}) { 
-    # callback would be for get_thruput
-    
-    fc_duckdb_fn <- glue("{fc_table}.duckdb")
-    conn_read <- get_duckdb_connection(fc_duckdb_fn, read_only = TRUE)
-    
-    fc <- tbl(conn_read, fc_table)
-    det_config <- tbl(conn_read, "dc")
-    fc <- left_join(fc, det_config, by = c("SignalID", "Detector", "CallPhase", "Date"))
-    
-    ac_duckdb_fn <- glue("{ac_table}.duckdb")
-    if (file.exists(ac_duckdb_fn)) {
-        file.remove(ac_duckdb_fn)
-    }
-    conn_write <- get_duckdb_connection(ac_duckdb_fn)
-    lapply(get_signals_chunks(fc), function(ss) {
-        ac <- fc %>% 
-            filter(SignalID %in% ss) %>%
-            collect() %>%
-            get_adjusted_counts() %>%
-            mutate(Date = as_date(Timeperiod)) %>%
-            callback()
-        #rand <- basename(tempfile(""))
-        #write_parquet(ac, basename(tempfile(fileext=".parquet")))
-        # Need to write somewhere. Separate duckdb database?
-        # For 1hr data, split by date and write to parquet files on s3.
-        # For 15min data, split by date and calculate throughput for each signal
-        dbWriteTable(conn_write, ac_table, ac, overwrite = FALSE, append = TRUE)
-    })
-    dbDisconnect(conn_read)
-    dbDisconnect(conn_write)
-}
-
-get_adjusted_counts_duckdb2 <- function(fc_table, ac_table, conf, callback = function(x) {x}) { 
-    # callback would be for get_thruput
-
-    fc_duckdb_fn <- glue("{fc_table}.duckdb")
-    conn_read <- get_duckdb_connection(fc_duckdb_fn, read_only = TRUE)
-    
-    fc <- tbl(conn_read, fc_table)
-    det_config <- tbl(conn_read, "dc")
-    fc <- left_join(fc, det_config, by = c("SignalID", "Detector", "CallPhase", "Date"))
-    
-    if (dir.exists(ac_table)) {
-        unlink(ac_table, recursive = TRUE)
-    }
-    dir.create(ac_table)
-
-    mclapply(get_signals_chunks(fc), mc.cores = usable_cores, mc.preschedule = FALSE, FUN = function(ss) {
-        ac <- fc %>% 
-            filter(SignalID %in% ss) %>%
-            collect() %>%
-            get_adjusted_counts() %>%
-            mutate(Date = as_date(Timeperiod)) %>%
-            callback()
-        lapply(unique(ac$Date), function(date_) {
-            date_str <- format(date_, "%F")
-            ac_dir <- glue("{ac_table}/date={date_str}")
-            if (!dir.exists(ac_dir)) {
-                dir.create(ac_dir)
-            }
-            filename <- tempfile(
-                tmpdir = ac_dir, 
-                pattern = "ac_", 
-                fileext = ".parquet")
-            ac %>% filter(Date == date_) %>% write_parquet(filename)
-        })
-    })
-    dbDisconnect(conn_read)
 }

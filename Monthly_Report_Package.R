@@ -287,23 +287,14 @@ print(glue("{Sys.time()} watchdog alerts [3 of 23]"))
 tryCatch(
     {
         # -- Alerts: detector downtime --
-
-        bad_det <- lapply(
-            seq(today() - days(90), today() - days(1), by = "1 day"),
-            function(date_) {
-                key <- glue("mark/bad_detectors/date={date_}/bad_detectors_{date_}.parquet")
-                tryCatch(
-                    {
-                        s3read_using(read_parquet, bucket = conf$bucket, object = key) %>%
-                            select(SignalID, Detector) %>%
-                            mutate(Date = date_)
-                    },
-                    error = function(e) {
-                        data.frame()
-                    }
-                )
-            }
+        bad_det <- s3_read_parquet_parallel(
+            "bad_detectors",
+            start_date = today() - days(90),
+            end_date = today() - days(1),
+            bucket = conf$bucket,
+            callback = function(x) { select(x, SignalID, Detector) %>% mutate(Date = date_) }
         ) %>%
+
             bind_rows() %>%
             mutate(
                 SignalID = factor(SignalID),
@@ -356,37 +347,22 @@ tryCatch(
             )
 
         # Zone_Group | Zone | Corridor | SignalID/CameraID | CallPhase | DetectorID | Date | Alert | Name
-
-        s3write_using(
+        s3_write_parquet(
             bad_det,
-            FUN = write_parquet,
-            object = "mark/watchdog/bad_detectors.parquet",
-
-            bucket = conf$bucket,
-            opts = list(multipart = TRUE)
+            object = file.path(conf$key_prefix, "mark/watchdog/bad_detectors.parquet", fsep = "/"),
+            bucket = conf$bucket
         )
         rm(bad_det)
         rm(det_config)
 
         # -- Alerts: pedestrian detector downtime --
-
-        bad_ped <- lapply(
-            seq(today() - days(90), today() - days(1), by = "1 day"),
-            function(date_) {
-                key <- glue("mark/bad_ped_detectors/date={date_}/bad_ped_detectors_{date_}.parquet")
-                tryCatch(
-                    {
-                        if (length(get_bucket(bucket = conf$bucket, prefix = key))) {
-                            s3read_using(read_parquet, bucket = conf$bucket, object = key) %>%
-                            mutate(Date = date_)
-                        }
-                    },
-                    error = function(e) {
-                        data.frame()
-                    }
-                )
-            }) %>%
-            bind_rows()
+        bad_ped <- s3_read_parquet_parallel(
+            "bad_ped_detectors",
+            start_date = today() - days(90),
+            end_date = today() - days(1),
+            bucket = conf$bucket,
+            callback = function(x) { mutate(x, Date = date_) }
+        )
 
         if (nrow(bad_ped)) {
             bad_ped %>%
@@ -406,11 +382,9 @@ tryCatch(
                           Alert = factor("Bad Ped Detection"),
                           Name = factor(Name)
                 )
-
-            s3write_using(
+            s3_write_parquet(
                 bad_ped,
-                FUN = write_parquet,
-                object = "mark/watchdog/bad_ped_pushbuttons.parquet",
+                object = file.path(conf$key_prefix, "mark/watchdog/bad_ped_pushbuttons.parquet", fsep = "/"),
                 bucket = conf$bucket)
         }
         rm(bad_ped)
@@ -449,11 +423,11 @@ tryCatch(
                           Name = factor(Name)
                 )
 
-            s3write_using(
+            s3_write_parquet(
                 bad_comm,
-                FUN = write_parquet,
-                object = "mark/watchdog/bad_comm.parquet",
+                object = file.path(conf$key_prefix, "mark/watchdog/bad_comm.parquet", fsep = "/"),
                 bucket = conf$bucket)
+
         }
         rm(bad_comm)
 
@@ -1948,31 +1922,11 @@ qsave(cor, "cor.qs")
 qsave(sig, "sig.qs")
 qsave(sub, "sub.qs")
 
-# TODO: Temporary while testing on local PC
-# aws.s3::put_object(
-#     file = "cor.qs",
-#     object = "cor_ec2.qs",
-#     bucket = conf$bucket,
-#     multipart = TRUE
-# )
-# aws.s3::put_object(
-#     file = "sig.qs",
-#     object = "sig_ec2.qs",
-#     bucket = conf$bucket,
-#     multipart = TRUE
-# )
-# aws.s3::put_object(
-#     file = "sub.qs",
-#     object = "sub_ec2.qs",
-#     bucket = conf$bucket,
-#     multipart = TRUE
-# )
-
 
 print(glue("{Sys.time()} Write to Database [23 of 23]"))
 
 source("write_sigops_to_db.R")
-        
+
 aurora <- keep_trying(get_aurora_connection, n_tries = 5)
 
 # Update Aurora Nightly

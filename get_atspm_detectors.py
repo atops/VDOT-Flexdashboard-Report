@@ -6,8 +6,6 @@ Created on Wed Nov 27 10:49:03 2019
 """
 
 import pandas as pd
-import os
-import pyodbc
 import sqlalchemy as sq
 from datetime import datetime, timedelta
 
@@ -103,16 +101,16 @@ def get_atspm_detectors(engine, date=None):
 def get_atspm_ped_detectors(engine, date=None):
 
     if date is not None:
-        start_date = (date - timedelta(days=90)).strftime('%Y-%m-%d')
+        start_date = (date - timedelta(days=180)).strftime('%Y-%m-%d')
     else:
-        start_date = (datetime.today() - timedelta(days=90)).strftime('%Y-%m-%d')
+        start_date = (datetime.today() - timedelta(days=180)).strftime('%Y-%m-%d')
 
     with engine.connect() as conn:
 
-        query = """SELECT Distinct SignalID, EventParam AS Detector
-                   FROM Controller_Event_Log WHERE EventCode = 90
-                   AND Timestamp > '{}'
-                   ORDER BY SignalID, EventParam""".format(start_date)
+        query = f"""SELECT Distinct SignalID, EventParam AS Detector
+                    FROM Controller_Event_Log WHERE EventCode = 90
+                    AND Timestamp > '{start_date}'
+                    ORDER BY SignalID, EventParam"""
 
         df = pd.read_sql_query(query, con=conn)
 

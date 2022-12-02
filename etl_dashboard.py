@@ -12,16 +12,14 @@ import sqlalchemy as sq
 import time
 import os
 import itertools
-import boto3
 import yaml
-import io
 import re
 import psutil
 
+import gcsio
 from spm_events import etl_main
-from parquet_lib import read_parquet_hive
-from s3io import *
 from config import get_date_from_string
+from pull_atspm_data import get_atspm_engine
 
 '''
     df:
@@ -39,6 +37,7 @@ from config import get_date_from_string
         Call Phase [int64]
 '''
 
+
 def etl2(s, date_, det_config, conf):
 
     date_str = date_.strftime('%Y-%m-%d')
@@ -46,14 +45,28 @@ def etl2(s, date_, det_config, conf):
     det_config = det_config[det_config.SignalID==s]
 
     start_date = date_
-    end_date = date_ + pd.DateOffset(days=1) - pd.DateOffset(seconds=0.1)
+    end_date = date_ + pd.DateOffset(days=1)
 
     t0 = time.time()
 
     try:
         bucket = conf['bucket']
-        key = f'atspm/date={date_str}/atspm_{s}_{date_str}.parquet'
-        df = read_parquet_hive(bucket, key)
+        key_prefix = conf['key_prefix']
+
+        with open('Monthly_Report_AWS.yaml') as yaml_file:
+            cred = yaml.load(yaml_file, Loader=yaml.Loader)
+
+        engine = get_atspm_engine(cred)
+
+        atspm_query = f"""SELECT DISTINCT Timestamp, SignalID, EventCode, EventParam
+                          FROM Controller_Event_Log
+                          WHERE Timestamp >= '{start_date.strftime('%F')}' 
+                          AND Timestamp < {end_date.strftime('%F')}
+                          AND SignalID = '{s}' 
+                          ORDER BY Timestamp, EventCode, EventParam"""
+
+        with engine.connect() as conn:
+            df = pd.read_sql_query(atspm_query, con=conn)
 
         if len(df)==0:
             print(f'{date_str} | {s} | No event data for this signal')
@@ -66,12 +79,8 @@ def etl2(s, date_, det_config, conf):
             c, d = etl_main(df, det_config)
 
             if len(c) > 0 and len(d) > 0:
-
-                c.to_parquet(f's3://{bucket}/cycles/date={date_str}/cd_{s}_{date_str}.parquet',
-                             allow_truncated_timestamps=True)
-
-                d.to_parquet(f's3://{bucket}/detections/date={date_str}/de_{s}_{date_str}.parquet',
-                             allow_truncated_timestamps=True)
+                gcsio.s3_write_parquet(c, conf['bucket'], "{conf['key_prefix']}/cycles/date={date_str}/cd_{s}_{date_str}.parquet")
+                gcsio.s3_write_parquet(d, conf['bucket'], "{conf['key_prefix']}/detections/date={date_str}/de_{s}_{date_str}.parquet")
 
             else:
                 print(f'{date_str} | {s} | No cycles')
@@ -95,21 +104,11 @@ def main(start_date, end_date, conf):
 
     dates = pd.date_range(start_date, end_date, freq='1D')
 
-    bucket = conf['bucket']
-   
     corridors_filename = re.sub('\..*', '.parquet', conf['corridors_filename_s3'])
-    corridors = pd.read_parquet(f's3://{bucket}/{corridors_filename}')
-    corridors = corridors[~corridors.SignalID.isna()]
+    corridors = gcsio.get_corridors(conf['bucket'], f"{conf['key_prefix']}/{corridors_filename}", keep_signalids_as_strings = True)
 
-    signalids = list(corridors.SignalID.astype('int').values)
+    signalids = list(corridors.SignalID.values)
   
-    bucket = conf['bucket']
-    athena_database = conf['athena']['database']
-    staging_dir = conf['athena']['staging_dir']
-    x = re.split('/+', staging_dir) # split path elements into a list
-    athena_bucket = x[1] # first path element that's not s3:
-    athena_prefix = '/'.join(x[2:])
-
 
     #-----------------------------------------------------------------------------------------
     # Placeholder for manual override of signalids
@@ -123,7 +122,7 @@ def main(start_date, end_date, conf):
         date_str = date_.strftime('%Y-%m-%d')
         print(date_str)
 
-        det_config = (get_det_config(date_, conf)
+        det_config = (gcsio.get_det_config(date_, conf)
                      .rename(columns={'CallPhase': 'Call Phase'})
                      .groupby(['SignalID','Call Phase'])
                      .apply(lambda group: group.assign(CountDetector = group.CountPriority == group.CountPriority.min()))
@@ -144,48 +143,6 @@ def main(start_date, end_date, conf):
             print('No good detectors. Skip this day.')
 
     print(f'{len(signalids)} signals in {len(dates)} days. Done in {int((time.time()-t0)/60)} minutes')
-
-
-    # Add a partition for each day. If more than ten days, update all partitions in one command.
-    if len(dates) > 10:
-        response_repair_cycledata = athena.start_query_execution(
-            QueryString=f"MSCK REPAIR TABLE cycledata;",
-            QueryExecutionContext={'Database': athena_database},
-            ResultConfiguration={'OutputLocation': staging_dir})
-
-        response_repair_detection_events = athena.start_query_execution(
-            QueryString=f"MSCK REPAIR TABLE detectionevents",
-            QueryExecutionContext={'Database': athena_database},
-            ResultConfiguration={'OutputLocation': staging_dir})
-    else:
-        for date_ in dates:
-            date_str = date_.strftime('%Y-%m-%d')
-            response_repair_cycledata = athena.start_query_execution(
-                QueryString=f"ALTER TABLE cycledata ADD PARTITION (date = '{date_str}');",
-                QueryExecutionContext={'Database': athena_database},
-                ResultConfiguration={'OutputLocation': staging_dir})
-
-            response_repair_detection_events = athena.start_query_execution(
-                QueryString=f"ALTER TABLE detectionevents ADD PARTITION (date = '{date_str}');",
-                QueryExecutionContext={'Database': athena_database}, 
-                ResultConfiguration={'OutputLocation': staging_dir})
-
-
-    # Check if the partitions for the last day were successfully added before moving on
-    while True:
-        response1 = s3.list_objects(
-            Bucket=athena_bucket,
-            Prefix=os.path.join(athena_prefix, response_repair_cycledata['QueryExecutionId']))
-        response2 = s3.list_objects(
-            Bucket=athena_bucket,
-            Prefix=os.path.join(athena_prefix, response_repair_detection_events['QueryExecutionId']))
-
-        if 'Contents' in response1 and 'Contents' in response2:
-            print('done.')
-            break
-        else:
-            time.sleep(2)
-            print('.', end='')
 
 
 if __name__=='__main__':

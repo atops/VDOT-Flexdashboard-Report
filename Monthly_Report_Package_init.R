@@ -25,14 +25,14 @@ doParallel::registerDoParallel(cores = usable_cores)
 qs_filename <- sub("\\..*", ".qs", conf$corridors_filename_s3)
 corridors <- s3read_using(
     qs::qread,
-    object = qs_filename,
+    object = file.path(conf$key_prefix, qs_filename, fsep="/"),
     bucket = conf$bucket
 )
 
 qs_all_filename <- sub("\\..*", ".qs", paste0("all_", conf$corridors_filename_s3))
 all_corridors <- s3read_using(
     qs::qread,
-    object = qs_all_filename,
+    object = file.path(conf$key_prefix, qs_all_filename, fsep="/"),
     bucket = conf$bucket
 )
 
@@ -48,13 +48,7 @@ subcorridors <- corridors %>%
         Corridor = Subcorridor) 
 
 
-conn <- get_athena_connection(conf)
-
-# cam_config <- get_cam_config(
-#     object = conf$cctv_config_filename, 
-#     bucket = conf$bucket,
-#     corridors = all_corridors)
-
+# conn <- get_athena_connection(conf)
 
 usable_cores <- get_usable_cores()
 doParallel::registerDoParallel(cores = usable_cores)

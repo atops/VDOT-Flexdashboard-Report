@@ -1,21 +1,12 @@
 
 # Monthly_Report config file (yaml format)
 
-agency: VDOT
-bucket: vdot-spm2
-profile: KH_VDOT
-aws_region: us-east-2
-region: 
-athena:
-    staging_dir: s3://vdot-spm2/athena
-    database: vdot_spm
-    atspm_table: atspm
-atspm:
-    odbc_dsn: atspm
-    uid_env: ATSPM_USERNAME
-    pwd_env: ATSPM_PASSWORD
-    svr_env: ATSPM_SERVER_INSTANCE
-    db_env: ATSPM_DB
+agency: CDOT
+bucket: its-apps-atspm-stage
+key_prefix: kimley-horn
+credentials_json: castle-rock-service-account.json
+profile: 
+region: CastleRock
 
 ssl_cert: True # True/False or *.pem file name
 
@@ -38,31 +29,14 @@ end_date: yesterday
 calcs_start_date: auto 
 report_end_date: yesterday
 
-corridors_filename_s3: VDOT_Corridors_Latest.xlsx
-corridors_TMCs_filename_s3: Corridor_TMCs_Virginia.xlsx
+corridors_filename_s3: CastleRock_Corridors.xlsx
+corridors_TMCs_filename_s3: Corridor_TMCs_CastleRock.xlsx
 
 AM_PEAK_HOURS: [6, 7, 8, 9]
 PM_PEAK_HOURS: [15, 16, 17, 18, 19]
 
 zone_groups:
-    - Northern Virginia
-    - Fredericksburg
-    - Culpeper
-    - Staunton
-    - Salem
-    - Bristol
-    - Lynchburg
-    - Richmond
-    - Hampton Roads
+    - Castle Rock
 
 map_center:
-    Bristol: [36.6161024,-82.1290933, 10]
-    Salem: [37.2996924,-80.0494047, 10]
-    Lynchburg: [37.3756183,-79.1289053, 10]
-    Richmond: [37.2903284,-77.4082598, 10]
-    Hampton Roads: [36.8833178,-76.4228342, 10]
-    Fredericksburg: [38.3174021,-77.4494158, 10]
-    Culpeper: [38.4593396,-77.9997405, 10]
-    Staunton: [38.1613373,-79.049259, 10]
-    Northern Virginia: [38.849359,-77.3766611, 10]
-
+    Castle Rock: [39.3736477,-104.9111698, 10]

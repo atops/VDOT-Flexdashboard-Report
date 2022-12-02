@@ -1,5 +1,4 @@
 
-library(aws.s3)
 library(qs)
 
 
