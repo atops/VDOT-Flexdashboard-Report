@@ -19,14 +19,6 @@ usable_cores <- get_usable_cores(4)
 doParallel::registerDoParallel(cores = usable_cores)
 
 
-# Set credentials from ~/.aws/credentials file
-aws.signature::use_credentials(profile = conf$profile)
-
-# Need to set the default region as well. use_credentials doesn't do this.
-credentials <- aws.signature::read_credentials()[[conf$profile]]
-Sys.setenv(AWS_DEFAULT_REGION = conf$aws_region)
-
-
 # aurora_pool <- get_aurora_connection_pool()
 aurora <- get_aurora_connection()
 

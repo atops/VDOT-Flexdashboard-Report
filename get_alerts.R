@@ -19,13 +19,6 @@ source("Database_Functions.R")
 
 conf <- read_yaml("Monthly_Report.yaml")
 
-# Set credentials from ~/.aws/credentials file
-aws.signature::use_credentials(profile = conf$profile)
-
-# Need to set the default region as well. use_credentials doesn't do this.
-credentials <- aws.signature::read_credentials()[[conf$profile]]
-Sys.setenv(AWS_DEFAULT_REGION = conf$aws_region)
-
 base_path = '.'
 
 if (!dir.exists('logs')) { 
