@@ -1,12 +1,36 @@
 
-s3_upload_parquet <- function(df, date_, fn, bucket, table_name, conf) {
+library(aws.s3)
+
+s3_list_objects <- function(...) {
+    gcs_list_objects(...) %>%
+        rename(Key = name)
+}
+
+
+s3_upload_file <- function(file, bucket, object) {
+    gcs_upload(file, bucket, name = object)
+}
+
+
+s3read_using <- aws.s3::s3read_using
+
+
+s3write_using <- aws.s3::s3write_using 
+
+
+s3_write_parquet <- function(df, bucket, object) {
+    s3write_using(write_parquet, df, bucket, object)
+}
+
+
+s3_upload_parquet <- function(df, date_, fn, bucket, table_name) {
     
     df <- ungroup(df)
     
     if ("Date" %in% names(df)) {
         df <- df %>% select(-Date)
     }
-    
+
     
     if ("Detector" %in% names(df)) {
         df <- mutate(df, Detector = as.character(Detector))
@@ -88,10 +112,14 @@ s3_read_parquet <- function(bucket, object, date_ = NULL) {
         date_ <- str_extract(object, "\\d{4}-\\d{2}-\\d{2}")
     }
     tryCatch({
-        s3read_using(read_parquet, bucket = bucket, object = object) %>%
-            select(-starts_with("__")) %>%
-            mutate(Date = ymd(date_))
+        df <- s3read_using(read_parquet, bucket = bucket, object = object) %>%
+            select(-starts_with("__"))
+        if (!is.na(date_)) {
+            df <- mutate(df, Date = as_date(date_))
+        }
+        df
     }, error = function(e) {
+        print(e)
         data.frame()
     })
 }
