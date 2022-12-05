@@ -1,14 +1,30 @@
 
 library(aws.s3)
 
+
+# Set credentials from ~/.aws/credentials file
+aws.signature::use_credentials(profile = conf$profile)
+
+# Need to set the default region as well. use_credentials doesn't do this.
+credentials <- aws.signature::read_credentials()[[conf$profile]]
+Sys.setenv(AWS_DEFAULT_REGION = conf$aws_region)
+
+
+
 s3_list_objects <- function(...) {
-    gcs_list_objects(...) %>%
-        rename(Key = name)
+    s3b <- aws.s3::get_bucket(...)
+    
+    df <- lapply(names(s3b$Contents), function(attr) {
+        print(attr)
+        unlist(lapply(s3b, function(x) x[[attr]]), use.names = FALSE)
+    }) %>% as.data.frame()
+    names(df) <- names(s3b$Contents)
+    df
 }
 
 
-s3_upload_file <- function(file, bucket, object) {
-    gcs_upload(file, bucket, name = object)
+s3_upload_file <- function(file, bucket, object, ...) {
+    aws.s3::put_object(file, bucket, object, ...)
 }
 
 
