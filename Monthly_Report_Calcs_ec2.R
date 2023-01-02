@@ -222,9 +222,6 @@ get_counts_based_measures <- function(month_abbrs) {
         prep_db_for_adjusted_counts_arrow("filtered_counts_1hr", conf, date_range)
         get_adjusted_counts_arrow("filtered_counts_1hr", "adjusted_counts_1hr", conf)
 
-        fc_ds <- keep_trying(
-            function() arrow::open_dataset(sources = "filtered_counts_1hr/"),
-            n_tries = 3, timeout = 60)
         ac_ds <- keep_trying(
             function() arrow::open_dataset(sources = "adjusted_counts_1hr/"),
             n_tries = 3, timeout = 60)
@@ -243,16 +240,22 @@ get_counts_based_measures <- function(month_abbrs) {
                 conf = conf, parallel = FALSE
             )
         })
+        rm(ac_ds)
 
-        mclapply(date_range, mc.cores = usable_cores, mc.preschedule = FALSE, FUN = function(x) {
+        # mclapply(date_range, mc.cores = usable_cores, mc.preschedule = FALSE, FUN = function(x) {
+        lapply(date_range, function(x) {
             write_signal_details(x, conf, signals_list)
         })
 
 
-        mclapply(date_range, mc.cores = usable_cores, mc.preschedule = FALSE, FUN = function(date_) {
+        # mclapply(date_range, mc.cores = usable_cores, mc.preschedule = FALSE, FUN = function(date_) {
+        lapply(date_range, function(date_) {
             date_str <- format(date_, "%F")
             if (between(date_, start_date, end_date)) {
                 print(glue("filtered_counts_1hr: {date_str}"))
+                fc_ds <- keep_trying(
+                    function() arrow::open_dataset(sources = "filtered_counts_1hr/"),
+                    n_tries = 3, timeout = 60)
                 filtered_counts_1hr <- fc_ds %>%
                     filter(date == date_str) %>%
                     select(-date) %>%
@@ -293,6 +296,9 @@ get_counts_based_measures <- function(month_abbrs) {
             }
 
             print(glue("reading adjusted_counts_1hr: {date_str}"))
+            ac_ds <- keep_trying(
+                function() arrow::open_dataset(sources = "adjusted_counts_1hr/"),
+                n_tries = 3, timeout = 60)
             adjusted_counts_1hr <- ac_ds %>%
                 filter(date == date_str) %>%
                 select(-date) %>%
@@ -348,9 +354,6 @@ get_counts_based_measures <- function(month_abbrs) {
         prep_db_for_adjusted_counts_arrow("filtered_counts_15min", conf, date_range)
         get_adjusted_counts_arrow("filtered_counts_15min", "adjusted_counts_15min", conf)
 
-        fc_ds <- keep_trying(
-            function() arrow::open_dataset(sources = "filtered_counts_15min/"),
-            n_tries = 3, timeout = 60)
         ac_ds <- keep_trying(
             function() arrow::open_dataset(sources = "adjusted_counts_15min/"),
             n_tries = 3, timeout = 60)
