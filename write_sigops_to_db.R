@@ -55,7 +55,7 @@ write_dataframe_to_db <- function(conn, df, table_name, recreate, calcs_start_da
                     dbExecute(conn, glue(paste(
                         "DELETE from {table_name} WHERE {datefield} >= '{start_date}'")))
                 } else {
-                    dbSendQuery(conn, glue("DELETE from {table_name}"))
+                    dbExecute(conn, glue("TRUNCATE TABLE {table_name}"))
                 }
                 # Filter Dates and Append
                 if (!is.null(start_date) & length(datefield) == 1) {
@@ -114,7 +114,7 @@ write_to_db_once_off <- function(conn, df, dfname, recreate = FALSE, calcs_start
         } else {
             if (table_name %in% dbListTables(conn)) {
                 # Clear Prior to Append
-                dbSendQuery(conn, glue("DELETE FROM {table_name}")) # duckdb doesn't support TRUNCATE statement
+                dbExecute(conn, glue("TRUNCATE TABLE {table_name}"))
                 # Filter Dates and Append
                 if (!is.null(start_date) & length(datefield) == 1) {
                     df <- filter(df, !!as.name(datefield) >= start_date)
@@ -154,7 +154,7 @@ set_index_duckdb <- function(conn, table_name) {
             return(0)
         }
         tryCatch({
-            dbSendStatement(conn, glue(paste(
+            dbExecute(conn, glue(paste(
                 "CREATE INDEX idx_{table_name}_zone_period",
                 "on {table_name} (Zone_Group, {period})")))
 
@@ -186,7 +186,7 @@ set_index_aurora <- function(aurora, table_name) {
         "AND table_name='{table_name}'",
         "AND index_name='idx_{table_name}_zone_period';")))
     if (nrow(index_exists) == 0) {
-        dbSendStatement(aurora, glue(paste(
+        dbExecute(aurora, glue(paste(
             "CREATE INDEX idx_{table_name}_zone_period",
             "on {table_name} (Zone_Group, {period})")))
     }
@@ -198,7 +198,7 @@ set_index_aurora <- function(aurora, table_name) {
         "AND table_name='{table_name}'",
         "AND index_name='idx_{table_name}_corridor_period';")))
     if (nrow(index_exists) == 0) {
-        dbSendStatement(aurora, glue(paste(
+        dbExecute(aurora, glue(paste(
             "CREATE INDEX idx_{table_name}_corridor_period",
             "on {table_name} (Corridor, {period})")))
     }
@@ -246,7 +246,7 @@ recreate_table <- function (conn, df, table_name) {
     # Delete and recreate with proper data types
     try(dbRemoveTable(conn, table_name))
 
-    try(dbSendStatement(conn, create_statement))
+    try(dbExecute(conn, create_statement))
 
     # Create Indexes
     try(set_index_aurora(conn, table_name))

@@ -1511,9 +1511,9 @@ print(glue("{Sys.time()} Termination Types [21 of 23]"))
 
 tryCatch(
     {
-        aurora <- keep_trying(get_aurora_connection, n_tries = 5)
-
         for (metric in list(gap_outs, max_outs, force_offs)) {
+
+            aurora <- keep_trying(get_aurora_connection, n_tries = 5)
 
             daily <- s3_read_parquet_parallel(
                 bucket = conf$bucket,
