@@ -153,8 +153,6 @@ if (conf$run$counts == TRUE) {
 
     print(glue("{Sys.time()} Detection Levels by Signal [5.1 of 11]"))
 
-    date_range <- seq(ymd(start_date), ymd(end_date), by = "1 day")
-
     lapply(date_range, function(date_) {
 
         signals_df <- select(corridors, SignalID) %>% mutate(Date = date_)
