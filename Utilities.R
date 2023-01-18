@@ -35,24 +35,31 @@ get_date_from_string <- function(x) {
 
 
 get_usable_cores <- function(GB=8) {
-    # Usable cores is one per 8 GB of RAM.
     # Get RAM from system file and divide
 
     if (Sys.info()["sysname"] == "Windows") {
-        1
+        x <- suppressWarnings(shell('systeminfo | findstr Memory', intern = TRUE))
+
+        memline <- x[grepl("Total Physical Memory", x)]
+        mem <- stringr::str_extract(string =  memline, pattern = "\\d+,\\d+")
+        mem <- as.numeric(gsub(",", "", mem))
+        mem <- round(mem, -3)
+        max(floor(mem/GB*1e3), 1)
+
     } else if (Sys.info()["sysname"] == "Linux") {
         x <- readLines('/proc/meminfo')
 
-        memline <- x[grepl("MemTotal", x)]
+        memline <- x[grepl("MemAvailable", x)]
         mem <- stringr::str_extract(string =  memline, pattern = "\\d+")
         mem <- as.integer(mem)
         mem <- round(mem, -6)
-        min(max(floor(mem/(GB*1e6)), 1), parallel::detectCores() - 1)
+        max(floor(mem/GB*1e6), 1)
 
     } else {
         stop("Unknown operating system.")
     }
 }
+
 
 
 
@@ -106,23 +113,29 @@ read_zipped_feather <- function(x) {
 }
 
 
+keep_trying <- function(func, n_tries, ..., sleep = 1, timeout = Inf) {
 
-keep_trying <- function(func, n_tries, ..., timeout = Inf) {
+    safely_func = purrr::safely(func, otherwise = NULL)
 
-    possibly_func = purrr::possibly(func, otherwise = NULL)
+    result <- NULL
+    error <- 1
+    try_number <- 1
 
-    result = NULL
-    try_number = 1
-    sleep = 1
-
-    while(is.null(result) && try_number <= n_tries) {
+    while((!is.null(error) || is.null(result)) && try_number <= n_tries) {
         if (try_number > 1) {
             print(glue("{deparse(substitute(func))} Attempt: {try_number}"))
         }
-        try_number = try_number + 1
-        result = R.utils::withTimeout(possibly_func(...), timeout=timeout, onTimeout="error")
 
-        Sys.sleep(sleep)
+        try_number = try_number + 1
+        x <- R.utils::withTimeout(safely_func(...), timeout=timeout, onTimeout="error")
+
+        result <- x$result
+        error <- x$error
+        if (!is.null(error)) {
+            print(error)
+        }
+
+	Sys.sleep(sleep)
         sleep = sleep + 1
     }
     return(result)
@@ -210,26 +223,22 @@ addtoRDS <- function(df, fn, delta_var, rsd, csd) {
         if (class(csd) == "character") csd <- as_date(csd)
 
         # Extract aggregation period from the data fields
-        periods <- intersect(c("Quarter", "Month", "Date", "Hour"), names(df0))
+        periods <- intersect(c("Month", "Date", "Hour", "Timeperiod"), names(df0))
+        per_ <- as.name(periods)
 
-        if (periods == "Quarter") {
-            # For quarterly data, always replace the whole thing with the new data.
-            df0 = df0[0, ]
-        } else {
-            per_ <- as.name(periods)
+        # Remove everything after calcs_start_date (csd)
+        # and before report_start_date (rsd) in original df
+        df0 <- df0 %>% filter(!!per_ >= rsd, !!per_ < csd)
 
-            # Remove everything after calcs_start_date (csd) in original df
-            df0 <- df0 %>% filter(!!per_ >= rsd, !!per_ < csd)
-
-            # Make sure new data starts on csd
-            # This is especially important for when csd is the start of the month
-            # and we've run calcs going back to the start of the week, which is in
-            # the previous month, e.g., 3/31/2020 is a Tuesday.
-            df <- df %>% filter(!!per_ >= csd)
-        }
+        # Make sure new data starts on csd
+        # This is especially important for when csd is the start of the month
+        # and we've run calcs going back to the start of the week, which is in
+        # the previous month, e.g., 3/31/2020 is a Tuesday.
+        df <- df %>% filter(!!per_ >= csd)
 
         # Extract aggregation groupings from the data fields
         # to calculate period-to-period deltas
+
         groupings <- intersect(c("Zone_Group", "Corridor", "SignalID"), names(df0))
         groups_ <- sapply(groupings, as.name)
 
@@ -269,7 +278,7 @@ addtoRDS <- function(df, fn, delta_var, rsd, csd) {
         df0 <- read_func(fn)
         if (is.list(df) && is.list(df0) &&
             !is.data.frame(df) && !is.data.frame(df0) &&
-            (names(df) == names(df0))) {
+            identical(names(df), names(df0))) {
             x <- purrr::map2(df0, df, combine_dfs, delta_var, rsd, csd)
         } else {
             x <- combine_dfs(df0, df, delta_var, rsd, csd)
@@ -298,6 +307,8 @@ write_fst_ <- function(df, fn, append = FALSE) {
 }
 
 
+
+
 get_unique_timestamps <- function(df) {
     df %>%
         dplyr::select(Timestamp) %>%
@@ -306,6 +317,9 @@ get_unique_timestamps <- function(df) {
         mutate(SignalID = 0) %>%
         dplyr::select(SignalID, Timestamp)
 }
+
+
+
 
 
 multicore_decorator <- function(FUN) {
@@ -324,9 +338,7 @@ multicore_decorator <- function(FUN) {
 get_Tuesdays <- function(df) {
     dates_ <- seq(min(df$Date) - days(6), max(df$Date) + days(6), by = "days")
     tuesdays <- dates_[wday(dates_) == 3]
-
-    tuesdays <- pmax(min(df$Date), tuesdays) # unsure of this. need to test
-    #tuesdays <- tuesdays[between(tuesdays, min(df$Date), max(df$Date))]
+    tuesdays <- pmax(min(df$Date), tuesdays)
 
     data.frame(Week = week(tuesdays), Date = tuesdays)
 }
@@ -573,55 +585,6 @@ show_largest_objects <- function(n=20) {
         ) %>% as.data.frame()
     names(df) <- c('Size')
     df %>% arrange(desc(Size)) %>% head(n)
-}
-
-
-
-sigify <- function(df, cor_df, corridors, identifier = "SignalID") {
-    if (identifier == "SignalID") {
-        df_ <- df %>%
-            left_join(distinct(corridors, SignalID, Corridor, Name), by = c("SignalID")) %>%
-            rename(Zone_Group = Corridor, Corridor = SignalID) %>%
-            ungroup() %>%
-            mutate(Corridor = factor(Corridor))
-    } else if (identifier == "CameraID") {
-        corridors <- rename(corridors, Name = Location)
-        df_ <- df %>%
-            select(
-                -matches("Subcorridor"),
-                -matches("Zone_Group")
-            ) %>%
-            left_join(distinct(corridors, CameraID, Corridor, Name), by = c("Corridor", "CameraID")) %>%
-            rename(
-                Zone_Group = Corridor,
-                Corridor = CameraID
-            ) %>%
-            ungroup() %>%
-            mutate(Corridor = factor(Corridor))
-    } else {
-        stop("bad identifier. Must be SignalID (default) or CameraID")
-    }
-
-    cor_df_ <- cor_df %>%
-        filter(Corridor %in% unique(df_$Zone_Group)) %>%
-        mutate(Zone_Group = Corridor) %>%
-        select(-matches("Subcorridor"))
-
-    br <- bind_rows(df_, cor_df_) %>%
-        mutate(Corridor = factor(Corridor))
-
-    if ("Zone_Group" %in% names(br)) {
-        br <- br %>%
-            mutate(Zone_Group = factor(Zone_Group))
-    }
-
-    if ("Month" %in% names(br)) {
-        br %>% arrange(Zone_Group, Corridor, Month)
-    } else if ("Hour" %in% names(br)) {
-        br %>% arrange(Zone_Group, Corridor, Hour)
-    } else if ("Date" %in% names(br)) {
-        br %>% arrange(Zone_Group, Corridor, Date)
-    }
 }
 
 

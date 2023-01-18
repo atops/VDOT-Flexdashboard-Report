@@ -1,10 +1,10 @@
 
 # Monthly_Report_Calcs.R
 
+source("renv/activate.R")
+
 library(yaml)
 library(glue)
-
-source("renv/activate.R")
 
 source("Monthly_Report_Functions.R")
 
@@ -86,7 +86,6 @@ if (as_datetime(xlsx_last_modified) > as_datetime(qs_last_modified)) {
     dbWriteTable(aurora, "AllCorridors", all_corridors, overwrite = FALSE, append = TRUE, row.names = FALSE)
 }
 
-#corridors <- qread(basename(qs_filename))
 corridors <- dbReadTable(aurora, "Corridors")
 dbDisconnect(aurora)
 
@@ -132,16 +131,14 @@ if (conf$run$counts == TRUE) {
     date_range <- seq(ymd(start_date), ymd(end_date), by = "1 day")
 
     if (length(date_range) == 1) {
-        date_ <- date_range
         get_counts2(
-            date_,
+            date_range[1],
             bucket = conf$bucket,
             cred = cred,
             uptime = TRUE,
             counts = TRUE
         )
     } else {
-#        foreach(date_ = date_range, .errorhandling = "pass") %dopar% {
         lapply(date_range, function(date_) {
             get_counts2(
                 date_,
@@ -183,8 +180,6 @@ print("\n---------------------- Finished counts ---------------------------\n")
 print(glue("{Sys.time()} monthly cu [5 of 11]"))
 
 
-# --- Everything up to here needs the ATSPM Database ---
-
 signals_list <- as.integer(as.character(corridors$SignalID))
 signals_list <- unique(as.character(signals_list[signals_list > 0]))
 
@@ -197,19 +192,11 @@ signals_list <- unique(as.character(signals_list[signals_list > 0]))
 #   adjusted_counts_1hr
 #   BadDetectors
 
-# COMMUNICATIONS QUALITY (FROM KITS) as proxy for communications uptime
-
-# df <- s3read_using(read_parquet, bucket = conf$bucket, object = "mark/comm_quality/date=2022-04-28/2022-04-28_cq.parquet") %>% convert_to_utc()
-# df %>% transmute(SignalID = INTID, CallPhase = 0, uptime = AvgQuality/100, ones = 1, Date = as_date(CSDATE))
-
-
-
 print(glue("{Sys.time()} counts-based measures [6 of 11]"))
 
 get_counts_based_measures <- function(month_abbrs) {
     lapply(month_abbrs, function(yyyy_mm) {
         # yyyy_mm <- month_abbrs[1] # for debugging
-        gc()
 
         #-----------------------------------------------
         # 1-hour counts, filtered, adjusted, bad detectors
@@ -254,46 +241,6 @@ get_counts_based_measures <- function(month_abbrs) {
 
         mclapply(date_range, mc.cores = usable_cores, mc.preschedule = FALSE, FUN = function(date_) {
             date_str <- format(date_, "%F")
-            if (between(date_, start_date, end_date)) {
-                print(glue("filtered_counts_1hr: {date_str}"))
-                filtered_counts_1hr <- fc_ds %>%
-                    filter(date == date_str) %>%
-                    select(-date) %>%
-                    collect()
-
-                if (!is.null(filtered_counts_1hr) && nrow(filtered_counts_1hr)) {
-                    filtered_counts_1hr <- filtered_counts_1hr %>%
-                        mutate(
-                            Date = date(Date),
-                            SignalID = factor(SignalID),
-                            CallPhase = factor(CallPhase),
-                            Detector = factor(Detector)
-                        )
-
-                    # BAD DETECTORS
-                    print(glue("detectors: {date_}"))
-                    bad_detectors <- get_bad_detectors(filtered_counts_1hr)
-                    s3_upload_parquet_date_split(
-                        bad_detectors,
-                        bucket = conf$bucket,
-                        prefix = "bad_detectors",
-                        table_name = "bad_detectors",
-                        conf = conf
-                    )
-
-                    # # DAILY DETECTOR UPTIME
-                    print(glue("ddu: {date_}"))
-                    daily_detector_uptime <- get_daily_detector_uptime(filtered_counts_1hr) %>%
-                        bind_rows()
-                    s3_upload_parquet_date_split(
-                        daily_detector_uptime,
-                        bucket = conf$bucket,
-                        prefix = "ddu",
-                        table_name = "detector_uptime_pd",
-                        conf = conf
-                    )
-                }
-            }
 
             print(glue("reading adjusted_counts_1hr: {date_str}"))
             adjusted_counts_1hr <- ac_ds %>%
@@ -495,7 +442,7 @@ if (conf$run$arrivals_on_green == TRUE) {
     # run python script and wait for completion
     system(glue("conda run -n tractionmetrics python get_aog.py {start_date} {end_date}"), wait = TRUE)
 }
-gc()
+invisible(gc())
 
 # # GET QUEUE SPILLBACK #######################################################
 get_queue_spillback_date_range <- function(start_date, end_date) {
@@ -556,6 +503,7 @@ get_pd_date_range <- function(start_date, end_date) {
             )
         }
     })
+    invisible(gc())
 }
 
 if (conf$run$ped_delay == TRUE) {

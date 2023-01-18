@@ -4,6 +4,7 @@ weighted_mean_by_corridor_ <- function(df, per_, corridors, var_, wt_ = NULL) {
     per_ <- as.name(per_)
 
     gdf <- left_join(df, corridors) %>%
+        filter(!is.na(Corridor)) %>%
         mutate(Corridor = factor(Corridor)) %>%
         group_by(Zone_Group, Zone, Corridor, !!per_)
 
@@ -267,8 +268,6 @@ get_weekly_avg_by_day <- function(df, var_, wt_ = "ones", peak_only = TRUE) {
         left_join(Tuesdays, by = c("Week")) %>%
         dplyr::select(SignalID, Date, Week, !!var_, !!wt_, delta) %>%
         ungroup()
-
-    # SignalID | Date | vpd
 }
 
 
@@ -330,7 +329,6 @@ get_monthly_avg_by_day <- function(df, var_, wt_ = NULL, peak_only = FALSE) {
     current_month <- max(df$Month)
 
     gdf <- df %>%
-        # group_by(SignalID, CallPhase) %>%
         complete(nesting(SignalID, CallPhase),
                  Month = seq(min(Month), current_month, by = "1 month")) %>%
         group_by(SignalID, Month, CallPhase)
@@ -1078,13 +1076,16 @@ get_cor_monthly_aog_peak <- function(cor_monthly_aog_by_hr) {
 }
 
 
-# Convert Monthly data to quarterly for Quarterly Report ####
+# Convert Monthly data to quarterly for Quarterly Report
 get_quarterly <- function(monthly_df, var_, wt_="ones", operation = "avg") {
 
     if (wt_ == "ones" & !"ones" %in% names(monthly_df)) {
         monthly_df <- monthly_df %>% mutate(ones = 1)
     }
 
+    if (sapply(monthly_df, class)[["Month"]] != "Date") {
+        monthly_df <- mutate(monthly_df, Month = as_date(Month))
+    }
     var_ <- as.name(var_)
     wt_ <- as.name(wt_)
 
@@ -1122,3 +1123,75 @@ get_quarterly <- function(monthly_df, var_, wt_="ones", operation = "avg") {
         ungroup() %>%
         dplyr::select(-lag_)
 }
+
+
+
+sigify <- function(df, cor_df, corridors, identifier = "SignalID") {
+
+    per <- intersect(names(df), c("Date", "Month"))
+
+    descs <- corridors %>%
+        select(SignalID, Corridor, Description) %>%
+        group_by(SignalID, Corridor) %>%
+        filter(Description == first(Description)) %>%
+        ungroup()
+
+    if (identifier == "SignalID") {
+        df_ <- df %>%
+            left_join(distinct(corridors, SignalID, Corridor, Name), by = c("SignalID")) %>%
+            rename(Zone_Group = Corridor, Corridor = SignalID) %>%
+            ungroup() %>%
+            mutate(Corridor = factor(Corridor)) %>%
+            left_join(descs, by = c("Corridor" = "SignalID", "Zone_Group" = "Corridor")) %>%
+            mutate(
+                Description = coalesce(Description, Corridor),
+                Corridor = factor(Corridor),
+                Description = factor(Description)
+            )
+    } else if (identifier == "CameraID") {
+        corridors <- rename(corridors, Name = Location)
+        df_ <- df %>%
+            select(
+                -matches("Subcorridor"),
+                -matches("Zone_Group")
+            ) %>%
+            left_join(distinct(corridors, CameraID, Corridor, Name), by = c("Corridor", "CameraID")) %>%
+            rename(
+                Zone_Group = Corridor,
+                Corridor = CameraID
+            ) %>%
+            ungroup() %>%
+            mutate(
+                Description = coalesce(Description, Corridor))
+    } else {
+        stop("bad identifier. Must be SignalID (default) or CameraID")
+    }
+
+    cor_df_ <- cor_df %>%
+        filter(Corridor %in% unique(df_$Zone_Group)) %>%
+        mutate(
+            Zone_Group = Corridor,
+            Description = Corridor) %>%
+        select(-matches("Subcorridor"))
+
+    br <- bind_rows(df_, cor_df_) %>%
+        mutate(
+            Corridor = factor(Corridor),
+            Description = factor(Description))
+
+    if ("Zone_Group" %in% names(br)) {
+        br <- br %>%
+            mutate(Zone_Group = factor(Zone_Group))
+    }
+
+    if ("Month" %in% names(br)) {
+        br %>% arrange(Zone_Group, Corridor, Month)
+    } else if ("Hour" %in% names(br)) {
+        br %>% arrange(Zone_Group, Corridor, Hour)
+    } else if ("Timeperiod" %in% names(br)) {
+        br %>% arrange(Zone_Group, Corridor, Timeperiod)
+    } else if ("Date" %in% names(br)) {
+        br %>% arrange(Zone_Group, Corridor, Date)
+    }
+}
+

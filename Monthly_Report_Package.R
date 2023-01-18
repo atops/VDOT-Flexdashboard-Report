@@ -2,6 +2,7 @@
 # Monthly_Report_Package.R
 
 source("Monthly_Report_Package_init.R")
+
 # options(warn = 2)
 
 # # DETECTOR UPTIME ###########################################################
@@ -552,7 +553,6 @@ tryCatch(
                 x <- x %>%
                     rename(pd = Avg.Max.Ped.Delay) %>%
                     mutate(CallPhase = factor(0))
-
             }
             x %>%
                 mutate(
@@ -1061,7 +1061,6 @@ tryCatch(
 
         rm(aog)
         rm(pr_by_hr)
-        # rm(cor_monthly_pr_peak)
         rm(monthly_pr_by_hr)
         rm(cor_monthly_pr_by_hr)
         rm(sub_monthly_pr_by_hr)

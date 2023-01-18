@@ -25,14 +25,14 @@ doParallel::registerDoParallel(cores = usable_cores)
 qs_filename <- sub("\\..*", ".qs", conf$corridors_filename_s3)
 corridors <- s3read_using(
     qs::qread,
-    object = file.path(conf$key_prefix, qs_filename, fsep="/"),
+    object = qs_filename, 
     bucket = conf$bucket
 )
 
 qs_all_filename <- sub("\\..*", ".qs", paste0("all_", conf$corridors_filename_s3))
 all_corridors <- s3read_using(
     qs::qread,
-    object = file.path(conf$key_prefix, qs_all_filename, fsep="/"),
+    object = qs_all_filename,
     bucket = conf$bucket
 )
 

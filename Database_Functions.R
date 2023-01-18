@@ -5,10 +5,35 @@ suppressMessages({
     library(RMariaDB)
     library(yaml)
     library(tictoc)
-    library(stringr)
 })
 
 cred <- read_yaml("Monthly_Report_AWS.yaml")
+
+
+# My own function to perform multiple inserts at once.
+# Hadn't found a way to do this through native functions.
+mydbAppendTable <- function(conn, name, value, chunksize = 1e4) {
+
+    df <- value %>%
+        mutate(across(where(is.Date), ~format(., "%F"))) %>%
+        mutate(across(where(is.POSIXct), ~format(., "%F %X"))) %>%
+        mutate(across(where(is.factor), as.character)) %>%
+        mutate(across(where(is.character), ~str_replace_all(., "'", "\\\\'")))
+
+    table_name <- name
+
+    vals <- unite(df, "z", names(df), sep = "','") %>% pull(z)
+    vals <- glue("('{vals}')")
+    vals_list <- split(vals, ceiling(seq_along(vals)/chunksize))
+
+    query0 <- glue("INSERT INTO {table_name} (`{paste0(colnames(df), collapse = '`, `')}`) VALUES ")
+
+    for (v in vals_list) {
+        query <- paste0(query0, paste0(v, collapse = ','))
+        dbExecute(conn, query)
+    }
+}
+
 
 # -- Previously from Monthly_Report_Functions.R
 
@@ -21,61 +46,22 @@ get_atspm_connection <- function(conf_atspm) {
 }
 
 
-get_maxview_connection <- function(dsn = "MaxView") {
-    
-    if (Sys.info()["sysname"] == "Windows") {
-        
-        dbConnect(odbc::odbc(),
-                  dsn = dsn,
-                  uid = Sys.getenv("ATSPM_USERNAME"),
-                  pwd = Sys.getenv("ATSPM_PASSWORD"))
-        
-    } else if (Sys.info()["sysname"] == "Linux") {
-        
-        dbConnect(odbc::odbc(),
-                  driver = "FreeTDS",
-                  server = Sys.getenv("MAXV_SERVER_INSTANCE"),
-                  database = Sys.getenv("MAXV_EVENTLOG_DB"),
-                  uid = Sys.getenv("ATSPM_USERNAME"),
-                  pwd = Sys.getenv("ATSPM_PASSWORD"))
-    }
-}
-
-
-get_maxview_eventlog_connection <- function() {
-    get_maxview_connection(dsn = "MaxView_EventLog")
-}
-
-
 get_cel_connection <- get_maxview_eventlog_connection
 
 
-get_aurora_connection <- function(f = RMariaDB::dbConnect, driver = RMariaDB::MariaDB()) {
-    
+get_aurora_connection <- function(
+    f = RMariaDB::dbConnect,
+    driver = RMariaDB::MariaDB(),
+    load_data_local_infile = FALSE
+) {
+
     f(drv = driver,
       host = cred$RDS_HOST,
       port = 3306,
       dbname = cred$RDS_DATABASE,
       username = cred$RDS_USERNAME,
-      password = cred$RDS_PASSWORD)
-}    
-
-get_aurora_connection_pool <- function() {
-    get_aurora_connection(pool::dbPool)
-}
-
-
-get_duckdb_connection <- function(dbdir, read_only = FALSE, f = duckdb::dbConnect) {
-    f(
-        drv = duckdb::duckdb(),
-        dbdir = dbdir,
-        read_only = read_only
-    )
-}
-
-
-get_duckdb_connection_pool <- function(dbdir, read_only = FALSE) {
-    get_duckdb_connection(dbdir, read_only, pool::dbPool)
+      password = cred$RDS_PASSWORD,
+      load_data_local_infile = load_data_local_infile)
 }
 
 
@@ -112,41 +98,41 @@ add_partition <- function(conf, table_name, date_) {
 
 
 query_data <- function(
-    metric, 
-    level = "corridor", 
-    resolution = "monthly", 
-    hourly = FALSE, 
-    zone_group, 
+    metric,
+    level = "corridor",
+    resolution = "monthly",
+    hourly = FALSE,
+    zone_group,
     corridor = NULL,
-    month, 
-    quarter = NULL, 
+    month = NULL,
+    quarter = NULL,
     upto = TRUE) {
-    
+
     # metric is one of {vpd, tti, aog, ...}
     # level is one of {corridor, subcorridor, signal}
     # resolution is one of {quarterly, monthly, weekly, daily}
-    
+
     per <- switch(
         resolution,
         "quarterly" = "qu",
         "monthly" = "mo",
         "weekly" = "wk",
         "daily" = "dy")
-    
+
     mr_ <- switch(
         level,
         "corridor" = "cor",
         "subcorridor" = "sub",
         "signal" = "sig")
-    
+
     tab <- if (hourly & !is.null(metric$hourly_table)) {
         metric$hourly_table
     } else {
         metric$table
     }
-    
+
     table <- glue("{mr_}_{per}_{tab}")
-    
+
     # Special cases--groups of corridors
     if (level == "corridor" & (grepl("RTOP", zone_group))) {
         if (zone_group == "All RTOP") {
@@ -163,24 +149,24 @@ query_data <- function(
         zones <- c("Zone 7", "Zone 7m", "Zone 7d")
         zones <- paste(glue("'{zones}'"), collapse = ",")
         where_clause <- glue("WHERE Zone_Group in ({zones})")
-    } else if (zone_group == "All") {
+    } else if (level == "signal" & zone_group == "All") {
         # Special case used by the map which currently shows signal-level data
         # for all signals all the time.
         where_clause <- "WHERE True"
     } else {
         where_clause <- "WHERE Zone_Group = '{zone_group}'"
     }
-    
+
     query <- glue(paste(
-        "SELECT * FROM {table}", 
+        "SELECT * FROM {table}",
         where_clause))
-    
+
     comparison <- ifelse(upto, "<=", "=")
-    
+
     if (typeof(month) == "character") {
         month <- as_date(month)
     }
-    
+
     if (hourly & !is.null(metric$hourly_table)) {
         if (resolution == "monthly") {
             query <- paste(query, glue("AND Hour <= '{month + months(1) - hours(1)}'"))
@@ -192,21 +178,23 @@ query_data <- function(
         query <- paste(query, glue("AND Month {comparison} '{month}'"))
     } else if (resolution == "quarterly") { # current_quarter is not null
         query <- paste(query, glue("AND Quarter {comparison} {quarter}"))
+
     } else if (resolution == "weekly" | resolution == "daily") {
         query <- paste(query, glue("AND Date {comparison} '{month + months(1) - days(1)}'"))
+
     } else {
         "oops"
     }
 
     df <- data.frame()
-    
+
     tryCatch({
         df <- dbGetQuery(sigops_connection_pool, query)
-        
+
         if (!is.null(corridor)) {
             df <- filter(df, Corridor == corridor)
         }
-        
+
         date_string <- intersect(c("Month", "Date"), names(df))
         if (length(date_string)) {
             df[[date_string]] = as_date(df[[date_string]])
@@ -220,25 +208,6 @@ query_data <- function(
     })
 
     df
-}
-
-
-dbWriteTable <- function(conn, name, value, ...) {
-    tic()
-    print(class(conn)[1])
-    if (class(conn)[1] == "MariaDBConnection") {
-        cols_ <- dbListFields(conn, name)
-        value <- value[cols_]  # Make sure columns are in the right order
-        fn <- tempfile()
-        readr::write_csv(value, fn)
-        DBI::dbExecute(
-            conn,
-            glue("LOAD DATA LOCAL INFILE '{fn}' into table {name} fields terminated by ',' IGNORE 1 LINES"))
-        file.remove(fn)
-    } else {
-        DBI::dbWriteTable(conn, name, value, ...)
-    }
-    toc()
 }
 
 

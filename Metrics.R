@@ -43,25 +43,35 @@ get_uptime <- function(df, start_date, end_time) {
 }
 
 
-
-get_spm_data_atspm <- function(start_date, end_date, signals_list, conf_atspm, table, TWR_only=TRUE) {
+get_spm_data_atspm <- function(start_date, end_date, conf_atspm, table, signals_list = NULL, eventcodes = NULL, TWR_only = FALSE) {
+    # To optimize query performance, specify signals_list, avoid specifying TWR_only
 
     conn <- get_atspm_connection(conf_atspm)
 
-    if (TWR_only==TRUE) {
-        query_where <- "WHERE DATEPART(dw, CycleStart) in (3,4,5)"
-    } else {
-        query_where <- ""
+    end_date1 <- ymd(end_date) + days(1)
+
+    df <- tbl(conn, table)
+
+    if (!is.null(signals_list)) {
+        if (is.factor(signals_list)) {
+            signals_list <- as.character(signals_list)
+        } else if (is.character(signals_list)) {
+            signals_list <- signals_list
+        }
+        df <- filter(df, SignalID %in% signals_list)
     }
 
-    query <- paste("SELECT * FROM", table, query_where)
+    df <- df %>%
+        filter(Timestamp >= start_date, Timestamp < end_date1)
 
-    df <- tbl(conn, sql(query))
+    if (!is.null(eventcodes)) {
+        df <- filter(df, EventCode %in% eventcodes)
+    }
 
-    end_date1 <- as.character(ymd(end_date) + days(1))
-
-    dplyr::filter(df, CycleStart >= start_date & CycleStart < end_date1 &
-                      SignalID %in% signals_list)
+    if (TWR_only) {
+        df <- filter(df, DATENAME(WEEKDAY, Timestamp) %in% c('Tuesday','Wednesday','Thursday'))
+    }
+    df
 }
 
 
@@ -270,9 +280,15 @@ get_sf_utah <- function(date_, conf, signals_list = NULL, first_seconds_of_red =
         rename(Phase = CallPhase)
 
     cat('.')
-
-    ds_de <- arrow::open_dataset(glue("gs://{conf$bucket}/{conf$key_prefix}/detections/date={date_}"))
-    de <- ds_de %>%
+    if (dir.exists(glue("./detections/date={date_}"))) {
+        print('read detections locally')
+        path <- "."
+    } else {
+        print('read detections from s3')
+        path <- glue("gs://{conf$bucket}/{conf$key_prefix}")
+    }
+    de <- arrow::open_dataset(glue("{path}/detections/date={date_}")) %>%
+        select(SignalID, Phase, Detector, CycleStart, PhaseStart, DetTimeStamp, DetDuration) %>%
         filter(SignalID %in% signals_list,
                Phase %in% c(3, 4, 7, 8)) %>%
         collect() %>%
@@ -297,8 +313,16 @@ get_sf_utah <- function(date_, conf, signals_list = NULL, first_seconds_of_red =
 
     cat('.')
 
-    ds_cd <- arrow::open_dataset(glue("gs://{conf$bucket}/{conf$key_prefix}/cycles/date={date_}"))
-    cd <- ds_cd %>%
+    if (dir.exists(glue("./cycles/date={date_}"))) {
+        print('read cycles locally')
+        path <- "."
+    } else {
+        print('read cycles from s3')
+        path <- glue("gs://{conf$bucket}/{conf$key_prefix}")
+    }
+
+    cd <- arrow::open_dataset(glue("{path}/cycles/date={date_}")) %>%
+        select(SignalID, Phase, CycleStart, PhaseStart, PhaseEnd, EventCode) %>%
         filter(SignalID %in% signals_list,
                Phase %in% c(3, 4, 7, 8),
                EventCode %in% c(1, 9)) %>%
@@ -326,6 +350,8 @@ get_sf_utah <- function(date_, conf, signals_list = NULL, first_seconds_of_red =
 
     cat('.')
 
+    rm(cd)
+
     grn_interval <- setDT(grn_interval)
     sor_interval <- setDT(sor_interval)
 
@@ -347,7 +373,8 @@ get_sf_utah <- function(date_, conf, signals_list = NULL, first_seconds_of_red =
         mutate(sf = if_else((gr_occ > 0.80) & (sr_occ > 0.80), 1, 0))
 
     # if a split failure on any phase
-    sf0 <- sf %>% group_by(SignalID, Phase = factor(0), CycleStart) %>%
+    sf0 <- sf %>%
+        group_by(SignalID, Phase = factor(0), CycleStart) %>%
         summarize(sf = max(sf), .groups = "drop")
 
     sf <- bind_rows(sf, sf0) %>%
