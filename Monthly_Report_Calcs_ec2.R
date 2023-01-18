@@ -4,6 +4,8 @@
 library(yaml)
 library(glue)
 
+source("renv/activate.R")
+
 source("Monthly_Report_Functions.R")
 
 
@@ -38,10 +40,20 @@ month_abbrs <- get_month_abbrs(start_date, end_date)
 
 # -- Code to update corridors file/table from Excel file
 
+x <- get_bucket(bucket = conf$bucket, prefix = conf$corridors_filename_s3)
+xlsx_last_modified <- if (!is.null(x)) {
+    x$Contents$LastModified
+} else {
+    as_date("1900-01-01")
+}
 
-xlsx_last_modified <- get_bucket(bucket = conf$bucket, prefix = conf$corridors_filename_s3)$Contents$LastModified
 qs_filename <- sub("\\..*", ".qs", conf$corridors_filename_s3)
-qs_last_modified <- get_bucket(bucket = conf$bucket, prefix = qs_filename)$Contents$LastModified
+x <- get_bucket(bucket = conf$bucket, prefix = qs_filename)
+qs_last_modified <- if (!is.null(x)) {
+    x$Contents$LastModified
+} else {
+    as_date("1900-01-01")
+}
 
 if (as_datetime(xlsx_last_modified) > as_datetime(qs_last_modified)) {
     corridors <- s3read_using(
@@ -49,10 +61,10 @@ if (as_datetime(xlsx_last_modified) > as_datetime(qs_last_modified)) {
         object = conf$corridors_filename_s3,
         bucket = conf$bucket
     )
-    qsave(corridors, qs_filename)
+    qsave(corridors, basename(qs_filename))
     s3_upload_file(
-        file = qs_filename,
-        object = file.path(conf$key_prefix, qs_filename, fsep="/"),
+        file = basename(qs_filename),
+        object = qs_filename,
         bucket = conf$bucket
     )
     dbExecute(aurora, "TRUNCATE TABLE Corridors")
@@ -64,16 +76,17 @@ if (as_datetime(xlsx_last_modified) > as_datetime(qs_last_modified)) {
         bucket = conf$bucket
     )
     qs_all_filename <- sub("\\..*", ".qs", paste0("all_", conf$corridors_filename_s3))
-    qsave(all_corridors, qs_all_filename)
+    qsave(all_corridors, basename(qs_all_filename))
     s3_upload_file(
-        file = qs_all_filename,
-        object = file.path(conf$key_prefix, qs_al_filename, fsep="/"),
+        file = basename(qs_all_filename),
+        object = qs_all_filename,
         bucket = conf$bucket
     )
     dbExecute(aurora, "TRUNCATE TABLE AllCorridors")
     dbWriteTable(aurora, "AllCorridors", all_corridors, overwrite = FALSE, append = TRUE, row.names = FALSE)
 }
 
+#corridors <- qread(basename(qs_filename))
 corridors <- dbReadTable(aurora, "Corridors")
 dbDisconnect(aurora)
 
@@ -123,20 +136,21 @@ if (conf$run$counts == TRUE) {
         get_counts2(
             date_,
             bucket = conf$bucket,
-            conf = conf,
+            cred = cred,
             uptime = TRUE,
             counts = TRUE
         )
     } else {
-        foreach(date_ = date_range, .errorhandling = "pass") %dopar% {
+#        foreach(date_ = date_range, .errorhandling = "pass") %dopar% {
+        lapply(date_range, function(date_) {
             get_counts2(
                 date_,
                 bucket = conf$bucket,
-                conf = conf,
+                cred = cred,
                 uptime = TRUE,
                 counts = TRUE
             )
-        }
+        })
     }
 
 

@@ -10,6 +10,7 @@ storage_client = storage.Client()
 def s3read_using(FUN, Bucket, Key, **kwargs):
     with io.BytesIO() as f:
         storage_client.bucket(Bucket).blob(Key).download_to_file(f)
+        f.seek(0)
         df = FUN(f, **kwargs)
     return df
 
@@ -19,18 +20,21 @@ def s3_write_parquet(df, Bucket, Key):
         df[col] = df[col].dt.round(freq='ms') # parquet doesn't support ns timestamps
     with io.BytesIO() as f:
         df.to_parquet(f)
+        f.seek(0)
         storage_client.bucket(Bucket).blob(Key).upload_from_file(f)
 
 
 def s3_write_excel(df, Bucket, Key):
     with io.BytesIO() as f:
         df.to_excel(f)
+        f.seek(0)
         storage_client.bucket(Bucket).blob(Key).upload_from_file(f)
 
 
 def s3_write_csv(df, Bucket, Key):
     with io.StringIO() as f:
         df.to_csv(f)
+        f.seek(0)
         storage_client.bucket(Bucket).blob(Key).upload_from_file(f)
 
 
@@ -49,6 +53,7 @@ def s3_read_feather(Bucket, Key, **kwargs):
 def s3_read_csv(Bucket, Key, **kwargs):
     with io.String() as f:
         storage_client.bucket(Bucket).blob(Key).download_to_file(f)
+        f.seek(0)
         df = pd.read_csv(f, **kwargs)
     return df
 

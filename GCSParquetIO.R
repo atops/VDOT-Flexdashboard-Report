@@ -1,7 +1,24 @@
 
+library(googleCloudStorageR)
+library(gargle)
+
+gcs_auth()
+
+
+get_bucket <- function(...) {
+    df <- gcs_list_objects(...)
+    if (nrow(df)) {
+        df <- rename(df, LastModified = updated)
+        list(Contents = df[1,])
+    } else {
+        NULL
+    }
+}
+
+
 s3_list_objects <- function(...) {
-    gcs_list_objects(...) %>%
-        rename(Key = name)
+    df <- gcs_list_objects(...)
+    ifelse(nrow(df), rename(df, Key = name), NULL)
 }
 
 
@@ -11,7 +28,11 @@ s3_upload_file <- function(file, bucket, object) {
 
 
 s3read_using <- function(FUN, bucket, object) {
-    FUN(gcs_get_object(bucket = bucket, object_name = object))
+    fn <- tempfile()
+    gcs_get_object(bucket = bucket, object_name = object, saveToDisk = fn)
+    x <- FUN(fn)
+    file.remove(fn)
+    x
 }
 
 

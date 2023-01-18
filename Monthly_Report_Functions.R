@@ -46,6 +46,8 @@ filter <- dplyr::filter
 options(future.rng.onMisue = "ignore")
 
 conf <- read_yaml("Monthly_Report.yaml")
+conf$corridors_filename_s3 <- paste(conf$key_prefix, conf$corridors_filename_s3, sep = "/")
+conf$corridors_TMCs_filename_s3 <- paste(conf$key_prefix, conf$corridors_TMCs_filename_s3, sep = "/")
 aws_conf <- read_yaml("Monthly_Report_AWS.yaml")
 
 if (Sys.info()["sysname"] == "Windows") {
