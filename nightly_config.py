@@ -9,11 +9,13 @@ import pandas as pd
 import sqlalchemy as sq
 from datetime import datetime
 import yaml
-
+import posixpath
 import gcsio
+
 from get_atspm_detectors import get_atspm_detectors, get_atspm_ped_detectors
 from get_included_detectors import get_included_detectors
 from pull_atspm_data import get_atspm_engine
+
 
 
 # get Good/Authoritative Detector Config (det_config) and write to feather
@@ -67,10 +69,14 @@ def get_det_config(ad, engine, date_string):
     return det_config
 
 
-def nightly_config(engine, date_, BUCKET, REGION):
+def nightly_config(engine, date_, conf):
     date_string = date_.strftime('%Y-%m-%d')
 
-    key_prefix = 'kimley-horn/config'
+    BUCKET = conf['bucket']
+    REGION = conf['region']
+    KEY_PREFIX = conf['key_prefix']
+
+    key_prefix = posixpath.join(KEY_PREFIX, 'config')
 
     print("ATSPM Vehicle Detectors [1 of 3]")
     ad = get_atspm_detectors(engine, date_)
@@ -96,28 +102,7 @@ if __name__=='__main__':
     with open('Monthly_Report_AWS.yaml') as yaml_file:
         cred = yaml.load(yaml_file, Loader=yaml.Loader)
     
-    BUCKET = conf['bucket']
-    REGION = conf['region']
-
-    
-    engine = get_atspm_engine(
-        username=cred['ATSPM_UID'], 
-        password=cred['ATSPM_PWD'], 
-        hostname=cred['ATSPM_HOST'], 
-        database=cred['ATSPM_DB'],
-        dsn=cred['ATSPM_DSN'])
+    engine = get_atspm_engine(cred)
         
-    #"""
     date_ = datetime.today()
-    nightly_config(engine, date_, BUCKET, REGION)
-
-
-    # Code to go back and calculate past days
-    """
-    dates = pd.date_range('2021-12-15', '2022-01-18', freq='1D')
-
-    for date_ in dates:
-        print(date_)
-        nightly_config(engine, date_, BUCKET, REGION)
-    """
-    #"""
+    nightly_config(engine, date_, conf)
