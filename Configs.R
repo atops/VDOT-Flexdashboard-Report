@@ -109,7 +109,7 @@ get_det_config_  <- function(bucket, folder) {
         tryCatch({
             arrow::open_dataset(
                 sources = glue("gs://{bucket}/{folder}/date={date_}"),
-                format="feather",
+                format="parquet",
                 schema = det_config_arrow_schema
             ) %>%
                 collect() %>%

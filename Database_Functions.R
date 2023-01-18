@@ -4,7 +4,6 @@ suppressMessages({
     library(odbc)
     library(RMariaDB)
     library(yaml)
-    library(duckdb)
     library(tictoc)
     library(stringr)
 })
