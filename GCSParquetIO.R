@@ -1,17 +1,4 @@
 
-dummy <- function() {
-f <- function(input, output) write_parquet(input, file = output)
-gcs_upload(
-    mtcars, 
-    bucket = "its-apps-atspm-stage", 
-    object_function = f, 
-    name = "kimley-horn/mtcars.parquet")
-
-df <- read_parquet(
-    gcs_get_object("gs://its-apps-atspm-stage/kimley-horn/mtcars.parquet"))
-}
-
-
 s3_list_objects <- function(...) {
     gcs_list_objects(...) %>%
         rename(Key = name)
@@ -45,7 +32,7 @@ s3_upload_parquet <- function(df, date_, fn, bucket, table_name) {
     if ("Date" %in% names(df)) {
         df <- df %>% select(-Date)
     }
-   
+
     
     if ("Detector" %in% names(df)) {
         df <- mutate(df, Detector = as.character(Detector))
@@ -126,8 +113,7 @@ s3_read_parquet <- function(bucket, object, date_ = NULL) {
         df <- read_parquet(gcs_get_object(bucket = bucket, object_name = object)) %>%
             select(-starts_with("__"))
         if (!is.na(date_)) {
-            df <- df %>%
-                mutate(Date = as_date(date_))
+            df <- mutate(df, Date = as_date(date_))
         }
         df
     }, error = function(e) {
