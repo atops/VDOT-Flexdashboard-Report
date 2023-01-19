@@ -17,8 +17,18 @@ get_bucket <- function(...) {
 
 
 s3_list_objects <- function(...) {
-    df <- gcs_list_objects(...)
-    ifelse(nrow(df), rename(df, Key = name), NULL)
+    z <- gcs_list_objects(...)
+    if (class(z) == "list") {
+	print("list block")
+	names(z) <- "Key"
+    } else if (class(z) == "data.frame") {
+        if (nrow(z) > 0) {
+            z <- rename(z, Key = name)
+	} else {
+            z <- NULL
+	}
+    }
+    z
 }
 
 
