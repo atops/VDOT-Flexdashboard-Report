@@ -1,5 +1,5 @@
 det_config_arrow_schema <- schema(
-    SignalID = int64(),
+    SignalID = string(),  # int64(),
     Detector = int64(),
     ID = int64(),
     DetectorID = string(),
@@ -44,9 +44,9 @@ det_config_arrow_schema <- schema(
 get_corridors <- function(corr_fn, filter_signals = TRUE) {
 
     # Keep this up to date to reflect the Corridors_Latest.xlsx file
-    cols <- list(SignalID = "numeric", #"text",
-                 Zone_Group = "text",
-                 Zone = "text",
+    cols <- list(SignalID = "text",  # "numeric",
+                 Contract = "text",
+                 District = "text",
                  Corridor = "text",
                  Subcorridor = "text",
                  Agency = "text",
@@ -59,9 +59,15 @@ get_corridors <- function(corr_fn, filter_signals = TRUE) {
                  Modified = "date",
                  Note = "text",
                  Latitude = "numeric",
-                 Longitude = "numeric")
+                 Longitude = "numeric",
+                 County = "text",
+                 City = "text",
+                 `TEAMS GUID` = "text",
+                 Priority = "text",
+                 Classification = "text")
 
     df <- readxl::read_xlsx(corr_fn, col_types = unlist(cols)) %>%
+        rename(Zone_Group = Contract, Zone = District) %>%
 
         # Get the last modified record for the Signal|Zone|Corridor combination
         replace_na(replace = list(Modified = ymd("1900-01-01"))) %>%
@@ -77,7 +83,7 @@ get_corridors <- function(corr_fn, filter_signals = TRUE) {
     if (filter_signals) {
         df <- df %>%
             filter(
-                SignalID > 0,
+                # SignalID > 0,
                 Include == TRUE)
     }
 

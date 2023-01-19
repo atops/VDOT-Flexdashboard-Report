@@ -5,33 +5,30 @@ get_counts <- function(df, det_config, units = "hours", date_, event_code = 82, 
     if (lubridate::wday(date_, label = TRUE) %in% c("Tue", "Wed", "Thu") || (TWR_only == FALSE)) {
 
         df <- df %>%
-            filter(eventcode == event_code)
+            filter(EventCode == event_code)
 
-        # Group by hour using Athena/Presto SQL
+        # Group by hour using MS SQL Server SQL
         if (units == "hours") {
             df <- df %>%
-                group_by(timeperiod = date_trunc('hour', timestamp),
-                         signalid,
-                         eventparam)
+                group_by(Timeperiod = dateadd(sql('HOUR'), datediff(sql('HOUR'), 0, Timestamp), 0),
+                         SignalID,
+                         EventParam)
 
-            # Group by 15 minute interval using Athena/Presto SQL
+        # Group by 15 minute interval using MS SQL Server SQL
         } else if (units == "15min") {
             df <- df %>%
-                mutate(timeperiod = date_trunc('minute', timestamp)) %>%
-                group_by(timeperiod = date_add('second',
-                                               as.integer(-1 * mod(to_unixtime(timeperiod), 15*60)),
-                                               timeperiod),
-                         signalid,
-                         eventparam)
+                group_by(Timeperiod = dateadd(sql('MINUTE'), floor(datediff(sql('MINUTE'), 0, Timestamp)/15.0) * 15, 0),
+                         SignalID,
+                         EventParam)
         }
 
         df <- df %>%
             count() %>%
             ungroup() %>%
             collect() %>%
-            transmute(Timeperiod = ymd_hms(timeperiod),
-                      SignalID = factor(signalid),
-                      Detector = factor(eventparam),
+            transmute(Timeperiod = as_datetime(Timeperiod),
+                      SignalID = factor(SignalID),
+                      Detector = factor(EventParam),
                       vol = as.integer(n)) %>%
             left_join(det_config, by = c("SignalID", "Detector")) %>%
 
@@ -66,12 +63,9 @@ get_counts2 <- function(date_, bucket, cred, uptime = TRUE, counts = TRUE) {
     atspm_query <- sql(glue(paste(
         "SELECT DISTINCT Timestamp, SignalID, EventCode, EventParam",
         "FROM Controller_Event_Log",
-        "WHERE Timestamp >= '{date_}' AND Timestamp < {date_ + days(1)}")))
+        "WHERE Timestamp >= '{date_}' AND Timestamp < '{date_ + days(1)}'")))
 
-    df <- tbl(conn, atspm_query) %>%
-        select(timestamp = Timestamp, signalid = SignalID, eventcode = EventCode, eventparam = EventParam) %>%
-        mutate(signalid = as.integer(signalid))
-
+    df <- tbl(conn, atspm_query)
 
     print(paste("-- Get Counts for:", date_, "-----------"))
 
@@ -90,7 +84,7 @@ get_counts2 <- function(date_, bucket, cred, uptime = TRUE, counts = TRUE) {
             mutate(SignalID = factor(SignalID),
                    CallPhase = factor(0),
                    uptime = uptime + (1 - uptime_all),
-                   Date_Hour = ymd_hms(paste(start_date, "00:00:00")),
+                   Date_Hour = as_datetime(paste(start_date, "00:00:00")),
                    Date = date(start_date),
                    DOW = wday(start_date),
                    Week = week(start_date)) %>%
@@ -99,7 +93,8 @@ get_counts2 <- function(date_, bucket, cred, uptime = TRUE, counts = TRUE) {
         s3_upload_parquet(cu, date_,
                           fn = glue("cu_{date_}"),
                           bucket = bucket,
-                          table_name = "comm_uptime")
+                          table_name = "comm_uptime",
+                          conf = conf)
     }
 
     if (counts == TRUE) {
@@ -127,7 +122,8 @@ get_counts2 <- function(date_, bucket, cred, uptime = TRUE, counts = TRUE) {
         s3_upload_parquet(counts_1hr, date_,
                           fn = counts_1hr_fn,
                           bucket = bucket,
-                          table_name = "counts_1hr")
+                          table_name = "counts_1hr",
+                          conf = conf)
 
         print("1-hr filtered counts")
         if (nrow(counts_1hr) > 0) {
@@ -138,7 +134,7 @@ get_counts2 <- function(date_, bucket, cred, uptime = TRUE, counts = TRUE) {
                               fn = filtered_counts_1hr_fn,
                               bucket = bucket,
                               table_name = "filtered_counts_1hr",
-                              conf_athena = conf_athena)
+                              conf = conf)
             rm(counts_1hr)
 
             # BAD DETECTORS
@@ -148,7 +144,7 @@ get_counts2 <- function(date_, bucket, cred, uptime = TRUE, counts = TRUE) {
                     bucket = conf$bucket,
                     prefix = "bad_detectors",
                     table_name = "bad_detectors",
-                    conf_athena = conf$athena
+                    conf = conf
                 )
 
             # # DAILY DETECTOR UPTIME
@@ -159,7 +155,7 @@ get_counts2 <- function(date_, bucket, cred, uptime = TRUE, counts = TRUE) {
                     bucket = conf$bucket,
                     prefix = "ddu",
                     table_name = "detector_uptime_pd",
-                    conf_athena = conf$athena
+                    conf = conf
                 )
         }
 
@@ -180,9 +176,10 @@ get_counts2 <- function(date_, bucket, cred, uptime = TRUE, counts = TRUE) {
         s3_upload_parquet(counts_ped_1hr, date_,
                           fn = counts_ped_1hr_fn,
                           bucket = bucket,
-                          table_name = "counts_ped_1hr")
+                          table_name = "counts_ped_1hr",
+                          conf = conf)
 
-	# PAPD - pedestrian activations per day
+        # PAPD - pedestrian activations per day
         print("papd")
         get_vpd(counts_ped_1hr, mainline_only = FALSE) %>%
             ungroup() %>%
@@ -191,10 +188,10 @@ get_counts2 <- function(date_, bucket, cred, uptime = TRUE, counts = TRUE) {
                 bucket = conf$bucket,
                 prefix = "papd",
                 table_name = "ped_actuations_pd",
-                conf_athena = conf$athena
+                conf = conf
         )
 
-	# PAPH - pedestrian activations per hour
+        # PAPH - pedestrian activations per hour
         print("paph")
         get_vph(counts_ped_1hr, interval = "1 hour", mainline_only = FALSE) %>%
             rename(paph = vph) %>%
@@ -202,12 +199,10 @@ get_counts2 <- function(date_, bucket, cred, uptime = TRUE, counts = TRUE) {
                 bucket = conf$bucket,
                 prefix = "paph",
                 table_name = "ped_actuations_ph",
-                conf_athena = conf$athena
+                conf = conf
         )
 
-	rm(counts_ped_1hr)
-
-        conn <- get_athena_connection(conf_athena)
+        rm(counts_ped_1hr)
 
         # get 15min counts
         print("15-minute counts")
@@ -224,7 +219,8 @@ get_counts2 <- function(date_, bucket, cred, uptime = TRUE, counts = TRUE) {
         s3_upload_parquet(counts_15min, date_,
                           fn = counts_15min_fn,
                           bucket = bucket,
-                          table_name = "counts_15min")
+                          table_name = "counts_15min",
+                          conf = conf)
 
         # get 15min filtered counts
         print("15-minute filtered counts")
@@ -237,10 +233,10 @@ get_counts2 <- function(date_, bucket, cred, uptime = TRUE, counts = TRUE) {
                     fn = filtered_counts_15min_fn,
                     bucket = bucket,
                     table_name = "filtered_counts_15min",
-                    conf_athena = conf_athena)
+                    conf = conf)
         }
 
-	# get 15min ped counts
+        # get 15min ped counts
         print("15-minute pedestrian actutation counts")
         counts_ped_15min <- get_counts(
             df,
@@ -255,10 +251,10 @@ get_counts2 <- function(date_, bucket, cred, uptime = TRUE, counts = TRUE) {
         s3_upload_parquet(counts_ped_15min, date_,
                           fn = counts_ped_15min_fn,
                           bucket = bucket,
-                          table_name = "counts_ped_15min")
-        rm(counts_ped_15min)
+                          table_name = "counts_ped_15min",
+                          conf = conf)
 
-	# PA15 - pedestrian activations per 15min
+        # PA15 - pedestrian activations per 15min
         print("pa15")
         get_vph(counts_ped_15min, interval = "15 min", mainline_only = FALSE) %>%
             rename(pa15 = vph) %>%
@@ -266,7 +262,7 @@ get_counts2 <- function(date_, bucket, cred, uptime = TRUE, counts = TRUE) {
                 bucket = conf$bucket,
                 prefix = "pa15",
                 table_name = "ped_actuations_15min",
-                conf_athena = conf$athena
+                conf = conf
             )
 
         rm(counts_ped_15min)

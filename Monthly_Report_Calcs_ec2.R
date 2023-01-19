@@ -16,8 +16,8 @@ if (interactive()) {
 } else {
     plan(multicore)
 }
-usable_cores <- get_usable_cores(4)
-# usable_cores <- 1
+# usable_cores <- get_usable_cores(4)
+usable_cores <- 1
 doParallel::registerDoParallel(cores = usable_cores)
 
 
@@ -40,14 +40,15 @@ month_abbrs <- get_month_abbrs(start_date, end_date)
 
 # -- Code to update corridors file/table from Excel file
 
-x <- get_bucket(bucket = conf$bucket, prefix = conf$corridors_filename_s3)
+xlsx_filename <- file.path(conf$key_prefix, conf$corridors_filename_s3)
+x <- get_bucket(bucket = conf$bucket, prefix = xlsx_filename)
 xlsx_last_modified <- if (!is.null(x)) {
     x$Contents$LastModified
 } else {
     as_date("1900-01-01")
 }
 
-qs_filename <- sub("\\..*", ".qs", conf$corridors_filename_s3)
+qs_filename <- sub("\\..*", ".qs", xlsx_filename)
 x <- get_bucket(bucket = conf$bucket, prefix = qs_filename)
 qs_last_modified <- if (!is.null(x)) {
     x$Contents$LastModified
@@ -58,7 +59,7 @@ qs_last_modified <- if (!is.null(x)) {
 if (as_datetime(xlsx_last_modified) > as_datetime(qs_last_modified)) {
     corridors <- s3read_using(
         function(x) get_corridors(x, filter_signals = TRUE),
-        object = conf$corridors_filename_s3,
+        object = xlsx_filename,
         bucket = conf$bucket
     )
     qsave(corridors, basename(qs_filename))
@@ -68,11 +69,11 @@ if (as_datetime(xlsx_last_modified) > as_datetime(qs_last_modified)) {
         bucket = conf$bucket
     )
     dbExecute(aurora, "TRUNCATE TABLE Corridors")
-    dbWriteTable(aurora, "Corridors", corridors, overwrite = FALSE, append = TRUE, row.names = FALSE)
+    dbAppendTable(aurora, "Corridors", corridors)
 
     all_corridors <- s3read_using(
         function(x) get_corridors(x, filter_signals = FALSE),
-        object = conf$corridors_filename_s3,
+        object = xlsx_filename,
         bucket = conf$bucket
     )
     qs_all_filename <- sub("\\..*", ".qs", paste0("all_", conf$corridors_filename_s3))
@@ -83,7 +84,7 @@ if (as_datetime(xlsx_last_modified) > as_datetime(qs_last_modified)) {
         bucket = conf$bucket
     )
     dbExecute(aurora, "TRUNCATE TABLE AllCorridors")
-    dbWriteTable(aurora, "AllCorridors", all_corridors, overwrite = FALSE, append = TRUE, row.names = FALSE)
+    dbAppendTable(aurora, "AllCorridors", all_corridors)
 }
 
 corridors <- dbReadTable(aurora, "Corridors")
@@ -357,7 +358,8 @@ get_counts_based_measures <- function(month_abbrs) {
             "counts_ped_1hr",
             as.character(sd),
             as.character(ed),
-            bucket = conf$bucket
+            bucket = conf$bucket,
+            conf = conf
         )
 
         if (!is.null(counts_ped_1hr) && nrow(counts_ped_1hr)) {
@@ -386,7 +388,7 @@ get_counts_based_measures <- function(month_abbrs) {
                 table_name = "ped_actuations_ph",
                 conf = conf
             )
-	}
+        }
 
         #-----------------------------------------------
         # 15-min pedestrian activation counts
@@ -396,7 +398,8 @@ get_counts_based_measures <- function(month_abbrs) {
             "counts_ped_15min",
             as.character(sd),
             as.character(ed),
-            bucket = conf$bucket
+            bucket = conf$bucket,
+            conf = conf
         )
 
         if (!is.null(counts_ped_15min) && nrow(counts_ped_15min)) {

@@ -286,7 +286,7 @@ get_cor_period_avg <- function(df, corridors, var_, per_, wt_ = "ones") {
 
     weighted_mean_by_corridor_(df, per_, corridors, var_, wt_) %>%
         filter(!is.nan(!!var_)) %>%
-	group_corridors_(per_, var_, wt_)
+        group_corridors_(per_, var_, wt_)
 }
 
 
@@ -974,7 +974,7 @@ get_cor_weekly_ti <- function(ti, cor_weekly_vph, corridors) {
 get_cor_monthly_ti_by_hr <- function(ti, tindx, cor_monthly_vph, corridors) {
 
     get_cor_monthly_ti(ti, cor_monthly_vph, corridors) %>%
-	get_cor_monthly_avg_by_hr(corridors, tindx, "pct")
+        get_cor_monthly_avg_by_hr(corridors, tindx, "pct")
 }
 
 

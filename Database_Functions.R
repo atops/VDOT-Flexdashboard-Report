@@ -46,9 +46,6 @@ get_atspm_connection <- function(conf_atspm) {
 }
 
 
-get_cel_connection <- get_maxview_eventlog_connection
-
-
 get_aurora_connection <- function(
     f = RMariaDB::dbConnect,
     driver = RMariaDB::MariaDB(),

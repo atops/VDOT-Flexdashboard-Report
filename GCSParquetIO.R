@@ -2,7 +2,7 @@
 library(googleCloudStorageR)
 library(gargle)
 
-gcs_auth()
+gcs_auth('../castle-rock-service-account.json')
 
 
 get_bucket <- function(...) {
@@ -23,7 +23,7 @@ s3_list_objects <- function(...) {
 
 
 s3_upload_file <- function(file, bucket, object) {
-    gcs_upload(file, bucket, name = object)
+    gcs_upload(file = file, bucket = bucket, name = object, predefinedAcl = "bucketLevel")
 }
 
 
@@ -37,7 +37,7 @@ s3read_using <- function(FUN, bucket, object) {
 
 
 s3write_using <- function(FUN, df, bucket, object) {
-    gcs_upload(df, object_function = FUN, bucket = bucket, name = object)
+    gcs_upload(df, object_function = FUN, bucket = bucket, name = object, predefinedAcl = "bucketLevel")
 }
 
 
@@ -46,7 +46,7 @@ s3_write_parquet <- function(df, bucket, object) {
 }
 
 
-s3_upload_parquet <- function(df, date_, fn, bucket, table_name) {
+s3_upload_parquet <- function(df, date_, fn, bucket, table_name, conf) {
     
     df <- ungroup(df)
     
@@ -69,10 +69,10 @@ s3_upload_parquet <- function(df, date_, fn, bucket, table_name) {
         gcs_upload,
         n_tries = 5,
         df,
-        object_function = function(input, output) write_parquet(input, file = output),
         bucket = bucket,
-        name = glue("{conf$key_prefix}/mark/{table_name}/date={date_}/{fn}.parquet")
-    )
+        name = glue("{conf$key_prefix}/mark/{table_name}/date={date_}/{fn}.parquet"),
+        object_function = function(input, output) write_parquet(x = input, sink = output),
+        predefinedAcl = "bucketLevel")
 }
 
 
@@ -149,6 +149,7 @@ s3_read_parquet_parallel <- function(table_name,
                                      end_date,
                                      signals_list = NULL,
                                      bucket = NULL,
+                                     conf = NULL,
                                      callback = function(x) {x},
                                      parallel = FALSE) {
     

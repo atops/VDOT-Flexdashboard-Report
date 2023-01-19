@@ -2,17 +2,17 @@
 get_uptime <- function(df, start_date, end_time) {
 
     ts_sig <- df %>%
-        mutate(timestamp = date_trunc('minute', timestamp)) %>%
-        distinct(signalid, timestamp) %>%
+        mutate(Timestamp = dateadd(sql('HOUR'), datediff(sql('HOUR'), 0, Timestamp), 0)) %>%
+        distinct(SignalID, Timestamp) %>%
         collect()
 
-    signals <- unique(ts_sig$signalid)
-    bookend1 <- expand.grid(SignalID = as.integer(signals), Timestamp = ymd_hms(glue("{start_date} 00:00:00")))
-    bookend2 <- expand.grid(SignalID = as.integer(signals), Timestamp = ymd_hms(end_time))
+    signals <- unique(ts_sig$SignalID)
+    bookend1 <- expand.grid(SignalID = signals, Timestamp = as_datetime(glue("{start_date} 00:00:00")))
+    bookend2 <- expand.grid(SignalID = signals, Timestamp = as_datetime(end_time))
 
 
     ts_sig <- ts_sig %>%
-        transmute(SignalID = signalid, Timestamp = ymd_hms(timestamp)) %>%
+        transmute(SignalID, Timestamp = as_datetime(Timestamp)) %>%
         bind_rows(., bookend1, bookend2) %>%
         distinct() %>%
         arrange(SignalID, Timestamp)
@@ -751,7 +751,7 @@ get_ped_delay <- function(date_, conf, signals_list) {
         mutate(CycleLength = ifelse(EventCode == 132, EventParam, NA)) %>%
         arrange(SignalID, Timestamp) %>%
         rename(Phase = EventParam) %>%
-	    convert_to_utc()
+            convert_to_utc()
 
     cat('.')
     coord.type <- group_by(pe, SignalID) %>%

@@ -135,7 +135,7 @@ keep_trying <- function(func, n_tries, ..., sleep = 1, timeout = Inf) {
             print(error)
         }
 
-	Sys.sleep(sleep)
+        Sys.sleep(sleep)
         sleep = sleep + 1
     }
     return(result)
@@ -264,10 +264,10 @@ addtoRDS <- function(df, fn, delta_var, rsd, csd) {
     if (tools::file_ext(fn)=="rds") {
         read_func <- readRDS
         write_func <- saveRDS
-	} else if (tools::file_ext(fn)=="parquet") {
+    } else if (tools::file_ext(fn)=="parquet") {
         read_func <- read_parquet
-	    write_func <- write_parquet
-	}
+        write_func <- write_parquet
+    }
 
     if (!file.exists(fn)) {
         if (!file.exists(dirname(fn))) {
@@ -381,8 +381,8 @@ walk_nested_list <- function(df, src, name=deparse(substitute(df)), indent=0) {
             }
 
             s3write_using(dfp, qsave, bucket = conf$bucket, object = glue("{src}/{name}.qs"))
+        }
 
-    	}
         for (n in names(df)) {
             if (!is.null(names(df[[n]]))) {
                 walk_nested_list(df[[n]], src, name = paste(name, n, sep="-"), indent = indent+10)
