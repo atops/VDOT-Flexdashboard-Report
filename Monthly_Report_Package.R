@@ -460,38 +460,42 @@ print(glue("{Sys.time()} Daily Pedestrian Activations [4 of 23]"))
 
 tryCatch(
     {
+        daily_papd <- get_daily_sum(papd, "papd")
         weekly_papd <- get_weekly_papd(papd)
-
-        # Group into corridors --------------------------------------------------------
-        cor_weekly_papd <- get_cor_weekly_papd(weekly_papd, corridors)
-
-        # Group into subcorridors --------------------------------------------------------
-        sub_weekly_papd <- get_cor_weekly_papd(weekly_papd, subcorridors) %>%
-            filter(!is.na(Corridor))
-
-        # Monthly volumes for bar charts and % change ---------------------------------
         monthly_papd <- get_monthly_papd(papd)
 
-        # Group into corridors
+        # Group into corridors --------------------------------------------------------
+        cor_daily_papd <- get_cor_weekly_papd(daily_papd, corridors) %>% select(-Week)
+        cor_weekly_papd <- get_cor_weekly_papd(weekly_papd, corridors)
         cor_monthly_papd <- get_cor_monthly_papd(monthly_papd, corridors)
 
-        # Group into subcorridors
+        # Group into subcorridors --------------------------------------------------------
+        sub_daily_papd <- get_cor_weekly_papd(daily_papd, subcorridors) %>% select(-Week) %>%
+            filter(!is.na(Corridor))
+        sub_weekly_papd <- get_cor_weekly_papd(weekly_papd, subcorridors) %>%
+            filter(!is.na(Corridor))
         sub_monthly_papd <- get_cor_monthly_papd(monthly_papd, subcorridors) %>%
             filter(!is.na(Corridor))
 
-        # Monthly % change from previous month by corridor ----------------------------
+
+        addtoRDS(daily_papd, "daily_papd.rds", "papd", report_start_date, wk_calcs_start_date)
         addtoRDS(weekly_papd, "weekly_papd.rds", "papd", report_start_date, wk_calcs_start_date)
         addtoRDS(monthly_papd, "monthly_papd.rds", "papd", report_start_date, calcs_start_date)
+        addtoRDS(cor_daily_papd, "cor_daily_papd.rds", "papd", report_start_date, wk_calcs_start_date)
         addtoRDS(cor_weekly_papd, "cor_weekly_papd.rds", "papd", report_start_date, wk_calcs_start_date)
         addtoRDS(cor_monthly_papd, "cor_monthly_papd.rds", "papd", report_start_date, calcs_start_date)
+        addtoRDS(sub_daily_papd, "sub_daily_papd.rds", "papd", report_start_date, wk_calcs_start_date)
         addtoRDS(sub_weekly_papd, "sub_weekly_papd.rds", "papd", report_start_date, wk_calcs_start_date)
         addtoRDS(sub_monthly_papd, "sub_monthly_papd.rds", "papd", report_start_date, calcs_start_date)
 
         rm(papd)
+        rm(daily_papd)
         rm(weekly_papd)
         rm(monthly_papd)
+        rm(cor_daily_papd)
         rm(cor_weekly_papd)
         rm(cor_monthly_papd)
+        rm(sub_daily_papd)
         rm(sub_weekly_papd)
         rm(sub_monthly_papd)
     },
@@ -584,18 +588,24 @@ tryCatch(
         weekly_pd_by_day <- get_weekly_avg_by_day(ped_delay, "pd", "Events", peak_only = FALSE)
         monthly_pd_by_day <- get_monthly_avg_by_day(ped_delay, "pd", "Events", peak_only = FALSE)
 
+        cor_daily_pd <- get_cor_weekly_avg_by_day(daily_pd, corridors, "pd", "Events") %>% select(-Week)
         cor_weekly_pd_by_day <- get_cor_weekly_avg_by_day(weekly_pd_by_day, corridors, "pd", "Events")
         cor_monthly_pd_by_day <- get_cor_monthly_avg_by_day(monthly_pd_by_day, corridors, "pd", "Events")
 
+        sub_daily_pd <- get_cor_weekly_avg_by_day(daily_pd, subcorridors, "pd", "Events") %>% select(-Week) %>%
+            filter(!is.na(Corridor))
         sub_weekly_pd_by_day <- get_cor_weekly_avg_by_day(weekly_pd_by_day, subcorridors, "pd", "Events") %>%
             filter(!is.na(Corridor))
         sub_monthly_pd_by_day <- get_cor_monthly_avg_by_day(monthly_pd_by_day, subcorridors, "pd", "Events") %>%
             filter(!is.na(Corridor))
 
+        addtoRDS(daily_pd, "daily_pd.rds", "pd", report_start_date, wk_calcs_start_date)
         addtoRDS(weekly_pd_by_day, "weekly_pd_by_day.rds", "pd", report_start_date, wk_calcs_start_date)
         addtoRDS(monthly_pd_by_day, "monthly_pd_by_day.rds", "pd", report_start_date, calcs_start_date)
+        addtoRDS(cor_daily_pd, "cor_daily_pd.rds", "pd", report_start_date, wk_calcs_start_date)
         addtoRDS(cor_weekly_pd_by_day, "cor_weekly_pd_by_day.rds", "pd", report_start_date, wk_calcs_start_date)
         addtoRDS(cor_monthly_pd_by_day, "cor_monthly_pd_by_day.rds", "pd", report_start_date, calcs_start_date)
+        addtoRDS(sub_daily_pd, "sub_daily_pd.rds", "pd", report_start_date, wk_calcs_start_date)
         addtoRDS(sub_weekly_pd_by_day, "sub_weekly_pd_by_day.rds", "pd", report_start_date, wk_calcs_start_date)
         addtoRDS(sub_monthly_pd_by_day, "sub_monthly_pd_by_day.rds", "pd", report_start_date, calcs_start_date)
 
@@ -603,8 +613,10 @@ tryCatch(
         rm(daily_pd)
         rm(weekly_pd_by_day)
         rm(monthly_pd_by_day)
+        rm(cor_daily_pd)
         rm(cor_weekly_pd_by_day)
         rm(cor_monthly_pd_by_day)
+        rm(sub_daily_pd)
         rm(sub_weekly_pd_by_day)
         rm(sub_monthly_pd_by_day)
     },
@@ -714,36 +726,44 @@ tryCatch(
                 Date = date(Date)
             )
 
+        daily_vpd <- get_daily_sum(vpd, "vpd")
         weekly_vpd <- get_weekly_vpd(vpd)
-
-        # Group into corridors --------------------------------------------------------
-        cor_weekly_vpd <- get_cor_weekly_vpd(weekly_vpd, corridors)
-        # Subcorridors
-        sub_weekly_vpd <- get_cor_weekly_vpd(weekly_vpd, subcorridors) %>%
-                filter(!is.na(Corridor))
-
-        # Monthly volumes for bar charts and % change ---------------------------------
         monthly_vpd <- get_monthly_vpd(vpd)
 
-        # Group into corridors
-        cor_monthly_vpd <- get_cor_monthly_vpd(monthly_vpd, corridors)
+        # Group into corridors --------------------------------------------------------
+        cor_daily_vpd <- get_cor_weekly_vpd(daily_vpd, corridors) %>% select(-ones, -Week)
+        cor_weekly_vpd %<-% get_cor_weekly_vpd(weekly_vpd, corridors)
+        cor_monthly_vpd %<-% get_cor_monthly_vpd(monthly_vpd, corridors)
+
         # Subcorridors
-        sub_monthly_vpd <- get_cor_monthly_vpd(monthly_vpd, subcorridors) %>%
+        sub_daily_vpd <- get_cor_weekly_vpd(daily_vpd, subcorridors) %>% select(-ones, -Week) %>%
+            filter(!is.na(Corridor))
+        sub_weekly_vpd <-
+            get_cor_weekly_vpd(weekly_vpd, subcorridors) %>%
+                filter(!is.na(Corridor))
+        sub_monthly_vpd <-
+            get_cor_monthly_vpd(monthly_vpd, subcorridors) %>%
                 filter(!is.na(Corridor))
 
         # Monthly % change from previous month by corridor ----------------------------
+        addtoRDS(daily_vpd, "daily_vpd.rds", "vpd", report_start_date, wk_calcs_start_date)
         addtoRDS(weekly_vpd, "weekly_vpd.rds", "vpd", report_start_date, wk_calcs_start_date)
         addtoRDS(monthly_vpd, "monthly_vpd.rds", "vpd", report_start_date, calcs_start_date)
+        addtoRDS(cor_daily_vpd, "cor_daily_vpd.rds", "vpd", report_start_date, wk_calcs_start_date)
         addtoRDS(cor_weekly_vpd, "cor_weekly_vpd.rds", "vpd", report_start_date, wk_calcs_start_date)
         addtoRDS(cor_monthly_vpd, "cor_monthly_vpd.rds", "vpd", report_start_date, calcs_start_date)
+        addtoRDS(sub_daily_vpd, "sub_daily_vpd.rds", "vpd", report_start_date, wk_calcs_start_date)
         addtoRDS(sub_weekly_vpd, "sub_weekly_vpd.rds", "vpd", report_start_date, wk_calcs_start_date)
         addtoRDS(sub_monthly_vpd, "sub_monthly_vpd.rds", "vpd", report_start_date, calcs_start_date)
 
         rm(vpd)
+        rm(daily_vpd)
         rm(weekly_vpd)
         rm(monthly_vpd)
+        rm(cor_daily_vpd)
         rm(cor_weekly_vpd)
         rm(cor_monthly_vpd)
+        rm(sub_daily_vpd)
         rm(sub_weekly_vpd)
         rm(sub_monthly_vpd)
     },
@@ -774,36 +794,44 @@ tryCatch(
                 Date = date(Date)
             )
 
+        hourly_vol <- get_hourly(vph, "vph", corridors)
+
+        cor_daily_vph <- get_cor_weekly_vph(hourly_vol, corridors)
+        sub_daily_vph <- get_cor_weekly_vph(hourly_vol, subcorridors) %>%
+            filter(!is.na(Corridor))
+
+        daily_vph_peak <- get_weekly_vph_peak(hourly_vol)
+        cor_daily_vph_peak <- get_cor_weekly_vph_peak(cor_daily_vph)
+        sub_daily_vph_peak <- get_cor_weekly_vph_peak(sub_daily_vph) %>%
+            map(~ filter(., !is.na(Corridor)))
+
         weekly_vph <- get_weekly_vph(vph)
-        weekly_vph_peak <- get_weekly_vph_peak(weekly_vph)
-
-        # Group into corridors --------------------------------------------------------
         cor_weekly_vph <- get_cor_weekly_vph(weekly_vph, corridors)
-        cor_weekly_vph_peak <- get_cor_weekly_vph_peak(cor_weekly_vph)
-
-        # Group into Subcorridors --------------------------------------------------------
         sub_weekly_vph <- get_cor_weekly_vph(weekly_vph, subcorridors) %>%
             filter(!is.na(Corridor))
+
+        weekly_vph_peak <- get_weekly_vph_peak(weekly_vph)
+        cor_weekly_vph_peak <- get_cor_weekly_vph_peak(cor_weekly_vph)
         sub_weekly_vph_peak <- get_cor_weekly_vph_peak(sub_weekly_vph) %>%
             map(~ filter(., !is.na(Corridor)))
 
         monthly_vph <- get_monthly_vph(vph)
-        monthly_vph_peak <- get_monthly_vph_peak(monthly_vph)
-
-        # Hourly volumes by Corridor --------------------------------------------------
         cor_monthly_vph <- get_cor_monthly_vph(monthly_vph, corridors)
-        cor_monthly_vph_peak <- get_cor_monthly_vph_peak(cor_monthly_vph)
-
-        # Hourly volumes by Subcorridor --------------------------------------------------
         sub_monthly_vph <- get_cor_monthly_vph(monthly_vph, subcorridors) %>%
             filter(!is.na(Corridor))
+
+        monthly_vph_peak <- get_monthly_vph_peak(monthly_vph)
+        cor_monthly_vph_peak <- get_cor_monthly_vph_peak(cor_monthly_vph)
         sub_monthly_vph_peak <- get_cor_monthly_vph_peak(sub_monthly_vph) %>%
             map(~ filter(., !is.na(Corridor)))
 
+
         addtoRDS(weekly_vph, "weekly_vph.rds", "vph", report_start_date, wk_calcs_start_date)
         addtoRDS(monthly_vph, "monthly_vph.rds", "vph", report_start_date, calcs_start_date)
+        addtoRDS(cor_daily_vph, "cor_daily_vph.rds", "vph", report_start_date, wk_calcs_start_date)
         addtoRDS(cor_weekly_vph, "cor_weekly_vph.rds", "vph", report_start_date, wk_calcs_start_date)
         addtoRDS(cor_monthly_vph, "cor_monthly_vph.rds", "vph", report_start_date, calcs_start_date)
+        addtoRDS(sub_daily_vph, "sub_daily_vph.rds", "vph", report_start_date, wk_calcs_start_date)
         addtoRDS(sub_weekly_vph, "sub_weekly_vph.rds", "vph", report_start_date, wk_calcs_start_date)
         addtoRDS(sub_monthly_vph, "sub_monthly_vph.rds", "vph", report_start_date, calcs_start_date)
 
@@ -826,10 +854,15 @@ tryCatch(
         addtoRDS(sub_monthly_vph_peak$pm, "sub_monthly_vph_pm.rds", "vph", report_start_date, calcs_start_date)
 
         rm(vph)
+        rm(hourly_vol)
+        rm(cor_daily_vph)
+        rm(sub_daily_vph)
+
         rm(weekly_vph)
-        rm(monthly_vph)
         rm(cor_weekly_vph)
         rm(sub_weekly_vph)
+
+        rm(monthly_vph)
         rm(cor_monthly_vph)
         rm(sub_monthly_vph)
 
@@ -877,8 +910,14 @@ tryCatch(
                 Date = date(Date)
             )
 
-        weekly_throughput <- get_weekly_thruput(throughput)
-        monthly_throughput <- get_monthly_thruput(throughput)
+        daily_throughput <- get_daily_sum(throughput, "vph")
+        weekly_throughput %<-% get_weekly_thruput(throughput)
+        monthly_throughput %<-% get_monthly_thruput(throughput)
+
+        # Daily throughput
+        cor_daily_throughput <- get_cor_weekly_thruput(daily_throughput, corridors) %>% select(-Week)
+        sub_daily_throughput <- get_cor_weekly_thruput(daily_throughput, subcorridors) %>% select(-Week) %>%
+            filter(!is.na(Corridor))
 
         # Weekly throughput - Group into corridors ---------------------------------
         cor_weekly_throughput <- get_cor_weekly_thruput(weekly_throughput, corridors)
@@ -890,18 +929,24 @@ tryCatch(
         sub_monthly_throughput <- get_cor_monthly_thruput(monthly_throughput, subcorridors) %>%
             filter(!is.na(Corridor))
 
+        addtoRDS(daily_throughput, "daily_throughput.rds", "vph", report_start_date, wk_calcs_start_date)
         addtoRDS(weekly_throughput, "weekly_throughput.rds", "vph", report_start_date, wk_calcs_start_date)
         addtoRDS(monthly_throughput, "monthly_throughput.rds", "vph", report_start_date, calcs_start_date)
+        addtoRDS(cor_daily_throughput, "cor_daily_throughput.rds", "vph", report_start_date, calcs_start_date)
         addtoRDS(cor_weekly_throughput, "cor_weekly_throughput.rds", "vph", report_start_date, wk_calcs_start_date)
         addtoRDS(cor_monthly_throughput, "cor_monthly_throughput.rds", "vph", report_start_date, calcs_start_date)
+        addtoRDS(sub_daily_throughput, "sub_daily_throughput.rds", "vph", report_start_date, calcs_start_date)
         addtoRDS(sub_weekly_throughput, "sub_weekly_throughput.rds", "vph", report_start_date, wk_calcs_start_date)
         addtoRDS(sub_monthly_throughput, "sub_monthly_throughput.rds", "vph", report_start_date, calcs_start_date)
 
         rm(throughput)
+        rm(daily_throughput)
         rm(weekly_throughput)
         rm(monthly_throughput)
+        rm(cor_daily_throughput)
         rm(cor_weekly_throughput)
         rm(cor_monthly_throughput)
+        rm(sub_daily_throughput)
         rm(sub_weekly_throughput)
         rm(sub_monthly_throughput)
     },
@@ -939,18 +984,24 @@ tryCatch(
         weekly_aog_by_day <- get_weekly_aog_by_day(aog)
         monthly_aog_by_day <- get_monthly_aog_by_day(aog)
 
+        cor_daily_aog <- get_cor_weekly_aog_by_day(daily_aog, corridors) %>% select(-Week)
         cor_weekly_aog_by_day <- get_cor_weekly_aog_by_day(weekly_aog_by_day, corridors)
         cor_monthly_aog_by_day <- get_cor_monthly_aog_by_day(monthly_aog_by_day, corridors)
 
+        sub_daily_aog <- get_cor_weekly_aog_by_day(daily_aog, subcorridors) %>% select(-Week) %>%
+            filter(!is.na(Corridor))
         sub_weekly_aog_by_day <- get_cor_weekly_aog_by_day(weekly_aog_by_day, subcorridors) %>%
             filter(!is.na(Corridor))
         sub_monthly_aog_by_day <- get_cor_monthly_aog_by_day(monthly_aog_by_day, subcorridors) %>%
             filter(!is.na(Corridor))
 
+        addtoRDS(daily_aog, "daily_aog.rds", "aog", report_start_date, wk_calcs_start_date)
         addtoRDS(weekly_aog_by_day, "weekly_aog_by_day.rds", "aog", report_start_date, wk_calcs_start_date)
         addtoRDS(monthly_aog_by_day, "monthly_aog_by_day.rds", "aog", report_start_date, calcs_start_date)
+        addtoRDS(cor_daily_aog, "cor_daily_aog.rds", "aog", report_start_date, calcs_start_date)
         addtoRDS(cor_weekly_aog_by_day, "cor_weekly_aog_by_day.rds", "aog", report_start_date, wk_calcs_start_date)
         addtoRDS(cor_monthly_aog_by_day, "cor_monthly_aog_by_day.rds", "aog", report_start_date, calcs_start_date)
+        addtoRDS(sub_daily_aog, "sub_daily_aog.rds", "aog", report_start_date, calcs_start_date)
         addtoRDS(sub_weekly_aog_by_day, "sub_weekly_aog_by_day.rds", "aog", report_start_date, wk_calcs_start_date)
         addtoRDS(sub_monthly_aog_by_day, "sub_monthly_aog_by_day.rds", "aog", report_start_date, calcs_start_date)
 
@@ -1010,28 +1061,38 @@ print(glue("{Sys.time()} Daily Progression Ratio [13 of 23]"))
 
 tryCatch(
     {
+        daily_pr <- get_daily_avg(aog, "pr", "vol")
         weekly_pr_by_day <- get_weekly_pr_by_day(aog)
         monthly_pr_by_day <- get_monthly_pr_by_day(aog)
 
+        cor_daily_pr <- get_cor_weekly_pr_by_day(daily_pr, corridors) %>% select(-Week)
         cor_weekly_pr_by_day <- get_cor_weekly_pr_by_day(weekly_pr_by_day, corridors)
         cor_monthly_pr_by_day <- get_cor_monthly_pr_by_day(monthly_pr_by_day, corridors)
 
+        sub_daily_pr <- get_cor_weekly_pr_by_day(daily_pr, subcorridors) %>% select(-Week) %>%
+            filter(!is.na(Corridor))
         sub_weekly_pr_by_day <- get_cor_weekly_pr_by_day(weekly_pr_by_day, subcorridors) %>%
             filter(!is.na(Corridor))
         sub_monthly_pr_by_day <- get_cor_monthly_pr_by_day(monthly_pr_by_day, subcorridors) %>%
             filter(!is.na(Corridor))
 
+        addtoRDS(daily_pr, "daily_pr.rds", "pr", report_start_date, wk_calcs_start_date)
         addtoRDS(weekly_pr_by_day, "weekly_pr_by_day.rds", "pr", report_start_date, wk_calcs_start_date)
         addtoRDS(monthly_pr_by_day, "monthly_pr_by_day.rds", "pr", report_start_date, calcs_start_date)
+        addtoRDS(cor_daily_pr, "cor_daily_pr.rds", "pr", report_start_date, wk_calcs_start_date)
         addtoRDS(cor_weekly_pr_by_day, "cor_weekly_pr_by_day.rds", "pr", report_start_date, wk_calcs_start_date)
         addtoRDS(cor_monthly_pr_by_day, "cor_monthly_pr_by_day.rds", "pr", report_start_date, calcs_start_date)
+        addtoRDS(sub_daily_pr, "sub_daily_pr.rds", "pr", report_start_date, wk_calcs_start_date)
         addtoRDS(sub_weekly_pr_by_day, "sub_weekly_pr_by_day.rds", "pr", report_start_date, wk_calcs_start_date)
         addtoRDS(sub_monthly_pr_by_day, "sub_monthly_pr_by_day.rds", "pr", report_start_date, calcs_start_date)
 
+        rm(daily_pr)
         rm(weekly_pr_by_day)
         rm(monthly_pr_by_day)
+        rm(cor_daily_pr)
         rm(cor_weekly_pr_by_day)
         rm(cor_monthly_pr_by_day)
+        rm(sub_daily_pr)
         rm(sub_weekly_pr_by_day)
         rm(sub_monthly_pr_by_day)
     },
@@ -1106,6 +1167,9 @@ tryCatch(
         sfp <- sf %>% filter(hour(Date_Hour) %in% c(AM_PEAK_HOURS, PM_PEAK_HOURS))
         # -------------------------------------------------------------------------
 
+        daily_sfp <- get_daily_avg(sfp, "sf_freq", "cycles")
+        daily_sfo <- get_daily_avg(sfo, "sf_freq", "cycles")
+
         weekly_sf_by_day <- get_weekly_avg_by_day(
             sfp, "sf_freq", "cycles",
             peak_only = FALSE
@@ -1114,15 +1178,6 @@ tryCatch(
             sfo, "sf_freq", "cycles",
             peak_only = FALSE
         )
-
-        cor_weekly_sf_by_day <- get_cor_weekly_sf_by_day(weekly_sf_by_day, corridors)
-        cor_weekly_sfo_by_day <- get_cor_weekly_sf_by_day(weekly_sfo_by_day, corridors)
-
-        sub_weekly_sf_by_day <- get_cor_weekly_sf_by_day(weekly_sf_by_day, subcorridors) %>%
-            filter(!is.na(Corridor))
-        sub_weekly_sfo_by_day <- get_cor_weekly_sf_by_day(weekly_sfo_by_day, subcorridors) %>%
-            filter(!is.na(Corridor))
-
         monthly_sf_by_day <- get_monthly_avg_by_day(
             sfp, "sf_freq", "cycles",
             peak_only = FALSE
@@ -1132,42 +1187,70 @@ tryCatch(
             peak_only = FALSE
         )
 
+        cor_daily_sfp <- get_cor_weekly_sf_by_day(daily_sfp, corridors) %>% select(-Week)
+        cor_daily_sfo <- get_cor_weekly_sf_by_day(daily_sfo, corridors) %>% select(-Week)
+        cor_weekly_sf_by_day <- get_cor_weekly_sf_by_day(weekly_sf_by_day, corridors)
+        cor_weekly_sfo_by_day <- get_cor_weekly_sf_by_day(weekly_sfo_by_day, corridors)
         cor_monthly_sf_by_day <- get_cor_monthly_sf_by_day(monthly_sf_by_day, corridors)
         cor_monthly_sfo_by_day <- get_cor_monthly_sf_by_day(monthly_sfo_by_day, corridors)
 
+        sub_daily_sfp <- get_cor_weekly_sf_by_day(daily_sfp, subcorridors) %>%
+            filter(!is.na(Corridor))
+        sub_daily_sfo <- get_cor_weekly_sf_by_day(daily_sfo, subcorridors) %>%
+            filter(!is.na(Corridor))
+        sub_weekly_sf_by_day <- get_cor_weekly_sf_by_day(weekly_sf_by_day, subcorridors) %>%
+            filter(!is.na(Corridor))
+        sub_weekly_sfo_by_day <- get_cor_weekly_sf_by_day(weekly_sfo_by_day, subcorridors) %>%
+            filter(!is.na(Corridor))
         sub_monthly_sf_by_day <- get_cor_monthly_sf_by_day(monthly_sf_by_day, subcorridors) %>%
             filter(!is.na(Corridor))
         sub_monthly_sfo_by_day <- get_cor_monthly_sf_by_day(monthly_sfo_by_day, subcorridors) %>%
             filter(!is.na(Corridor))
 
 
+        ############################### Ended here 9/13
+
+        addtoRDS(daily_sfp, "daily_sfp.rds", "sf_freq", report_start_date, wk_calcs_start_date)
         addtoRDS(weekly_sf_by_day, "wsf.rds", "sf_freq", report_start_date, wk_calcs_start_date)
         addtoRDS(monthly_sf_by_day, "monthly_sfd.rds", "sf_freq", report_start_date, calcs_start_date)
+
+        addtoRDS(cor_daily_sfp, "cor_daily_sfp.rds", "sf_freq", report_start_date, wk_calcs_start_date)
         addtoRDS(cor_weekly_sf_by_day, "cor_wsf.rds", "sf_freq", report_start_date, wk_calcs_start_date)
         addtoRDS(cor_monthly_sf_by_day, "cor_monthly_sfd.rds", "sf_freq", report_start_date, calcs_start_date)
+
+        addtoRDS(sub_daily_sfp, "sub_daily_sfp.rds", "sf_freq", report_start_date, wk_calcs_start_date)
         addtoRDS(sub_weekly_sf_by_day, "sub_wsf.rds", "sf_freq", report_start_date, wk_calcs_start_date)
         addtoRDS(sub_monthly_sf_by_day, "sub_monthly_sfd.rds", "sf_freq", report_start_date, calcs_start_date)
 
+        addtoRDS(daily_sfo, "daily_sfo.rds", "sf_freq", report_start_date, wk_calcs_start_date)
         addtoRDS(weekly_sfo_by_day, "wsfo.rds", "sf_freq", report_start_date, wk_calcs_start_date)
         addtoRDS(monthly_sfo_by_day, "monthly_sfo.rds", "sf_freq", report_start_date, calcs_start_date)
+        addtoRDS(cor_daily_sfo, "cor_daily_sfo.rds", "sf_freq", report_start_date, wk_calcs_start_date)
         addtoRDS(cor_weekly_sfo_by_day, "cor_wsfo.rds", "sf_freq", report_start_date, wk_calcs_start_date)
         addtoRDS(cor_monthly_sfo_by_day, "cor_monthly_sfo.rds", "sf_freq", report_start_date, calcs_start_date)
+        addtoRDS(sub_daily_sfo, "sub_daily_sfo.rds", "sf_freq", report_start_date, wk_calcs_start_date)
         addtoRDS(sub_weekly_sfo_by_day, "sub_wsfo.rds", "sf_freq", report_start_date, wk_calcs_start_date)
         addtoRDS(sub_monthly_sfo_by_day, "sub_monthly_sfo.rds", "sf_freq", report_start_date, calcs_start_date)
 
         rm(sfp)
         rm(sfo)
+        rm(daily_sfp)
         rm(weekly_sf_by_day)
         rm(monthly_sf_by_day)
+        rm(cor_daily_sfp)
         rm(cor_weekly_sf_by_day)
         rm(cor_monthly_sf_by_day)
+        rm(sub_daily_sfp)
         rm(sub_weekly_sf_by_day)
         rm(sub_monthly_sf_by_day)
 
+        rm(daily_sfo)
         rm(weekly_sfo_by_day)
         rm(monthly_sfo_by_day)
+        rm(cor_daily_sfo)
         rm(cor_weekly_sfo_by_day)
         rm(cor_monthly_sfo_by_day)
+        rm(sub_daily_sfo)
         rm(sub_weekly_sfo_by_day)
         rm(sub_monthly_sfo_by_day)
     },
@@ -1228,27 +1311,38 @@ tryCatch(
                 Date = date(Date)
             )
 
+        daily_qs <- get_daily_avg(qs, "qs_freq", "cycles")
         wqs <- get_weekly_qs_by_day(qs)
+        monthly_qsd <- get_monthly_qs_by_day(qs)
+
+        cor_daily_qs <- get_cor_weekly_qs_by_day(daily_qs, corridors) %>% select(-Week)
         cor_wqs <- get_cor_weekly_qs_by_day(wqs, corridors)
+        cor_monthly_qsd <- get_cor_monthly_qs_by_day(monthly_qsd, corridors)
+
+        sub_daily_qs <- get_cor_weekly_qs_by_day(daily_qs, subcorridors) %>% select(-Week) %>%
+            filter(!is.na(Corridor))
         sub_wqs <- get_cor_weekly_qs_by_day(wqs, subcorridors) %>%
             filter(!is.na(Corridor))
-
-        monthly_qsd <- get_monthly_qs_by_day(qs)
-        cor_monthly_qsd <- get_cor_monthly_qs_by_day(monthly_qsd, corridors)
         sub_monthly_qsd <- get_cor_monthly_qs_by_day(monthly_qsd, subcorridors) %>%
             filter(!is.na(Corridor))
 
+        addtoRDS(daily_qs, "daily_qsd.rds", "qs_freq", report_start_date, calcs_start_date)
         addtoRDS(wqs, "wqs.rds", "qs_freq", report_start_date, wk_calcs_start_date)
         addtoRDS(monthly_qsd, "monthly_qsd.rds", "qs_freq", report_start_date, calcs_start_date)
+        addtoRDS(cor_daily_qs, "cor_daily_qsd.rds", "qs_freq", report_start_date, calcs_start_date)
         addtoRDS(cor_wqs, "cor_wqs.rds", "qs_freq", report_start_date, wk_calcs_start_date)
         addtoRDS(cor_monthly_qsd, "cor_monthly_qsd.rds", "qs_freq", report_start_date, calcs_start_date)
+        addtoRDS(sub_daily_qs, "sub_daily_qsd.rds", "qs_freq", report_start_date, calcs_start_date)
         addtoRDS(sub_wqs, "sub_wqs.rds", "qs_freq", report_start_date, wk_calcs_start_date)
         addtoRDS(sub_monthly_qsd, "sub_monthly_qsd.rds", "qs_freq", report_start_date, calcs_start_date)
 
+        rm(daily_qs)
         rm(wqs)
         rm(monthly_qsd)
+        rm(cor_daily_qs)
         rm(cor_wqs)
         rm(cor_monthly_qsd)
+        rm(sub_daily_qs)
         rm(sub_wqs)
         rm(sub_monthly_qsd)
     },
@@ -1581,6 +1675,16 @@ tryCatch(
     {
         cor <- list()
         cor$dy <- list(
+            "vpd" = readRDS("cor_daily_vpd.rds"),
+            "vphpa" = readRDS("cor_daily_vph_peak.rds")$am,
+            "vphpp" = readRDS("cor_daily_vph_peak.rds")$pm,
+            "papd" = readRDS("cor_daily_papd.rds"),
+            "tp" = readRDS("cor_daily_throughput.rds"),
+            "aogd" = readRDS("cor_daily_aog.rds"),
+            "prd" = readRDS("cor_daily_pr.rds"),
+            "qsd" = readRDS("cor_daily_qsd.rds"),
+            "sfd" = readRDS("cor_daily_sfp.rds"),
+            "sfo" = readRDS("cor_daily_sfo.rds"),
             "du" = readRDS("cor_avg_daily_detector_uptime.rds"),
             "cu" = readRDS("cor_daily_comm_uptime.rds"),
             "pau" = readRDS("cor_daily_pa_uptime.rds")
@@ -1670,6 +1774,16 @@ tryCatch(
     {
         sub <- list()
         sub$dy <- list(
+            "vpd" = readRDS("sub_daily_vpd.rds"),
+            "vphpa" = readRDS("sub_daily_vph_peak.rds")$am,
+            "vphpp" = readRDS("sub_daily_vph_peak.rds")$pm,
+            "papd" = readRDS("sub_daily_papd.rds"),
+            "tp" = readRDS("sub_daily_throughput.rds"),
+            "aogd" = readRDS("sub_daily_aog.rds"),
+            "prd" = readRDS("sub_daily_pr.rds"),
+            "qsd" = readRDS("sub_daily_qsd.rds"),
+            "sfd" = readRDS("sub_daily_sfp.rds"),
+            "sfo" = readRDS("sub_daily_sfo.rds"),
             "du" = readRDS("sub_avg_daily_detector_uptime.rds") %>%
                 select(Zone_Group, Corridor, Date, uptime.sb, uptime.pr, uptime),
             "cu" = readRDS("sub_daily_comm_uptime.rds") %>%
