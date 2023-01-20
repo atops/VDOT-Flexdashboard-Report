@@ -40,6 +40,11 @@ det_config_arrow_schema <- schema(
     CountPriority = int64(),
     index = double())
 
+ped_config_arrow_schema <- schema(
+    SignalID = string(),
+    Detector = int64(),
+    CallPhase = int64())
+
 
 get_corridors <- function(corr_fn, filter_signals = TRUE) {
 
@@ -108,29 +113,39 @@ get_corridors <- function(corr_fn, filter_signals = TRUE) {
 # This is a "function factory"
 # It is meant to be used to create a get_det_config function that takes only the date:
 # like: get_det_config <- get_det_config_(conf$bucket, "atspm_det_config_good")
-get_det_config_  <- function(bucket, folder) {
+get_det_config_  <- function(bucket, folder, type = "det") {
 
     function(date_) {
+        prefix <- glue("{folder}/date={date_}")
+        objs <- s3_list_objects(bucket = bucket, prefix = prefix)
 
-        tryCatch({
-            arrow::open_dataset(
-                sources = glue("gs://{bucket}/{folder}/date={date_}"),
-                format="parquet",
-                schema = det_config_arrow_schema
-            ) %>%
-                collect() %>%
-                mutate(SignalID = as.character(SignalID),
-                       Detector = as.integer(Detector),
-                       CallPhase = as.integer(CallPhase))
-        }, error = function(e) {
-            stop(glue("Problem getting detector config file for {date_}: {e}"))
-            print(e)
-        })
+	if (type == "det") {
+		arrow_schema <- det_config_arrow_schema
+	} else if (type == "ped") {
+		arrow_schema <- ped_config_arrow_schema
+	}
+
+	if (!is.null(objs)) {
+            tryCatch({
+                arrow::open_dataset(
+                    sources = file.path("gs:/", bucket, prefix),
+                    format="parquet",
+                    schema = arrow_schema
+                ) %>%
+                    collect() %>%
+                    mutate(SignalID = as.character(SignalID),
+                           Detector = as.integer(Detector),
+                           CallPhase = as.integer(CallPhase))
+            }, error = function(e) {
+                stop(glue("Problem getting detector config file for {date_}: {e}"))
+                print(e)
+            })
+        }
     }
 }
 
-get_det_config <- get_det_config_(glue("{conf$bucket}/{conf$key_prefix}/config"), "atspm_det_config_good")
-get_ped_config <- get_det_config_(glue("{conf$bucket}/{conf$key_prefix}/config"), "atspm_ped_config")
+get_det_config <- get_det_config_(conf$bucket, file.path(conf$key_prefix, "config/atspm_det_config_good"), type = "det")
+get_ped_config <- get_det_config_(conf$bucket, file.path(conf$key_prefix, "config/atspm_ped_config"), type = "ped")
 
 
 

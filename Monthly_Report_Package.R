@@ -295,10 +295,8 @@ tryCatch(
             start_date = today() - days(90),
             end_date = today() - days(1),
             bucket = conf$bucket,
-            callback = function(x) { select(x, SignalID, Detector) %>% mutate(Date = date_) }
+            conf = conf
         ) %>%
-
-            bind_rows() %>%
             mutate(
                 SignalID = factor(SignalID),
                 Detector = factor(Detector)
@@ -364,6 +362,7 @@ tryCatch(
             start_date = today() - days(90),
             end_date = today() - days(1),
             bucket = conf$bucket,
+            conf = conf,
             callback = function(x) { mutate(x, Date = date_) }
         )
 
@@ -627,7 +626,8 @@ tryCatch(
             table_name = "comm_quality",
             start_date = wk_calcs_start_date,
             end_date = report_end_date,
-            signals_list = signals_list
+            signals_list = signals_list,
+            conf = conf
         ) %>%
             mutate(
                 SignalID = factor(AssetNum),
@@ -706,7 +706,8 @@ tryCatch(
             table_name = "vehicles_pd",
             start_date = wk_calcs_start_date,
             end_date = report_end_date,
-            signals_list = signals_list
+            signals_list = signals_list,
+            conf = conf
         ) %>%
             mutate(
                 SignalID = factor(SignalID),
@@ -766,7 +767,8 @@ tryCatch(
             table_name = "vehicles_ph",
             start_date = wk_calcs_start_date,
             end_date = report_end_date,
-            signals_list = signals_list
+            signals_list = signals_list,
+            conf = conf
         ) %>%
             mutate(
                 SignalID = factor(SignalID),
@@ -869,7 +871,8 @@ tryCatch(
             table_name = "throughput",
             start_date = wk_calcs_start_date,
             end_date = report_end_date,
-            signals_list = signals_list
+            signals_list = signals_list,
+            conf = conf
         ) %>%
             mutate(
                 SignalID = factor(SignalID),
@@ -925,7 +928,8 @@ tryCatch(
             table_name = "arrivals_on_green",
             start_date = wk_calcs_start_date,
             end_date = report_end_date,
-            signals_list = signals_list
+            signals_list = signals_list,
+            conf = conf
         ) %>%
             mutate(
                 SignalID = factor(SignalID),
@@ -1220,7 +1224,8 @@ tryCatch(
             table_name = "queue_spillback",
             start_date = wk_calcs_start_date,
             end_date = report_end_date,
-            signals_list = signals_list
+            signals_list = signals_list,
+            conf = conf
         ) %>%
             mutate(
                 SignalID = factor(SignalID),
@@ -1305,7 +1310,8 @@ tryCatch(
             bucket = conf$bucket,
             table_name = "cor_travel_times_1hr",
             start_date = wk_calcs_start_date,
-            end_date = report_end_date
+            end_date = report_end_date,
+            conf = conf
         ) %>%
             mutate(Corridor = factor(Corridor)) %>%
             left_join(distinct(all_corridors, Zone_Group, Zone, Corridor)) %>%
@@ -1499,7 +1505,8 @@ tryCatch(
                 table_name = metric$s3table,
                 start_date = wk_calcs_start_date,
                 end_date = report_end_date,
-                signals_list = signals_list
+                signals_list = signals_list,
+                conf = conf
             ) %>%
                 mutate(
                     SignalID = factor(SignalID),

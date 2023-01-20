@@ -658,9 +658,12 @@ get_pau_gamma <- function(papd, paph, corridors, wk_calcs_start_date, pau_start_
                   .groups = "drop")
 
     ped_config <- lapply(unique(papd$Date), function(d) {
-        get_ped_config(d) %>%
-            mutate(Date = d) %>%
-            filter(SignalID %in% papd$SignalID)
+        pc <- get_ped_config(d)
+        if (!is.null(pc)) {
+	    pc %>%
+                mutate(Date = d) %>%
+                filter(SignalID %in% papd$SignalID)
+        }
     }) %>%
         bind_rows() %>%
         mutate(SignalID = factor(SignalID),

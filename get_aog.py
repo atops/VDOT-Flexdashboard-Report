@@ -122,7 +122,8 @@ def main(start_date, end_date, conf):
             det_config = gcsio.get_det_config(date_, conf)
 
             print('1 hour')
-            with get_context('spawn').Pool(24) as pool:
+            nthreads = round(psutil.virtual_memory().total/1e9)  # ensure 1 MB memory per thread
+            with get_context('spawn').Pool(processes=nthreads) as pool:
                 results = pool.starmap_async(
                     get_aog,
                     list(itertools.product(signalids, [date_], [det_config], [conf])))

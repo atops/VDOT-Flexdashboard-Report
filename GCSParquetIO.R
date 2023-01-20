@@ -50,12 +50,12 @@ s3write_using <- function(df, FUN, bucket, object) {
     if (identical(FUN, write_parquet)) {
 	 FUN = function(input, output) write_parquet(x = input, sink = output)
     }
-    gcs_upload(df, object_function = FUN, bucket = bucket, name = object, predefinedAcl = "bucketLevel")
+    gcs_upload(file = df, object_function = FUN, bucket = bucket, name = object, predefinedAcl = "bucketLevel")
 }
 
 
 s3_write_parquet <- function(df, bucket, object) {
-    s3write_using(write_parquet, df, bucket, object)
+    s3write_using(df, write_parquet, bucket, object)
 }
 
 

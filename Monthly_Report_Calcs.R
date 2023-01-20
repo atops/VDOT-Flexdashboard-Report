@@ -400,7 +400,7 @@ get_pd_date_range <- function(start_date, end_date) {
     lapply(date_range, function(date_) {
         print(date_)
 
-        pd <- get_ped_delay(date_, conf, signals_list)
+        pd <- get_ped_delay(date_, cred, signals_list)
         if (nrow(pd) > 0) {
             s3_upload_parquet_date_split(
                 pd,

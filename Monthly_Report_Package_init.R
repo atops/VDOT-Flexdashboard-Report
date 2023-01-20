@@ -4,11 +4,13 @@
 source("renv/activate.R")
 
 
-print(glue("{Sys.time()} Starting Package Script"))
-
 source("write_sigops_to_db.R")
 source("Monthly_Report_Functions.R")
 source("Classes.R")
+
+
+print(glue("{Sys.time()} Starting Package Script"))
+
 
 if (interactive()) {
     plan(multisession)
@@ -51,6 +53,7 @@ doParallel::registerDoParallel(cores = usable_cores)
 
 report_end_date <- Sys.Date() - days(1)
 report_start_date <- floor_date(report_end_date - months(15), unit = "months")
+report_start_date <- max(as_date("2022-09-29"), report_start_date)
 
 if (conf$report_end_date == "yesterday") {
     report_end_date <- Sys.Date() - days(1)
