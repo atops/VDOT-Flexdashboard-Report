@@ -94,7 +94,7 @@ source("Map.R")
 source("Aggregations.R")
 source("Database_Functions.R")
 
-usable_cores <- get_usable_cores()
+
 
 
 

@@ -72,12 +72,12 @@ def s3_read_parquet_hive(bucket, key):
                 .rename(columns = {'Timestamp': 'TimeStamp'}))
     else:
         df = pd.DataFrame()
-        
+
     return df
 
 
 # Read Corridors File from S3
-def get_corridors(bucket, key, keep_signalids_as_strings = False):
+def get_corridors(bucket, key, keep_signalids_as_strings = True):
     corridors = s3_read_parquet(Bucket=bucket, Key=key)
     corridors = (corridors[~corridors.SignalID.isna()]
         .drop(['Description'], axis=1))
@@ -86,6 +86,15 @@ def get_corridors(bucket, key, keep_signalids_as_strings = False):
         corridors.SignalID = corridors.SignalID.astype('int')
 
     return corridors
+
+
+def get_signalids(date_, conf):
+    date_str = date_.strftime('%Y-%m-%d')
+    bucket = conf['bucket']
+    key_prefix = conf['key_prefix']
+    prefix = f'{key_prefix}/detections/date={date_str}'
+    keys = s3_list_objects(Bucket=bucket, Prefix=prefix)
+    return [re.search('(?<=de_)\d+(?=_)', k).group() for k in keys]
 
 
 def get_det_config(date_, conf):
@@ -105,10 +114,9 @@ def get_det_config(date_, conf):
     key_prefix = conf['key_prefix']
 
     bd = s3_read_parquet(Bucket=bucket, Key=f'{key_prefix}/mark/bad_detectors/date={date_str}/bad_detectors_{date_str}.parquet')
-    bd.SignalID = bd.SignalID.astype('int64')
     bd.Detector = bd.Detector.astype('int64')
 
-    dc_prefix = f'{key_prefix}/atspm_det_config_good/date={date_str}'
+    dc_prefix = f'{key_prefix}/config/atspm_det_config_good/date={date_str}'
     dc_keys = s3_list_objects(bucket, dc_prefix)
 
     dc = pd.concat(list(map(lambda k: read_det_config(bucket, k), dc_keys)))

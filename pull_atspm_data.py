@@ -62,6 +62,25 @@ def get_atspm_engine(cred):
         dsn=cred['ATSPM_DSN'])
 
 
+def get_aurora_engine_(username, password, hostname = None, database = None, dsn = None):
+    password = urllib.parse.quote_plus(password)
+    if dsn is None:
+        engine = sq.create_engine(rf'mysql+pymysql://{username}:{password}@{hostname}/{database}')
+    else:
+        # Should probably add some error handling here
+        engine = sq.create_engine(rf'mysql+pyodbc://{username}:{password}@{dsn}')
+    return engine
+
+
+def get_aurora_engine(cred):
+    return get_aurora_engine_(
+        username=cred['RDS_USERNAME'], 
+        password=cred['RDS_PASSWORD'], 
+        hostname=cred['RDS_HOST'], 
+        database=cred['RDS_DATABASE'],
+        dsn=cred['RDS_DSN'])
+
+
 def add_barriers(df):
     '''
     Where main street phases (1,6, 2,5) terminate and side street phases (4,7, 3,8)

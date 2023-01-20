@@ -19,17 +19,17 @@ import psutil
 import gcsio
 from spm_events import etl_main
 from config import get_date_from_string
-from pull_atspm_data import get_atspm_engine
+from pull_atspm_data import get_atspm_engine, get_aurora_engine
 
 '''
     df:
-        SignalID [int64]
+        SignalID [str]
         TimeStamp [datetime]
         EventCode [str or int64]
         EventParam [str or int64]
 
     det_config:
-        SignalID [int64]
+        SignalID [str]
         IP [str]
         PrimaryName [str]
         SecondaryName [str]
@@ -58,11 +58,11 @@ def etl2(s, date_, det_config, conf):
 
         engine = get_atspm_engine(cred)
 
-        atspm_query = f"""SELECT DISTINCT Timestamp, SignalID, EventCode, EventParam
+        atspm_query = f"""SELECT DISTINCT Timestamp AS TimeStamp, SignalID, EventCode, EventParam
                           FROM Controller_Event_Log
-                          WHERE Timestamp >= '{start_date.strftime('%F')}' 
-                          AND Timestamp < {end_date.strftime('%F')}
-                          AND SignalID = '{s}' 
+                          WHERE Timestamp >= '{start_date.strftime('%F')}'
+                          AND Timestamp < '{end_date.strftime('%F')}'
+                          AND SignalID = '{s}'
                           ORDER BY Timestamp, EventCode, EventParam"""
 
         with engine.connect() as conn:
@@ -79,8 +79,8 @@ def etl2(s, date_, det_config, conf):
             c, d = etl_main(df, det_config)
 
             if len(c) > 0 and len(d) > 0:
-                gcsio.s3_write_parquet(c, conf['bucket'], "{conf['key_prefix']}/cycles/date={date_str}/cd_{s}_{date_str}.parquet")
-                gcsio.s3_write_parquet(d, conf['bucket'], "{conf['key_prefix']}/detections/date={date_str}/de_{s}_{date_str}.parquet")
+                gcsio.s3_write_parquet(c, bucket, f'{key_prefix}/cycles/date={date_str}/cd_{s}_{date_str}.parquet')
+                gcsio.s3_write_parquet(d, bucket, f'{key_prefix}/detections/date={date_str}/de_{s}_{date_str}.parquet')
 
             else:
                 print(f'{date_str} | {s} | No cycles')
@@ -104,11 +104,15 @@ def main(start_date, end_date, conf):
 
     dates = pd.date_range(start_date, end_date, freq='1D')
 
-    corridors_filename = re.sub('\..*', '.parquet', conf['corridors_filename_s3'])
-    corridors = gcsio.get_corridors(conf['bucket'], f"{conf['key_prefix']}/{corridors_filename}", keep_signalids_as_strings = True)
+    with open('Monthly_Report_AWS.yaml') as yaml_file:
+        cred = yaml.load(yaml_file, Loader=yaml.Loader)
+
+    engine = get_aurora_engine(cred)
+    with engine.connect() as conn:
+        corridors = pd.read_sql_table('Corridors', conn)
 
     signalids = list(corridors.SignalID.values)
-  
+
 
     #-----------------------------------------------------------------------------------------
     # Placeholder for manual override of signalids
@@ -122,11 +126,10 @@ def main(start_date, end_date, conf):
         date_str = date_.strftime('%Y-%m-%d')
         print(date_str)
 
-        det_config = (gcsio.get_det_config(date_, conf)
-                     .rename(columns={'CallPhase': 'Call Phase'})
-                     .groupby(['SignalID','Call Phase'])
-                     .apply(lambda group: group.assign(CountDetector = group.CountPriority == group.CountPriority.min()))
-                     .reset_index())
+        det_config = gcsio.get_det_config(date_, conf)
+        det_config = det_config.rename(columns={'CallPhase': 'Call Phase'})
+        dcg = det_config.groupby(['SignalID', 'Call Phase'])['CountPriority']
+        det_config = det_config.assign(CountDetector = det_config.CountPriority == dcg.transform(min))
 
         if len(det_config) > 0:
             nthreads = round(psutil.virtual_memory().total/1e9)  # ensure 1 MB memory per thread
@@ -157,11 +160,8 @@ if __name__=='__main__':
         start_date = conf['start_date']
         end_date = conf['end_date']
 
-    start_date = conf['start_date']
-    end_date = conf['end_date']
-    
     start_date = get_date_from_string(start_date)
     end_date = get_date_from_string(end_date)
-    
+
     main(start_date, end_date, conf)
 

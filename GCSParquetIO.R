@@ -46,7 +46,10 @@ s3read_using <- function(FUN, bucket, object) {
 }
 
 
-s3write_using <- function(FUN, df, bucket, object) {
+s3write_using <- function(df, FUN, bucket, object) {
+    if (identical(FUN, write_parquet)) {
+	 FUN = function(input, output) write_parquet(x = input, sink = output)
+    }
     gcs_upload(df, object_function = FUN, bucket = bucket, name = object, predefinedAcl = "bucketLevel")
 }
 
@@ -159,7 +162,7 @@ s3_read_parquet_parallel <- function(table_name,
                                      end_date,
                                      signals_list = NULL,
                                      bucket = NULL,
-                                     conf = NULL,
+                                     conf,
                                      callback = function(x) {x},
                                      parallel = FALSE) {
     

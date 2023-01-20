@@ -9,20 +9,15 @@ import yaml
 import time
 import sys
 from datetime import datetime, timedelta
-import boto3
 import pandas as pd
 import io
 import re
 from multiprocessing import get_context
 import itertools
-import pprint
 import urllib3
 
-from s3io import *
-
-
-pp = pprint.PrettyPrinter()
-
+import gcsio
+from pull_atspm_data import get_aurora_engine
 
 
 def get_aog(signalid, date_, det_config, conf, per='H'):
@@ -31,13 +26,14 @@ def get_aog(signalid, date_, det_config, conf, per='H'):
     '''
     try:
         bucket = conf['bucket']
-    
+        key_prefix = conf['key_prefix']
+
         date_str = date_.strftime('%Y-%m-%d')
         all_hours = pd.date_range(date_, periods=25, freq='H')
     
-        detection_events = read_parquet(
+        detection_events = gcsio.s3_read_parquet(
             Bucket=bucket, 
-            Key=f'detections/date={date_str}/de_{signalid}_{date_str}.parquet')
+            Key=f'{key_prefix}/detections/date={date_str}/de_{signalid}_{date_str}.parquet')
     
         df = (pd.merge(
                 detection_events,
@@ -82,12 +78,12 @@ def get_aog(signalid, date_, det_config, conf, per='H'):
                      .sort_index()
                      .ffill() # fill forward missing Intervals for on the hour rows
                      .reset_index(level=['IntervalStart']))
-            df_gc['IntervalEnd'] = df_gc.groupby(level=['SignalID','Phase']).shift(-1)['IntervalStart']
+            df_gc['IntervalEnd'] = df_gc.groupby(level=['SignalID', 'Phase']).shift(-1)['IntervalStart']
             df_gc['IntervalDuration'] = (df_gc.IntervalEnd - df_gc.IntervalStart).dt.total_seconds()
             df_gc['Hour'] = df_gc.IntervalStart.dt.floor(per)
-            df_gc = df_gc.groupby(['Hour', 'SignalID', 'Phase', 'Interval']).sum()
+            df_gc = df_gc.groupby(['Hour', 'SignalID', 'Phase', 'Interval']).sum(numeric_only=True)
     
-            df_gc['Duration'] = df_gc.groupby(level=[0, 1, 2]).transform('sum')
+            df_gc['Duration'] = df_gc.groupby(level=['Hour', 'SignalID', 'Phase']).transform('sum')
             df_gc['gC'] = df_gc['IntervalDuration']/df_gc['Duration']
             gC = (df_gc.reset_index('Interval')
                   .query('Interval == 1')
@@ -122,9 +118,8 @@ def main(start_date, end_date, conf):
             date_str = date_.strftime('%Y-%m-%d')
             print(date_str)
     
-            det_config = get_det_config(date_, conf)
-            signalids = get_signalids(date_, conf)
-
+            signalids = gcsio.get_signalids(date_, conf)
+            det_config = gcsio.get_det_config(date_, conf)
 
             print('1 hour')
             with get_context('spawn').Pool(24) as pool:
@@ -148,22 +143,13 @@ def main(start_date, end_date, conf):
                           CallPhase=lambda x: x.CallPhase.astype('str'),
                           vol=lambda x: x.vol.astype('int32')))
 
-            write_parquet(
+            bucket = conf['bucket']
+            key_prefix = conf['key_prefix']
+
+            gcsio.s3_write_parquet(
                 df,
-                Bucket=conf['bucket'], 
-                Key=f'mark/arrivals_on_green/date={date_str}/aog_{date_str}.parquet')
-
-            partition_query = '''ALTER TABLE arrivals_on_green add partition (date="{d}")
-                                 location "s3://{b}/mark/arrivals_on_green/date={d}/"
-                              '''.format(b=conf['bucket'], d=date_.date())
-
-            response = athena.start_query_execution(
-                    QueryString = partition_query,
-                    QueryExecutionContext={'Database': conf['athena']['staging_dir']},
-                    ResultConfiguration={'OutputLocation': conf['athena']['staging_dir']})
-            print('')
-            print('Update Athena partitions:')
-            pp.pprint(response)
+                Bucket=bucket, 
+                Key=f'{key_prefix}/mark/arrivals_on_green/date={date_str}/aog_{date_str}.parquet')
 
             num_signals = len(list(set(df.SignalID.values)))
             t1 = round(time.time() - t0, 1)

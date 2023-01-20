@@ -13,7 +13,7 @@ ssl_cert: True # True/False or *.pem file name
 # Sections of Monthly_Report_Calcs_ec2 to run
 run:
     cctv: FALSE #--
-    travel_times: TRUE
+    travel_times: FALSE
     counts: TRUE
     counts_based_measures: TRUE
     etl: TRUE

@@ -38,13 +38,7 @@ get_usable_cores <- function(GB=8) {
     # Get RAM from system file and divide
 
     if (Sys.info()["sysname"] == "Windows") {
-        x <- suppressWarnings(shell('systeminfo | findstr Memory', intern = TRUE))
-
-        memline <- x[grepl("Total Physical Memory", x)]
-        mem <- stringr::str_extract(string =  memline, pattern = "\\d+,\\d+")
-        mem <- as.numeric(gsub(",", "", mem))
-        mem <- round(mem, -3)
-        max(floor(mem/GB*1e3), 1)
+	1
 
     } else if (Sys.info()["sysname"] == "Linux") {
         x <- readLines('/proc/meminfo')
@@ -454,21 +448,21 @@ write_signal_details <- function(plot_date, conf, signals_list = NULL) {
     #--- This takes approx one minute per day -----------------------
     rc <- s3_read_parquet(
         bucket = conf$bucket,
-        object = glue("mark/counts_1hr/date={plot_date}/counts_1hr_{plot_date}.parquet")) %>%
+        object = glue("{conf$key_prefix}/mark/counts_1hr/date={plot_date}/counts_1hr_{plot_date}.parquet")) %>%
         convert_to_utc() %>%
         select(
             SignalID, Date, Timeperiod, Detector, CallPhase, vol)
 
     fc <- s3_read_parquet(
         bucket = conf$bucket,
-        object = glue("mark/filtered_counts_1hr/date={plot_date}/filtered_counts_1hr_{plot_date}.parquet")) %>%
+        object = glue("{conf$key_prefix}/mark/filtered_counts_1hr/date={plot_date}/filtered_counts_1hr_{plot_date}.parquet")) %>%
         convert_to_utc() %>%
         select(
             SignalID, Date, Timeperiod, Detector, CallPhase, Good_Day)
 
     ac <- s3_read_parquet(
         bucket = conf$bucket,
-        object = glue("mark/adjusted_counts_1hr/date={plot_date}/adjusted_counts_1hr_{plot_date}.parquet")) %>%
+        object = glue("{conf$key_prefix}/mark/adjusted_counts_1hr/date={plot_date}/adjusted_counts_1hr_{plot_date}.parquet")) %>%
         convert_to_utc() %>%
         select(
             SignalID, Date, Timeperiod, Detector, CallPhase, vol)
@@ -490,7 +484,7 @@ write_signal_details <- function(plot_date, conf, signals_list = NULL) {
         ) %>%
         mutate(bad_day = if_else(Good_Day==0, TRUE, FALSE)) %>%
         transmute(
-            SignalID = as.integer(SignalID),
+            SignalID = SignalID,
             Timeperiod = Timeperiod,
             Detector = as.integer(Detector),
             CallPhase = as.integer(CallPhase),
@@ -513,10 +507,7 @@ write_signal_details <- function(plot_date, conf, signals_list = NULL) {
         df,
         write_parquet,
         bucket = conf$bucket,
-        object = glue("mark/signal_details/date={plot_date}/sg_{plot_date}.parquet"),
-        opts = list(multipart=TRUE))
-
-    add_partition(conf, "signal_details", plot_date)
+        object = glue("{conf$key_prefix}/mark/signal_details/date={plot_date}/sg_{plot_date}.parquet"))
 }
 
 

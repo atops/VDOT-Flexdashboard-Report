@@ -21,7 +21,8 @@ tryCatch(
             table_name = "detector_uptime_pd",
             start_date = wk_calcs_start_date,
             end_date = report_end_date,
-            signals_list = signals_list,
+            signals_list = signals_list, 
+            conf = conf,
             callback = cb
         ) %>%
             mutate(
@@ -124,7 +125,8 @@ tryCatch(
             table_name = "counts_ped_1hr",
             start_date = pau_start_date, # We have to look at a longer duration for pau
             end_date = report_end_date,
-            signals_list = signals_list,
+            signals_list = signals_list, 
+            conf = conf,
             parallel = FALSE
         ) %>%
             filter(!is.na(CallPhase)) %>%
@@ -400,7 +402,8 @@ tryCatch(
             table_name = "comm_quality",
             start_date = today() - days(90),
             end_date = today() - days(1),
-            signals_list = signals_list,
+            signals_list = signals_list, 
+            conf = conf,
         )
         if (nrow(bad_comm)) {
             bad_comm <- bad_comm %>%
@@ -566,7 +569,8 @@ tryCatch(
             table_name = "ped_delay",
             start_date = wk_calcs_start_date,
             end_date = report_end_date,
-            signals_list = signals_list,
+            signals_list = signals_list, 
+            conf = conf,
             callback = cb
         ) %>%
             mutate(
@@ -1086,7 +1090,8 @@ tryCatch(
             table_name = "split_failures",
             start_date = wk_calcs_start_date,
             end_date = report_end_date,
-            signals_list = signals_list,
+            signals_list = signals_list, 
+            conf = conf,
             callback = function(x) filter(x, CallPhase == 0)
         ) %>%
             mutate(
@@ -1430,7 +1435,8 @@ tryCatch(
             table_name = "detection_levels",
             start_date = wk_calcs_start_date,
             end_date = report_end_date,
-            signals_list = signals_list,
+            signals_list = signals_list, 
+            conf = conf,
             callback = function(x)
                 mutate(x, CallPhase = 0, Week = week(Date), DOW = wday(Date))
         ) %>%

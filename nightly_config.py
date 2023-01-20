@@ -44,14 +44,9 @@ def get_det_config(ad, engine, date_string):
 
     adc = ad
 
-    try:
-        adc = adc[adc.SignalID != 'null']
-    except:
-        pass
     adc = adc[~adc.Detector.isna()]
     adc = adc[~adc.CallPhase.isna()]
 
-    adc.SignalID = adc.SignalID.astype('int')
     adc.Detector = adc.Detector.astype('int')
     adc.CallPhase = adc.CallPhase.astype('int')
 

@@ -30,8 +30,8 @@ start_date <- get_date_from_string(conf$start_date)
 end_date <- get_date_from_string(conf$end_date)
 
 # Manual overrides
-# start_date <- "2020-01-04"
-# end_date <- "2020-01-04"
+# start_date <- "2023-01-17"
+# end_date <- "2023-01-17"
 
 month_abbrs <- get_month_abbrs(start_date, end_date)
 #-----------------------------------------------------------------------------#
@@ -181,8 +181,7 @@ print("\n---------------------- Finished counts ---------------------------\n")
 print(glue("{Sys.time()} monthly cu [5 of 11]"))
 
 
-signals_list <- as.integer(as.character(corridors$SignalID))
-signals_list <- unique(as.character(signals_list[signals_list > 0]))
+signals_list <- unique(corridors$SignalID)
 
 # Group into months to calculate filtered and adjusted counts
 # adjusted counts needs a full month to fill in gaps based on monthly averages
@@ -454,7 +453,7 @@ get_queue_spillback_date_range <- function(start_date, end_date) {
     lapply(date_range, function(date_) {
         print(date_)
 
-        detection_events <- get_detection_events(date_, date_, conf, signals_list)
+        detection_events <- get_detection_events_arrow(date_, conf, signals_list)
         if (nrow(collect(head(detection_events))) > 0) {
 
             qs <- get_qs(detection_events, intervals = c("hour", "15min"))

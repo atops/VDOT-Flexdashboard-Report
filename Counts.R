@@ -471,7 +471,7 @@ prep_db_for_adjusted_counts_arrow <- function(table, conf, date_range) {
         date_str <- format(date_, "%F")
         cat('.')
 
-        fc <- s3_read_parquet_parallel(table, date_, date_, bucket = conf$bucket) %>%
+        fc <- s3_read_parquet_parallel(table, date_, date_, bucket = conf$bucket, conf = conf) %>%
             transmute(
                 SignalID = as.integer(as.character(SignalID)),
                 Date, Timeperiod, Month_Hour,
