@@ -21,7 +21,7 @@ tryCatch(
             table_name = "detector_uptime_pd",
             start_date = wk_calcs_start_date,
             end_date = report_end_date,
-            signals_list = signals_list, 
+            signals_list = signals_list,
             conf = conf,
             callback = cb
         ) %>%
@@ -125,7 +125,7 @@ tryCatch(
             table_name = "counts_ped_1hr",
             start_date = pau_start_date, # We have to look at a longer duration for pau
             end_date = report_end_date,
-            signals_list = signals_list, 
+            signals_list = signals_list,
             conf = conf,
             parallel = FALSE
         ) %>%
@@ -304,7 +304,7 @@ tryCatch(
                 Detector = factor(Detector)
             )
 
-        det_config <- mclapply(sort(unique(bad_det$Date)), mc.cores = usable_cores, function(date_) {
+        det_config <- lapply(sort(unique(bad_det$Date)), function(date_) {
             get_det_config(date_) %>%
                 transmute(
                     SignalID,
@@ -402,7 +402,7 @@ tryCatch(
             table_name = "comm_quality",
             start_date = today() - days(90),
             end_date = today() - days(1),
-            signals_list = signals_list, 
+            signals_list = signals_list,
             conf = conf,
         )
         if (nrow(bad_comm)) {
@@ -569,7 +569,7 @@ tryCatch(
             table_name = "ped_delay",
             start_date = wk_calcs_start_date,
             end_date = report_end_date,
-            signals_list = signals_list, 
+            signals_list = signals_list,
             conf = conf,
             callback = cb
         ) %>%
@@ -1090,7 +1090,7 @@ tryCatch(
             table_name = "split_failures",
             start_date = wk_calcs_start_date,
             end_date = report_end_date,
-            signals_list = signals_list, 
+            signals_list = signals_list,
             conf = conf,
             callback = function(x) filter(x, CallPhase == 0)
         ) %>%
@@ -1435,7 +1435,7 @@ tryCatch(
             table_name = "detection_levels",
             start_date = wk_calcs_start_date,
             end_date = report_end_date,
-            signals_list = signals_list, 
+            signals_list = signals_list,
             conf = conf,
             callback = function(x)
                 mutate(x, CallPhase = 0, Week = week(Date), DOW = wday(Date))
@@ -1641,7 +1641,7 @@ tryCatch(
             "vphpa" = get_quarterly(cor$mo$vphpa, "vph"),
             "vphpp" = get_quarterly(cor$mo$vphpp, "vph"),
             "papd" = get_quarterly(cor$mo$papd, "papd"),
-            #"pd" = get_quarterly(cor$mo$pd, "Duration"),
+            "pd" = get_quarterly(cor$mo$pd, "pd"),
             "tp" = get_quarterly(cor$mo$tp, "vph"),
             "aogd" = get_quarterly(cor$mo$aogd, "aog", "vol"),
             "prd" = get_quarterly(cor$mo$prd, "pr", "vol"),
@@ -1686,9 +1686,9 @@ tryCatch(
                 select(Zone_Group, Corridor, Date, vph),
             "papd" = readRDS("sub_weekly_papd.rds") %>%
                 select(Zone_Group, Corridor, Date, papd),
-            #"paph" = readRDS("sub_weekly_paph.rds"),
-            #"pd" = readRDS("sub_weekly_pd_by_day.rds") %>%
-            #    select(Zone_Group, Corridor, Date, Duration),
+            # "paph" = readRDS("sub_weekly_paph.rds"),
+            "pd" = readRDS("sub_weekly_pd_by_day.rds") %>%
+                select(Zone_Group, Corridor, Date, pd),
             "tp" = readRDS("sub_weekly_throughput.rds") %>%
                 select(Zone_Group, Corridor, Date, vph),
             "aogd" = readRDS("sub_weekly_aog_by_day.rds") %>%
@@ -1716,8 +1716,8 @@ tryCatch(
             "vphpa" = readRDS("sub_monthly_vph_am.rds"),
             "vphpp" = readRDS("sub_monthly_vph_pm.rds"),
             "papd" = readRDS("sub_monthly_papd.rds"),
-            #"paph" = readRDS("sub_monthly_paph.rds"),
-            #"pd" = readRDS("sub_monthly_pd_by_day.rds"),
+            # "paph" = readRDS("sub_monthly_paph.rds"),
+            "pd" = readRDS("sub_monthly_pd_by_day.rds"),
             "tp" = readRDS("sub_monthly_throughput.rds"),
             "aogd" = readRDS("sub_monthly_aog_by_day.rds"),
             "aogh" = readRDS("sub_monthly_aog_by_hr.rds"),
@@ -1769,44 +1769,44 @@ tryCatch(
         sig <- list()
         sig$dy <- list(
             "du" = sigify(readRDS("avg_daily_detector_uptime.rds"), cor$dy$du, corridors) %>%
-                select(Zone_Group, Corridor, Date, uptime, uptime.sb, uptime.pr),
+                select(Zone_Group, Corridor, Description, Date, uptime, uptime.sb, uptime.pr),
             "cu" = sigify(readRDS("daily_comm_uptime.rds"), cor$dy$cu, corridors) %>%
-                select(Zone_Group, Corridor, Date, uptime),
+                select(Zone_Group, Corridor, Description, Date, uptime),
             "pau" = sigify(readRDS("daily_pa_uptime.rds"), cor$dy$pau, corridors) %>%
-                select(Zone_Group, Corridor, Date, uptime)
+                select(Zone_Group, Corridor, Description, Date, uptime)
         )
         sig$wk <- list(
             "vpd" = sigify(readRDS("weekly_vpd.rds"), cor$wk$vpd, corridors) %>%
-                select(Zone_Group, Corridor, Date, vpd),
+                select(Zone_Group, Corridor, Description, Date, vpd),
             "vphpa" = sigify(readRDS("weekly_vph_am.rds"), cor$wk$vphpa, corridors) %>%
-                select(Zone_Group, Corridor, Date, vph),
+                select(Zone_Group, Corridor, Description, Date, vph),
             "vphpp" = sigify(readRDS("weekly_vph_pm.rds"), cor$wk$vphpp, corridors) %>%
-                select(Zone_Group, Corridor, Date, vph),
+                select(Zone_Group, Corridor, Description, Date, vph),
             "papd" = sigify(readRDS("weekly_papd.rds"), cor$wk$papd, corridors) %>%
-                select(Zone_Group, Corridor, Date, papd),
-            #"paph" = sigify(readRDS("weekly_paph.rds"), cor$wk$paph, corridors),
-            #"pd" = sigify(readRDS("weekly_pd_by_day.rds"), cor$wk$pd, corridors) %>%
-            #    select(Zone_Group, Corridor, Date, Duration),
+                select(Zone_Group, Corridor, Description, Date, papd),
+            # "paph" = sigify(readRDS("weekly_paph.rds"), cor$wk$paph, corridors),
+            "pd" = sigify(readRDS("weekly_pd_by_day.rds"), cor$wk$pd, corridors) %>%
+                select(Zone_Group, Corridor, Description, Date, Duration),
             "tp" = sigify(readRDS("weekly_throughput.rds"), cor$wk$tp, corridors) %>%
-                select(Zone_Group, Corridor, Date, vph),
+                select(Zone_Group, Corridor, Description, Date, vph),
             "aogd" = sigify(readRDS("weekly_aog_by_day.rds"), cor$wk$aogd, corridors) %>%
-                select(Zone_Group, Corridor, Date, aog),
+                select(Zone_Group, Corridor, Description, Date, aog),
             "prd" = sigify(readRDS("weekly_pr_by_day.rds"), cor$wk$prd, corridors) %>%
-                select(Zone_Group, Corridor, Date, pr),
+                select(Zone_Group, Corridor, Description, Date, pr),
             "qsd" = sigify(readRDS("wqs.rds"), cor$wk$qsd, corridors) %>%
-                select(Zone_Group, Corridor, Date, qs_freq),
+                select(Zone_Group, Corridor, Description, Date, qs_freq),
             "sfd" = sigify(readRDS("wsf.rds"), cor$wk$sfd, corridors) %>%
-                select(Zone_Group, Corridor, Date, sf_freq),
+                select(Zone_Group, Corridor, Description, Date, sf_freq),
             "sfo" = sigify(readRDS("wsfo.rds"), cor$wk$sfo, corridors) %>%
-                select(Zone_Group, Corridor, Date, sf_freq),
+                select(Zone_Group, Corridor, Description, Date, sf_freq),
             "du" = sigify(readRDS("weekly_detector_uptime.rds"), cor$wk$du, corridors) %>%
-                select(Zone_Group, Corridor, Date, uptime),
+                select(Zone_Group, Corridor, Description, Date, uptime),
             "cu" = sigify(readRDS("weekly_comm_uptime.rds"), cor$wk$cu, corridors) %>%
-                select(Zone_Group, Corridor, Date, uptime),
+                select(Zone_Group, Corridor, Description, Date, uptime),
             "pau" = sigify(readRDS("weekly_pa_uptime.rds"), cor$wk$pau, corridors) %>%
-                select(Zone_Group, Corridor, Date, uptime),
+                select(Zone_Group, Corridor, Description, Date, uptime),
             "dl" = sigify(readRDS("weekly_dl.rds"), cor$wk$dl, corridors) %>%
-                select(Zone_Group, Corridor, Date, Level)
+                select(Zone_Group, Corridor, Description, Date, Level)
         )
         sig$mo <- list(
             "vpd" = sigify(readRDS("monthly_vpd.rds"), cor$mo$vpd, corridors) %>%
@@ -1817,10 +1817,10 @@ tryCatch(
                 select(-c(Name, ones)),
             "papd" = sigify(readRDS("monthly_papd.rds"), cor$mo$papd, corridors) %>%
                 select(-c(Name, ones)),
-            #"paph" = sigify(readRDS("monthly_paph.rds"), cor$mo$paph, corridors) %>%
+            # "paph" = sigify(readRDS("monthly_paph.rds"), cor$mo$paph, corridors) %>%
             #    select(-c(Name, ones)),
-            #"pd" = sigify(readRDS("monthly_pd_by_day.rds"), cor$mo$pd, corridors) %>%
-            #    select(-c(Name, ones)),
+            "pd" = sigify(readRDS("monthly_pd_by_day.rds"), cor$mo$pd, corridors) %>%
+                select(-c(Name, Events)),
             "tp" = sigify(readRDS("monthly_throughput.rds"), cor$mo$tp, corridors) %>%
                 select(-c(Name, ones)),
             "aogd" = sigify(readRDS("monthly_aog_by_day.rds"), cor$mo$aogd, corridors) %>%
@@ -1845,7 +1845,6 @@ tryCatch(
             "pti" = data.frame(),
             "bi" = data.frame(),
             "spd" = data.frame(),
-
             "du" = sigify(readRDS("monthly_detector_uptime.rds"), cor$mo$du, corridors) %>%
                 select(Zone_Group, Corridor, Month, uptime, uptime.sb, uptime.pr, delta),
             "cu" = sigify(readRDS("monthly_comm_uptime.rds"), cor$mo$cu, corridors) %>%
@@ -1862,62 +1861,6 @@ tryCatch(
     }
 )
 
-# Assign Descriptions for hover text
-
-descs <- corridors %>%
-    select(SignalID, Corridor, Description) %>%
-    group_by(SignalID, Corridor) %>%
-    filter(Description == first(Description)) %>%
-    ungroup()
-
-for (tab in c(
-    "vpd", "vphpa", "vphpp", "papd", "pd", "bpsi", "rsi", "cri", "kabco",
-    "tp", "aog", "aogd", "aogh", "prd", "prh", "qsd", "qsh", "sfd", "sfh", "sfo",
-    "du", "cu", "pau", "dl", "cctv", "maint_plot", "ops_plot", "safety_plot"
-)) {
-    if (tab %in% names(sig$mo) & tab != "cctv") {
-        sig$mo[[tab]] <- sig$mo[[tab]] %>%
-            left_join(descs, by = c("Corridor" = "SignalID", "Zone_Group" = "Corridor")) %>%
-            mutate(
-                Description = coalesce(Description, Corridor),
-                Corridor = factor(Corridor),
-                Description = factor(Description)
-            )
-    }
-    if (tab %in% names(sub$mo)) {
-        sub$mo[[tab]] <- sub$mo[[tab]] %>% mutate(Description = Corridor)
-    }
-    if (tab %in% names(cor$mo)) {
-        cor$mo[[tab]] <- cor$mo[[tab]] %>% mutate(Description = Corridor)
-    }
-
-    if (tab %in% names(sig$wk) & tab != "cctv") {
-        sig$wk[[tab]] <- sig$wk[[tab]] %>%
-            left_join(descs, by = c("Corridor" = "SignalID", "Zone_Group" = "Corridor")) %>%
-            mutate(
-                Description = coalesce(Description, Corridor),
-                Corridor = factor(Corridor),
-                Description = factor(Description)
-            )
-    }
-    if (tab %in% names(sub$wk)) {
-        sub$wk[[tab]] <- sub$wk[[tab]] %>% mutate(Description = Corridor)
-    }
-    if (tab %in% names(cor$wk)) {
-        cor$wk[[tab]] <- cor$wk[[tab]] %>% mutate(Description = Corridor)
-    }
-}
-
-for (tab in c("du", "cu", "pau")) {
-    sig$dy[[tab]] <- sig$dy[[tab]] %>%
-        left_join(descs, by = c("Corridor" = "SignalID", "Zone_Group" = "Corridor")) %>%
-        mutate(
-            Description = coalesce(Description, Corridor),
-            Corridor = factor(Corridor),
-            Description = factor(Description)
-        )
-}
-
 
 
 
@@ -1929,8 +1872,6 @@ qsave(sub, "sub.qs")
 
 
 print(glue("{Sys.time()} Write to Database [23 of 23]"))
-
-source("write_sigops_to_db.R")
 
 aurora <- keep_trying(get_aurora_connection, n_tries = 5)
 
