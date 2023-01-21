@@ -362,8 +362,7 @@ tryCatch(
             start_date = today() - days(90),
             end_date = today() - days(1),
             bucket = conf$bucket,
-            conf = conf,
-            callback = function(x) { mutate(x, Date = date_) }
+            conf = conf
         )
 
         if (nrow(bad_ped)) {
@@ -828,6 +827,8 @@ tryCatch(
             map(~ filter(., !is.na(Corridor)))
 
 
+        addtoRDS(daily_vph_peak$am, "daily_vph_am.rds", "vph", report_start_date, calcs_start_date)
+        addtoRDS(daily_vph_peak$pm, "daily_vph_pm.rds", "vph", report_start_date, calcs_start_date)
         addtoRDS(weekly_vph, "weekly_vph.rds", "vph", report_start_date, wk_calcs_start_date)
         addtoRDS(monthly_vph, "monthly_vph.rds", "vph", report_start_date, calcs_start_date)
         addtoRDS(cor_daily_vph, "cor_daily_vph.rds", "vph", report_start_date, wk_calcs_start_date)
@@ -1401,7 +1402,7 @@ tryCatch(
 # TRAVEL TIME AND BUFFER TIME INDEXES #########################################
 
 print(glue("{Sys.time()} Travel Time Indexes [19 of 23]"))
-
+if (FALSE) {
 tryCatch(
     {
         # ------- Corridor/Subcorridor Travel Time Metrics ------- #
@@ -1527,7 +1528,7 @@ tryCatch(
         print(e)
     }
 )
-
+}
 
 
 # DAILY DETECTION LEVELS #####################################################
@@ -1599,7 +1600,7 @@ tryCatch(
 
         daily <- s3_read_parquet_parallel(
             bucket = conf$bucket,
-            table_name = phase_termination,
+            table_name = "phase_termination",
             start_date = wk_calcs_start_date,
             end_date = report_end_date,
             signals_list = signals_list,
@@ -1899,25 +1900,25 @@ tryCatch(
         sig <- list()
         sig$dy <- list(
             "vpd" = sigify(readRDS("daily_vpd.rds"), cor$dy$vpd, corridors) %>%
-                select(Zone_Group, Corridor, Date, vpd, delta),
-            "vphpa" = sigify(readRDS("daily_vph_peak.rds")$am, cor$dy$vphpa, corridors) %>%
-                select(Zone_Group, Corridor, Date, vph, delta),
-            "vphpp" = sigify(readRDS("daily_vph_peak.rds")$pm, cor$dy$vphpp, corridors) %>%
-                select(Zone_Group, Corridor, Date, vph, delta),
+                select(Zone_Group, Corridor, Description, Date, vpd, delta),
+            "vphpa" = sigify(readRDS("daily_vph_am.rds"), cor$dy$vphpa, corridors) %>%
+                select(Zone_Group, Corridor, Description, Date, vph, delta),
+            "vphpp" = sigify(readRDS("daily_vph_pm.rds"), cor$dy$vphpp, corridors) %>%
+                select(Zone_Group, Corridor, Description, Date, vph, delta),
             "papd" = sigify(readRDS("daily_papd.rds"), cor$dy$papd, corridors) %>%
-                select(Zone_Group, Corridor, Date, papd, delta),
+                select(Zone_Group, Corridor, Description, Date, papd, delta),
             "tp" = sigify(readRDS("daily_throughput.rds"), cor$dy$tp, corridors) %>%
-                select(Zone_Group, Corridor, Date, vph, delta),
+                select(Zone_Group, Corridor, Description, Date, vph, delta),
             "aogd" = sigify(readRDS("daily_aog.rds"), cor$dy$aogd, corridors) %>%
-              select(Zone_Group, Corridor, Date, aog, delta),
+              select(Zone_Group, Corridor, Description, Date, aog, delta),
             "prd" = sigify(readRDS("daily_pr.rds"), cor$dy$prd, corridors) %>%
-              select(Zone_Group, Corridor, Date, pr, delta),
+              select(Zone_Group, Corridor, Description, Date, pr, delta),
             "qsd" = sigify(readRDS("daily_qsd.rds"), cor$dy$qsd, corridors) %>%
-              select(Zone_Group, Corridor, Date, qs_freq, delta),
+              select(Zone_Group, Corridor, Description, Date, qs_freq, delta),
             "sfd" = sigify(readRDS("daily_sfp.rds"), cor$dy$sfd, corridors) %>%
-              select(Zone_Group, Corridor, Date, sf_freq, delta),
+              select(Zone_Group, Corridor, Description, Date, sf_freq, delta),
             "sfo" = sigify(readRDS("daily_sfo.rds"), cor$dy$sfo, corridors) %>%
-              select(Zone_Group, Corridor, Date, sf_freq, delta),
+              select(Zone_Group, Corridor, Description, Date, sf_freq, delta),
             "du" = sigify(readRDS("avg_daily_detector_uptime.rds"), cor$dy$du, corridors) %>%
                 select(Zone_Group, Corridor, Description, Date, uptime, uptime.sb, uptime.pr),
             #"cu" = sigify(readRDS("daily_comm_uptime.rds"), cor$dy$cu, corridors) %>%
@@ -2018,18 +2019,8 @@ tryCatch(
             "sfd" = get_quarterly(sig$mo$sfd, "sf_freq"),
             "sfo" = get_quarterly(sig$mo$sfo, "sf_freq"),
             "du" = get_quarterly(sig$mo$du, "uptime"),
-            "cu" = get_quarterly(sig$mo$cu, "uptime"),
-            "pau" = get_quarterly(sig$mo$pau, "uptime"),
-            "cctv" = get_quarterly(sig$mo$cctv, "uptime"),
-            "ttyp" = get_quarterly(sig$mo$ttyp, "Reported"),
-            "tsub" = get_quarterly(sig$mo$tsub, "Reported"),
-            "tpri" = get_quarterly(sig$mo$tpri, "Reported"),
-            "tsou" = get_quarterly(sig$mo$tsou, "Reported"),
-            "reported" = get_quarterly(sig$mo$tasks, "Reported"),
-            "resolved" = get_quarterly(sig$mo$tasks, "Resolved"),
-            "outstanding" = get_quarterly(sig$mo$tasks, "Outstanding", operation = "latest"),
-            "over45" = get_quarterly(sig$mo$over45, "over45", operation = "latest"),
-            "mttr" = get_quarterly(sig$mo$mttr, "mttr", operation = "latest")
+            #"cu" = get_quarterly(sig$mo$cu, "uptime"),
+            "pau" = get_quarterly(sig$mo$pau, "uptime")
         )
 
     },
