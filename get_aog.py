@@ -6,6 +6,7 @@ Created on Sat Feb 15 15:15:31 2020
 """
 
 import os
+import psutil
 import yaml
 import time
 import sys
