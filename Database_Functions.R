@@ -4,7 +4,6 @@ suppressMessages({
     library(odbc)
     library(RMariaDB)
     library(yaml)
-    library(tictoc)
 })
 
 cred <- read_yaml("Monthly_Report_AWS.yaml")

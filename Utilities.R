@@ -38,7 +38,7 @@ get_usable_cores <- function(GB=8) {
     # Get RAM from system file and divide
 
     if (Sys.info()["sysname"] == "Windows") {
-	1
+        1
 
     } else if (Sys.info()["sysname"] == "Linux") {
         x <- readLines('/proc/meminfo')
@@ -217,41 +217,44 @@ addtoRDS <- function(df, fn, delta_var, rsd, csd) {
         if (class(csd) == "character") csd <- as_date(csd)
 
         # Extract aggregation period from the data fields
-        periods <- intersect(c("Month", "Date", "Hour", "Timeperiod"), names(df0))
+        periods <- intersect(c("Quarter", "Month", "Date", "Hour", "Timeperiod"), names(df0))
         per_ <- as.name(periods)
 
-        # Remove everything after calcs_start_date (csd)
-        # and before report_start_date (rsd) in original df
-        df0 <- df0 %>% filter(!!per_ >= rsd, !!per_ < csd)
+        if ("Quarter" %in% periods) {
+            x <- df
+        } else {
+            # Remove everything after calcs_start_date (csd)
+            # and before report_start_date (rsd) in original df
+            df0 <- df0 %>% filter(!!per_ >= rsd, !!per_ < csd)
 
-        # Make sure new data starts on csd
-        # This is especially important for when csd is the start of the month
-        # and we've run calcs going back to the start of the week, which is in
-        # the previous month, e.g., 3/31/2020 is a Tuesday.
-        df <- df %>% filter(!!per_ >= csd)
+            # Make sure new data starts on csd
+            # This is especially important for when csd is the start of the month
+            # and we've run calcs going back to the start of the week, which is in
+            # the previous month, e.g., 3/31/2020 is a Tuesday.
+            df <- df %>% filter(!!per_ >= csd)
 
-        # Extract aggregation groupings from the data fields
-        # to calculate period-to-period deltas
+            # Extract aggregation groupings from the data fields
+            # to calculate period-to-period deltas
 
-        groupings <- intersect(c("Zone_Group", "Corridor", "SignalID"), names(df0))
-        groups_ <- sapply(groupings, as.name)
+            groupings <- intersect(c("Zone_Group", "Corridor", "SignalID"), names(df0))
+            groups_ <- sapply(groupings, as.name)
 
-        group_arrange <- c(periods, groupings) %>%
-            sapply(as.name)
+            group_arrange <- c(periods, groupings) %>%
+                sapply(as.name)
 
-        var_ <- as.name(delta_var)
+            var_ <- as.name(delta_var)
 
-        # Combine old and new
-        x <- bind_rows_keep_factors(list(df0, df)) %>%
+            # Combine old and new
+            x <- bind_rows_keep_factors(list(df0, df)) %>%
 
-            # Recalculate deltas from prior periods over combined df
-            group_by(!!!groups_) %>%
-            arrange(!!!group_arrange) %>%
-            mutate(lag_ = lag(!!var_),
-                   delta = ((!!var_) - lag_)/lag_) %>%
-            ungroup() %>%
-            dplyr::select(-lag_)
-
+                # Recalculate deltas from prior periods over combined df
+                group_by(!!!groups_) %>%
+                arrange(!!!group_arrange) %>%
+                mutate(lag_ = lag(!!var_),
+                       delta = ((!!var_) - lag_)/lag_) %>%
+                ungroup() %>%
+                dplyr::select(-lag_)
+        }
         x
     }
 

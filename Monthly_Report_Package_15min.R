@@ -39,6 +39,7 @@ tryCatch(
             start_date = rds_start_date,
             end_date = report_end_date,
             signals_list = signals_list,
+            conf = conf,
             parallel = FALSE
         ) %>%
             filter(!is.na(CallPhase)) %>%   # Added 1/14/20 to perhaps exclude non-programmed ped pushbuttons
@@ -58,16 +59,23 @@ tryCatch(
             start_date = rds_start_date,
             end_date = report_end_date,
             signals_list = signals_list,
+            conf = conf,
             parallel = FALSE
-        ) %>%
-            mutate(
-                SignalID = factor(SignalID),
-                Detector = factor(Detector))
+        )
 
-        # Filter out bad days
-        paph <- paph %>%
-            select(SignalID, Timeperiod, CallPhase, Detector, vol) %>%
-            anti_join(bad_ped_detectors)
+        if (nrow(bad_ped_detectors) > 0) {
+            bad_ped_detectors <- bad_ped_detectors %>%
+                mutate(
+                    SignalID = factor(SignalID),
+                    Detector = factor(Detector))
+            # Filter out bad days
+            paph <- paph %>%
+                select(SignalID, Timeperiod, CallPhase, Detector, vol) %>%
+                anti_join(bad_ped_detectors)
+        } else {
+            paph <- paph %>%
+                select(SignalID, Timeperiod, CallPhase, Detector, vol)
+        }
 
         pa_15min <- get_period_sum(paph, "vol", "Timeperiod")
         cor_15min_pa <- get_cor_monthly_avg_by_period(pa_15min, corridors, "vol", "Timeperiod")
@@ -122,7 +130,8 @@ tryCatch(
             table_name = "vehicles_15min",
             start_date = rds_start_date,
             end_date = report_end_date,
-            signals_list = signals_list
+            signals_list = signals_list,
+            conf = conf
         ) %>%
             mutate(
                 SignalID = factor(SignalID),
@@ -178,7 +187,8 @@ tryCatch(
             table_name = "arrivals_on_green_15min",
             start_date = rds_start_date,
             end_date = report_end_date,
-            signals_list = signals_list
+            signals_list = signals_list,
+            conf = conf
         ) %>%
             mutate(
                 SignalID = factor(SignalID),
@@ -293,6 +303,7 @@ tryCatch(
             start_date = rds_start_date,
             end_date = report_end_date,
             signals_list = signals_list,
+            conf = conf,
             callback = function(x) filter(x, CallPhase == 0)
         ) %>%
             mutate(
@@ -356,7 +367,8 @@ tryCatch(
             table_name = "queue_spillback_15min",
             start_date = rds_start_date,
             end_date = report_end_date,
-            signals_list = signals_list
+            signals_list = signals_list,
+            conf = conf
         ) %>%
             mutate(
                 SignalID = factor(SignalID),
