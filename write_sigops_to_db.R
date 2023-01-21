@@ -40,7 +40,7 @@ write_dataframe_to_db <- function(conn, df, table_name, recreate, calcs_start_da
                     dbExecute(conn, glue(paste(
                         "DELETE from {table_name} WHERE {datefield} >= '{start_date}'")))
                 } else {
-                    dbSendQuery(conn, glue("DELETE from {table_name}"))
+                    dbSendQuery(conn, glue("TRUNCATE TABLE {table_name}"))
                 }
                 # Filter Dates and Append
                 if (!is.null(start_date) & length(datefield) == 1) {
@@ -250,7 +250,7 @@ recreate_database <- function(conn, df, dfname) {
 
 recreate_table <- function(conn, df, table_name) {
 
-    print(glue("{Sys.time()} Writing {table_name} | 3 | recreate = {recreate}"))
+    print(glue("{Sys.time()} Writing {table_name} | 3 | recreate = TRUE"))
 
     # Overwrite to create initial data types
     DBI::dbWriteTable(
@@ -261,7 +261,7 @@ recreate_table <- function(conn, df, table_name) {
         row.names = FALSE)
     dbExecute(conn, glue("TRUNCATE TABLE {table_name}"))
 
-    create_statement <- dbGetQuery(conn, glue("show create table {table_name};"))
+    create_statement <- dbGetQuery(conn, glue("show create table {table_name};"))$`Create Table`
 
     # Modify CREATE TABLE Statements
     # To change text to VARCHAR with fixed size because this is required for indexing these fields

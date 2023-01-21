@@ -461,19 +461,19 @@ prep_db_for_adjusted_counts_arrow <- function(table, conf, date_range) {
         filter(date %in% format(date_range, "%F"))
     chunks <- get_signals_chunks_arrow(fc_ds)
     groups <- tibble(group = names(chunks), SignalID = chunks) %>%
-        unnest(SignalID) %>%
-        mutate(SignalID = as.integer(SignalID))
+        unnest(SignalID)
 
     if (dir.exists(table)) unlink(table, recursive = TRUE)
     dir.create(table)
 
+    date_range <- fc_ds %>% distinct(date) %>% pull(date) %>% as_date()
     mclapply(date_range, mc.cores = usable_cores, mc.preschedule = FALSE, FUN = function(date_) {
         date_str <- format(date_, "%F")
         cat('.')
 
         fc <- s3_read_parquet_parallel(table, date_, date_, bucket = conf$bucket, conf = conf) %>%
             transmute(
-                SignalID = as.integer(as.character(SignalID)),
+                SignalID = as.character(SignalID),
                 Date, Timeperiod, Month_Hour,
                 Detector = as.integer(as.character(Detector)),
                 CallPhase = as.integer(as.character(CallPhase)),
@@ -481,7 +481,7 @@ prep_db_for_adjusted_counts_arrow <- function(table, conf, date_range) {
                 vol)
         dc <- get_det_config_vol(date_) %>%
             transmute(
-                SignalID = as.integer(as.character(SignalID)),
+                SignalID = as.character(SignalID),
                 Date,
                 Detector = as.integer(as.character(Detector)),
                 CallPhase = as.integer(as.character(CallPhase)),

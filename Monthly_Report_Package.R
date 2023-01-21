@@ -1992,10 +1992,10 @@ tryCatch(
                 select(-c(Name, cycles)),
             "sfo" = sigify(readRDS("monthly_sfo.rds"), cor$mo$sfo, corridors) %>%
                 select(-c(Name, cycles)),
-            "tti" = data.frame(),
-            "pti" = data.frame(),
-            "bi" = data.frame(),
-            "spd" = data.frame(),
+            #"tti" = data.frame(),
+            #"pti" = data.frame(),
+            #"bi" = data.frame(),
+            #"spd" = data.frame(),
             "du" = sigify(readRDS("monthly_detector_uptime.rds"), cor$mo$du, corridors) %>%
                 select(Zone_Group, Corridor, Month, uptime, uptime.sb, uptime.pr, delta),
             #"cu" = sigify(readRDS("monthly_comm_uptime.rds"), cor$mo$cu, corridors) %>%

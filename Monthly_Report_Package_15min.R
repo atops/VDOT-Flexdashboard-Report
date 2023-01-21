@@ -7,6 +7,7 @@ source("Monthly_Report_Package_init.R")
 # to limit the amount of data to process and upload.
 calcs_start_date <- today(tzone = "America/New_York") - days(7)
 calcs_start_date <- max(calcs_start_date, as_date(get_date_from_string(conf$start_date)) - days(1))
+calcs_start_date <- as_date("2022-09-29")
 # Need to keep some data in rds prior to the calcs_start_date to calculate accurate deltas
 rds_start_date <- calcs_start_date - days(1)
 

@@ -14,15 +14,19 @@ cred <- read_yaml("Monthly_Report_AWS.yaml")
 mydbAppendTable <- function(conn, name, value, chunksize = 1e4) {
 
     df <- value %>%
-        mutate(across(where(is.Date), ~format(., "%F"))) %>%
-        mutate(across(where(is.POSIXct), ~format(., "%F %X"))) %>%
-        mutate(across(where(is.factor), as.character)) %>%
-        mutate(across(where(is.character), ~str_replace_all(., "'", "\\\\'")))
+        mutate(
+            across(where(is.Date), ~format(., "%F")),
+            across(where(is.POSIXct), ~format(., "%F %H:%M:%S")),
+            across(where(is.factor), as.character),
+            across(where(is.character), ~replace(., is.na(.), "")),
+            across(where(is.character), ~str_replace_all(., "'", "\\\\'")),
+            across(where(is.character), function(s) glue("'{s}'")),
+            across(where(is.numeric), ~replace(., !is.finite(.), NA)))
 
     table_name <- name
 
-    vals <- unite(df, "z", names(df), sep = "','") %>% pull(z)
-    vals <- glue("('{vals}')")
+    vals <- unite(df, "z", names(df), sep = ",") %>% pull(z)
+    vals <- glue("({vals})") %>% str_replace_all("NA", "NULL")
     vals_list <- split(vals, ceiling(seq_along(vals)/chunksize))
 
     query0 <- glue("INSERT INTO {table_name} (`{paste0(colnames(df), collapse = '`, `')}`) VALUES ")

@@ -92,9 +92,7 @@ get_spm_data_athena <- function(start_date, end_date, signals_list = NULL, conf,
 
     if (!is.null(signals_list)) {
         if (is.factor(signals_list)) {
-            signals_list <- as.integer(as.character(signals_list))
-        } else if (is.character(signals_list)) {
-            signals_list <- as.integer(signals_list)
+            signals_list <- as.character(signals_list)
         }
         df <- df %>% filter(signalid %in% signals_list)
     }
