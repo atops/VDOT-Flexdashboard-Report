@@ -843,11 +843,17 @@ tryCatch(
         addtoRDS(monthly_vph_peak$am, "monthly_vph_am.rds", "vph", report_start_date, calcs_start_date)
         addtoRDS(monthly_vph_peak$pm, "monthly_vph_pm.rds", "vph", report_start_date, calcs_start_date)
 
+        addtoRDS(cor_daily_vph_peak$am, "cor_daily_vph_am.rds", "vph", report_start_date, calcs_start_date)
+        addtoRDS(cor_daily_vph_peak$pm, "cor_daily_vph_pm.rds", "vph", report_start_date, calcs_start_date)
+
         addtoRDS(cor_weekly_vph_peak$am, "cor_weekly_vph_am.rds", "vph", report_start_date, wk_calcs_start_date)
         addtoRDS(cor_weekly_vph_peak$pm, "cor_weekly_vph_pm.rds", "vph", report_start_date, wk_calcs_start_date)
 
         addtoRDS(cor_monthly_vph_peak$am, "cor_monthly_vph_am.rds", "vph", report_start_date, calcs_start_date)
         addtoRDS(cor_monthly_vph_peak$pm, "cor_monthly_vph_pm.rds", "vph", report_start_date, calcs_start_date)
+
+        addtoRDS(sub_daily_vph_peak$am, "sub_daily_vph_am.rds", "vph", report_start_date, calcs_start_date)
+        addtoRDS(sub_daily_vph_peak$pm, "sub_daily_vph_pm.rds", "vph", report_start_date, calcs_start_date)
 
         addtoRDS(sub_weekly_vph_peak$am, "sub_weekly_vph_am.rds", "vph", report_start_date, wk_calcs_start_date)
         addtoRDS(sub_weekly_vph_peak$pm, "sub_weekly_vph_pm.rds", "vph", report_start_date, wk_calcs_start_date)
@@ -1683,8 +1689,8 @@ tryCatch(
         cor <- list()
         cor$dy <- list(
             "vpd" = readRDS("cor_daily_vpd.rds"),
-            "vphpa" = readRDS("cor_daily_vph_peak.rds")$am,
-            "vphpp" = readRDS("cor_daily_vph_peak.rds")$pm,
+            "vphpa" = readRDS("cor_daily_vph_am.rds"),
+            "vphpp" = readRDS("cor_daily_vph_pm.rds"),
             "papd" = readRDS("cor_daily_papd.rds"),
             "tp" = readRDS("cor_daily_throughput.rds"),
             "aogd" = readRDS("cor_daily_aog.rds"),
@@ -1782,8 +1788,8 @@ tryCatch(
         sub <- list()
         sub$dy <- list(
             "vpd" = readRDS("sub_daily_vpd.rds"),
-            "vphpa" = readRDS("sub_daily_vph_peak.rds")$am,
-            "vphpp" = readRDS("sub_daily_vph_peak.rds")$pm,
+            "vphpa" = readRDS("sub_daily_vph_am.rds"),
+            "vphpp" = readRDS("sub_daily_vph_pm.rds"),
             "papd" = readRDS("sub_daily_papd.rds"),
             "tp" = readRDS("sub_daily_throughput.rds"),
             "aogd" = readRDS("sub_daily_aog.rds"),
@@ -1889,6 +1895,26 @@ tryCatch(
     {
         sig <- list()
         sig$dy <- list(
+            "vpd" = sigify(readRDS("daily_vpd.rds"), cor$dy$vpd, corridors) %>%
+                select(Zone_Group, Corridor, Date, vpd, delta),
+            "vphpa" = sigify(readRDS("daily_vph_peak.rds")$am, cor$dy$vphpa, corridors) %>%
+                select(Zone_Group, Corridor, Date, vph, delta),
+            "vphpp" = sigify(readRDS("daily_vph_peak.rds")$pm, cor$dy$vphpp, corridors) %>%
+                select(Zone_Group, Corridor, Date, vph, delta),
+            "papd" = sigify(readRDS("daily_papd.rds"), cor$dy$papd, corridors) %>%
+                select(Zone_Group, Corridor, Date, papd, delta),
+            "tp" = sigify(readRDS("daily_throughput.rds"), cor$dy$tp, corridors) %>%
+                select(Zone_Group, Corridor, Date, vph, delta),
+            "aogd" = sigify(readRDS("daily_aog.rds"), cor$dy$aogd, corridors) %>%
+              select(Zone_Group, Corridor, Date, aog, delta),
+            "prd" = sigify(readRDS("daily_pr.rds"), cor$dy$prd, corridors) %>%
+              select(Zone_Group, Corridor, Date, pr, delta),
+            "qsd" = sigify(readRDS("daily_qsd.rds"), cor$dy$qsd, corridors) %>%
+              select(Zone_Group, Corridor, Date, qs_freq, delta),
+            "sfd" = sigify(readRDS("daily_sfp.rds"), cor$dy$sfd, corridors) %>%
+              select(Zone_Group, Corridor, Date, sf_freq, delta),
+            "sfo" = sigify(readRDS("daily_sfo.rds"), cor$dy$sfo, corridors) %>%
+              select(Zone_Group, Corridor, Date, sf_freq, delta),
             "du" = sigify(readRDS("avg_daily_detector_uptime.rds"), cor$dy$du, corridors) %>%
                 select(Zone_Group, Corridor, Description, Date, uptime, uptime.sb, uptime.pr),
             "cu" = sigify(readRDS("daily_comm_uptime.rds"), cor$dy$cu, corridors) %>%
@@ -1975,6 +2001,34 @@ tryCatch(
             "dl" = sigify(readRDS("monthly_dl.rds"), cor$mo$dl, corridors) %>%
                 select(Zone_Group, Corridor, Month, Level, delta)
         )
+        sig$qu <- list(
+            "vpd" = get_quarterly(sig$mo$vpd, "vpd"),
+            # "vph" = data.frame(), # get_quarterly(sig$mo$vph, "vph"),
+            "vphpa" = get_quarterly(sig$mo$vphpa, "vph"),
+            "vphpp" = get_quarterly(sig$mo$vphpp, "vph"),
+            "papd" = get_quarterly(sig$mo$papd, "papd"),
+            "pd" = get_quarterly(sig$mo$pd, "pd"),
+            "tp" = get_quarterly(sig$mo$tp, "vph"),
+            "aogd" = get_quarterly(sig$mo$aogd, "aog"),
+            "prd" = get_quarterly(sig$mo$prd, "pr"),
+            "qsd" = get_quarterly(sig$mo$qsd, "qs_freq"),
+            "sfd" = get_quarterly(sig$mo$sfd, "sf_freq"),
+            "sfo" = get_quarterly(sig$mo$sfo, "sf_freq"),
+            "du" = get_quarterly(sig$mo$du, "uptime"),
+            "cu" = get_quarterly(sig$mo$cu, "uptime"),
+            "pau" = get_quarterly(sig$mo$pau, "uptime"),
+            "cctv" = get_quarterly(sig$mo$cctv, "uptime"),
+            "ttyp" = get_quarterly(sig$mo$ttyp, "Reported"),
+            "tsub" = get_quarterly(sig$mo$tsub, "Reported"),
+            "tpri" = get_quarterly(sig$mo$tpri, "Reported"),
+            "tsou" = get_quarterly(sig$mo$tsou, "Reported"),
+            "reported" = get_quarterly(sig$mo$tasks, "Reported"),
+            "resolved" = get_quarterly(sig$mo$tasks, "Resolved"),
+            "outstanding" = get_quarterly(sig$mo$tasks, "Outstanding", operation = "latest"),
+            "over45" = get_quarterly(sig$mo$over45, "over45", operation = "latest"),
+            "mttr" = get_quarterly(sig$mo$mttr, "mttr", operation = "latest")
+        )
+
     },
     error = function(e) {
         print("ENCOUNTERED AN ERROR:")
