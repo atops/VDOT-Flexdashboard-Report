@@ -82,7 +82,7 @@ SUN = 1; MON = 2; TUE = 3; WED = 4; THU = 5; FRI = 6; SAT = 7
 AM_PEAK_HOURS = conf$AM_PEAK_HOURS
 PM_PEAK_HOURS = conf$PM_PEAK_HOURS
 
-Sys.setenv(TZ="America/New_York")
+Sys.setenv(TZ = conf$timezone)
 
 
 source("Utilities.R")

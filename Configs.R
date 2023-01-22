@@ -236,7 +236,7 @@ get_det_config_vol <- function(date_) {
 #TODO: Do we need this? If so, update to use yaml conf for bucket
 get_latest_det_config <- function(conf) {
 
-    date_ <- today(tzone = "America/New_York")
+    date_ <- today(tzone = conf$timezone) 
 
     # Get most recent detector config file, start with today() and work backward
     while (TRUE) {
