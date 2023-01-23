@@ -23,7 +23,7 @@ if __name__ == '__main__':
     engine = get_atspm_engine(cred)
 
     # Code to go back and calculate past days
-    dates = pd.date_range('2023-01-19', '2023-01-20', freq='1D')
+    dates = pd.date_range(start_date, end_date, freq='1D')
 
     for date_ in reversed(dates):
         print(date_)

@@ -140,6 +140,8 @@ get_det_config_  <- function(bucket, folder, type = "det") {
                 stop(glue("Problem getting detector config file for {date_}: {e}"))
                 print(e)
             })
+        } else {
+            stop(glue("No detector config file for {date_}"))
         }
     }
 }

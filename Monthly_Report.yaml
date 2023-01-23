@@ -7,6 +7,7 @@ key_prefix: kimley-horn
 credentials_json: castle-rock-service-account.json
 profile: 
 region: CastleRock
+timezone: America/Denver
 
 ssl_cert: True # True/False or *.pem file name
 

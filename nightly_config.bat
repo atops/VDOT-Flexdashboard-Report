@@ -8,7 +8,6 @@ for /f "tokens=1-4 delims=/ " %%i in ("%date%") do (
 set datestr=%year%%month%%day%
 echo datestr is %datestr% > nightly_config_last_run.txt
 
-rem Call out paths explicitly because we're running schedule tasks from service account
 call activate.bat
 cd c:\TractionMetrics\production\
-conda run -n tractionmetrics python nightly_config.py >> logs\nightly_config_%datestr%.log
+conda run -n tractionmetrics python nightly_config.py > logs\nightly_config_%datestr%.log
