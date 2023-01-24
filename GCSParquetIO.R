@@ -134,7 +134,6 @@ s3_upload_parquet_date_split <- function(df, prefix, bucket, table_name, conf, p
                 })
         }
     }
-    
 }
 
 
@@ -151,7 +150,7 @@ s3_read_parquet <- function(bucket, object, date_ = NULL) {
         }
         df
     }, error = function(e) {
-        print(e)
+        print(glue("Could not read {bucket}/{object}"))
         data.frame()
     })
 }

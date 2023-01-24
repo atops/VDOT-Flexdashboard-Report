@@ -401,6 +401,7 @@ get_pd_date_range <- function(start_date, end_date) {
         print(date_)
 
         pd <- get_ped_delay(date_, cred, signals_list)
+
         if (nrow(pd) > 0) {
             s3_upload_parquet_date_split(
                 pd,
@@ -432,20 +433,24 @@ get_sf_date_range <- function(start_date, end_date) {
 
         sf <- get_sf_utah(date_, conf, signals_list, intervals = c("hour", "15min"))
 
-        s3_upload_parquet_date_split(
-            sf$hour,
-            bucket = conf$bucket,
-            prefix = "sf",
-            table_name = "split_failures",
-            conf = conf
-        )
-        s3_upload_parquet_date_split(
-            sf$`15min`,
-            bucket = conf$bucket,
-            prefix = "sf",
-            table_name = "split_failures_15min",
-            conf = conf
-        )
+        if (nrow(sf$hour) > 0) {
+            s3_upload_parquet_date_split(
+                sf$hour,
+                bucket = conf$bucket,
+                prefix = "sf",
+                table_name = "split_failures",
+                conf = conf
+            )
+        }
+        if (nrow(sf$`15min`) > 0) {
+            s3_upload_parquet_date_split(
+                sf$`15min`,
+                bucket = conf$bucket,
+                prefix = "sf",
+                table_name = "split_failures_15min",
+                conf = conf
+            )
+        }
     })
 }
 
@@ -468,13 +473,15 @@ if (conf$run$phase_termination == TRUE) {
 
         terms <- get_termination_type(date_, conf, signals_list)
 
-        s3_upload_parquet_date_split(
-            terms,
-            bucket = conf$bucket,
-            prefix = "term",
-            table_name = "phase_termination",
-            conf = conf
-        )
+        if (nrow(terms) > 0) {
+            s3_upload_parquet_date_split(
+                terms,
+                bucket = conf$bucket,
+                prefix = "term",
+                table_name = "phase_termination",
+                conf = conf
+            )
+        }
     })
 }
 

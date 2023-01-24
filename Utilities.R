@@ -162,6 +162,10 @@ convert_to_utc <- function(df) {
 }
 
 
+convert_to_local_tz <- function(df) {
+    df %>% mutate(across(where(is.POSIXct), ~force_tz(., conf$timezone)))
+}
+
 
 week <- function(d) {
     d0 <- ymd("2016-12-25")
@@ -446,71 +450,94 @@ get_corridor_summary_data <- function(cor) {
 }
 
 
+# TODO: This function has a problem in that it can't handle missing data
 write_signal_details <- function(plot_date, conf, signals_list = NULL) {
-    print(plot_date)
-    #--- This takes approx one minute per day -----------------------
-    rc <- s3_read_parquet(
-        bucket = conf$bucket,
-        object = glue("{conf$key_prefix}/mark/counts_1hr/date={plot_date}/counts_1hr_{plot_date}.parquet")) %>%
-        convert_to_utc() %>%
-        select(
-            SignalID, Date, Timeperiod, Detector, CallPhase, vol)
 
-    fc <- s3_read_parquet(
-        bucket = conf$bucket,
-        object = glue("{conf$key_prefix}/mark/filtered_counts_1hr/date={plot_date}/filtered_counts_1hr_{plot_date}.parquet")) %>%
-        convert_to_utc() %>%
-        select(
-            SignalID, Date, Timeperiod, Detector, CallPhase, Good_Day)
+    print(glue("Writing signal details for {plot_date}"))
 
-    ac <- s3_read_parquet(
-        bucket = conf$bucket,
-        object = glue("{conf$key_prefix}/mark/adjusted_counts_1hr/date={plot_date}/adjusted_counts_1hr_{plot_date}.parquet")) %>%
-        convert_to_utc() %>%
-        select(
-            SignalID, Date, Timeperiod, Detector, CallPhase, vol)
+    tryCatch({
+        #--- This takes approx one minute per day -----------------------
+        rc <- s3_read_parquet(
+            bucket = conf$bucket,
+            object = glue("{conf$key_prefix}/mark/counts_1hr/date={plot_date}/counts_1hr_{plot_date}.parquet"))
+        if (nrow(rc) > 0) {
+            rc <- rc %>%
+            convert_to_utc() %>%
+            select(
+                SignalID, Date, Timeperiod, Detector, CallPhase, vol)
+        } else {
+            return(NULL)
+        }
 
-    if (!is.null(signals_list)) {
-        rc <- rc %>%
-            filter(as.character(SignalID) %in% signals_list)
-        fc <- fc %>%
-            filter(as.character(SignalID) %in% signals_list)
-        ac <- ac %>%
-            filter(as.character(SignalID) %in% signals_list)
-    }
+        fc <- s3_read_parquet(
+            bucket = conf$bucket,
+            object = glue("{conf$key_prefix}/mark/filtered_counts_1hr/date={plot_date}/filtered_counts_1hr_{plot_date}.parquet"))
+        if (nrow(fc) > 0) {
+            fc <- fc %>%
+            convert_to_utc() %>%
+            select(
+                SignalID, Date, Timeperiod, Detector, CallPhase, Good_Day)
+        } else {
+            return(NULL)
+        }
 
-    df <- list(
-        rename(rc, vol_rc = vol),
-        fc,
-        rename(ac, vol_ac = vol)) %>%
-        reduce(full_join, by = c("SignalID", "Date", "Timeperiod", "Detector", "CallPhase")
-        ) %>%
-        mutate(bad_day = if_else(Good_Day==0, TRUE, FALSE)) %>%
-        transmute(
-            SignalID = SignalID,
-            Timeperiod = Timeperiod,
-            Detector = as.integer(Detector),
-            CallPhase = as.integer(CallPhase),
-            vol_rc = as.integer(vol_rc),
-            vol_ac = ifelse(bad_day, as.integer(vol_ac), NA),
-            bad_day) %>%
-        arrange(
-            SignalID,
-            Detector,
-            Timeperiod)
-    #----------------------------------------------------------------
+        ac <- s3_read_parquet(
+            bucket = conf$bucket,
+            object = glue("{conf$key_prefix}/mark/adjusted_counts_1hr/date={plot_date}/adjusted_counts_1hr_{plot_date}.parquet"))
+        if (nrow(ac) > 0) {
+            ac <- ac %>%
+            convert_to_utc() %>%
+            select(
+                SignalID, Date, Timeperiod, Detector, CallPhase, vol)
+        } else {
+            return(NULL)
+        }
 
-    df <- df %>% mutate(
-        Hour = hour(Timeperiod)) %>%
-        select(-Timeperiod) %>%
-        relocate(Hour) %>%
-        nest(data = -c(SignalID))
+        if (!is.null(signals_list)) {
+            rc <- rc %>%
+                filter(as.character(SignalID) %in% signals_list)
+            fc <- fc %>%
+                filter(as.character(SignalID) %in% signals_list)
+            ac <- ac %>%
+                filter(as.character(SignalID) %in% signals_list)
+        }
 
-    s3write_using(
-        df,
-        write_parquet,
-        bucket = conf$bucket,
-        object = glue("{conf$key_prefix}/mark/signal_details/date={plot_date}/sg_{plot_date}.parquet"))
+        df <- list(
+            rename(rc, vol_rc = vol),
+            fc,
+            rename(ac, vol_ac = vol)) %>%
+            reduce(full_join, by = c("SignalID", "Date", "Timeperiod", "Detector", "CallPhase")
+            ) %>%
+            mutate(bad_day = if_else(Good_Day==0, TRUE, FALSE)) %>%
+            transmute(
+                SignalID = SignalID,
+                Timeperiod = Timeperiod,
+                Detector = as.integer(Detector),
+                CallPhase = as.integer(CallPhase),
+                vol_rc = as.integer(vol_rc),
+                vol_ac = ifelse(bad_day, as.integer(vol_ac), NA),
+                bad_day) %>%
+            arrange(
+                SignalID,
+                Detector,
+                Timeperiod)
+        #----------------------------------------------------------------
+
+        df <- df %>% mutate(
+            Hour = hour(Timeperiod)) %>%
+            select(-Timeperiod) %>%
+            relocate(Hour) %>%
+            nest(data = -c(SignalID))
+
+        s3write_using(
+            df,
+            write_parquet,
+            bucket = conf$bucket,
+            object = glue("{conf$key_prefix}/mark/signal_details/date={plot_date}/sg_{plot_date}.parquet"))
+
+    }, error = function(e) {
+        print(glue("Can't write signal details for {plot_date}"))
+    })
 }
 
 

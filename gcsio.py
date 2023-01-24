@@ -113,15 +113,19 @@ def get_det_config(date_, conf):
     bucket = conf['bucket']
     key_prefix = conf['key_prefix']
 
-    bd = s3_read_parquet(Bucket=bucket, Key=f'{key_prefix}/mark/bad_detectors/date={date_str}/bad_detectors_{date_str}.parquet')
-    bd.Detector = bd.Detector.astype('int64')
-
     dc_prefix = f'{key_prefix}/config/atspm_det_config_good/date={date_str}'
     dc_keys = s3_list_objects(bucket, dc_prefix)
 
     dc = pd.concat(list(map(lambda k: read_det_config(bucket, k), dc_keys)))
 
-    df = pd.merge(dc, bd, how='outer', on=['SignalID','Detector']).fillna(value={'Good_Day': 1})
-    df = df.loc[df.Good_Day==1].drop(columns=['Good_Day'])
+    bd_key = f'{key_prefix}/mark/bad_detectors/date={date_str}/bad_detectors_{date_str}.parquet'
+    if len(s3_list_objects(Bucket=bucket, Prefix=bd_key)) > 0:
+        bd = s3_read_parquet(Bucket=bucket, Key=bd_key)
+        bd.Detector = bd.Detector.astype('int64')
+
+        df = pd.merge(dc, bd, how='outer', on=['SignalID','Detector']).fillna(value={'Good_Day': 1})
+        df = df.loc[df.Good_Day==1].drop(columns=['Good_Day'])
+    else:
+        df = dc
 
     return df

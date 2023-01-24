@@ -43,39 +43,6 @@ get_uptime <- function(df, start_date, end_time) {
 }
 
 
-get_spm_data_atspm <- function(start_date, end_date, conf_atspm, table, signals_list = NULL, eventcodes = NULL, TWR_only = FALSE) {
-    # To optimize query performance, specify signals_list, avoid specifying TWR_only
-
-    conn <- get_atspm_connection(conf_atspm)
-
-    end_date1 <- ymd(end_date) + days(1)
-
-    df <- tbl(conn, table)
-
-    if (!is.null(signals_list)) {
-        if (is.factor(signals_list)) {
-            signals_list <- as.character(signals_list)
-        } else if (is.character(signals_list)) {
-            signals_list <- signals_list
-        }
-        df <- filter(df, SignalID %in% signals_list)
-    }
-
-    df <- df %>%
-        filter(Timestamp >= start_date, Timestamp < end_date1)
-
-    if (!is.null(eventcodes)) {
-        df <- filter(df, EventCode %in% eventcodes)
-    }
-
-    if (TWR_only) {
-        df <- filter(df, DATENAME(WEEKDAY, Timestamp) %in% c('Tuesday','Wednesday','Thursday'))
-    }
-    df
-}
-
-
-
 get_spm_data_athena <- function(start_date, end_date, signals_list = NULL, conf, table, TWR_only=TRUE) {
 
     conn <- get_athena_connection(conf)
@@ -105,6 +72,7 @@ get_spm_data_athena <- function(start_date, end_date, signals_list = NULL, conf,
 
 get_spm_data <- get_spm_data_athena
 
+
 # Query Cycle Data
 get_cycle_data <- function(start_date, end_date, conf, signals_list = NULL) {
     get_spm_data(
@@ -118,15 +86,34 @@ get_cycle_data <- function(start_date, end_date, conf, signals_list = NULL) {
 
 
 # Query Detection Events
+get_detection_events <- function(start_date, end_date, conf, signals_list = NULL) {
+    get_spm_data(
+        start_date,
+        end_date,
+        signals_list,
+        conf,
+        table = "DetectionEvents",
+        TWR_only = FALSE)
+}
+
+
+# Query Detection Events
 get_detection_events_arrow <- function(date_, conf, signals_list = NULL, callback = function(x) {x}) {
-    if (dir.exists(glue("./detections/date={date_}"))) {
+
+    detections_path <- glue("detections/date={date_}")
+
+    if (dir.exists(detections_path)) {
         print('read detections locally')
-        path <- "."
-    } else {
+        arrow_path <- detections_path
+    } else if (!is.null(s3_list_objects(bucket = conf$bucket, prefix = file.path(conf$key_prefix, detections_path)))) {
         print('read detections from s3')
-        path <- glue("gs://{conf$bucket}/{conf$key_prefix}")
+        arrow_path <- file.path("gs:/", conf$bucket, conf$key_prefix, detections_path)
+    } else {
+        print(glue("No detections data for {date_}"))
+        return(data.frame())
     }
-    de <- arrow::open_dataset(glue("{path}/detections/date={date_}")) %>%
+
+    de <- arrow::open_dataset(arrow_path) %>%
         select(SignalID, Phase, Detector, CycleStart, PhaseStart, DetTimeStamp, DetDuration)
 
     if (!is.null(signals_list)) {
@@ -153,14 +140,22 @@ get_detection_events_arrow <- function(date_, conf, signals_list = NULL, callbac
 
 # Query Cycle Data
 get_cycle_data_arrow <- function(date_, conf, signals_list = NULL, callback = function(x) {x}) {
-    if (dir.exists(glue("./cycles/date={date_}"))) {
+
+    # TODO: This is repetitive with the previous function. Candidate for refactoring.
+    cycles_path <- glue("cycles/date={date_}")
+
+    if (dir.exists(cycles_path)) {
         print('read cycles locally')
-        path <- "."
-    } else {
+        arrow_path <- cycles_path
+    } else if (!is.null(s3_list_objects(bucket = conf$bucket, prefix = file.path(conf$key_prefix, cycles_path)))) {
         print('read cycles from s3')
-        path <- glue("gs://{conf$bucket}/{conf$key_prefix}")
+        arrow_path <- file.path("gs:/", conf$bucket, conf$key_prefix, cycles_path)
+    } else {
+        print(glue("No cycles data for {date_}"))
+        return(data.frame())
     }
-    cd <- arrow::open_dataset(glue("{path}/cycles/date={date_}")) %>%
+
+    cd <- arrow::open_dataset(arrow_path) %>%
         select(SignalID, Phase, CycleStart, PhaseStart, PhaseEnd, EventCode)
 
     if (!is.null(signals_list)) {
@@ -177,18 +172,6 @@ get_cycle_data_arrow <- function(date_, conf, signals_list = NULL, callback = fu
             SignalID = factor(SignalID),
             Phase = factor(Phase),
             Date = as_date(date_))
-}
-
-
-# Query Detection Events
-get_detection_events <- function(start_date, end_date, conf, signals_list = NULL) {
-    get_spm_data(
-        start_date,
-        end_date,
-        signals_list,
-        conf,
-        table = "DetectionEvents",
-        TWR_only = FALSE)
 }
 
 
@@ -340,15 +323,19 @@ get_sf_utah <- function(date_, conf, signals_list = NULL, first_seconds_of_red =
         rename(Phase = CallPhase)
 
     cat('.')
-    if (dir.exists(glue("./detections/date={date_}"))) {
-        print('read detections locally')
-        path <- "."
-    } else {
-        print('read detections from s3')
-        path <- glue("gs://{conf$bucket}/{conf$key_prefix}")
-    }
 
     de <- get_detection_events_arrow(date_, conf, callback = function(x) filter(x, Phase %in% c(3,4,7,8)))
+
+    cat('.')
+
+    cd <- get_cycle_data_arrow(date_, conf, callback = function(x) filter(x, Phase %in% c(3, 4, 7, 8), EventCode %in% c(1, 9)))
+
+    if (nrow(de) == 0 & nrow(cd) == 0) {
+        print(glue(" Can't calculate split failures for {date_}. No cycle or detector data."))
+        return_list <- lapply(intervals, function(x) data.frame())
+        names(return_list) <- intervals
+	return(return_list)
+    }
 
     de <- left_join(de, dc, by = c("SignalID", "Phase", "Detector", "Date")) %>%
         filter(!is.na(TimeFromStopBar)) %>%
@@ -356,10 +343,6 @@ get_sf_utah <- function(date_, conf, signals_list = NULL, first_seconds_of_red =
                Phase = factor(Phase),
                Detector = factor(Detector)) %>%
         data.table()
-
-    cat('.')
-
-    cd <- get_cycle_data_arrow(date_, conf, callback = function(x) filter(x, Phase %in% c(3, 4, 7, 8), EventCode %in% c(1, 9)))
 
     cat('\n')
     print("Running calcs")
@@ -461,6 +444,12 @@ get_sf <- function(df) {
 
 # SPM Queue Spillback - updated 2/20/2020
 get_qs <- function(detection_events, intervals = c("hour")) {
+
+    if (is.null(detection_events)) {
+        return_list <- lapply(intervals, function(x) data.frame())
+        names(return_list) <- intervals
+	return(return_list)
+    }
 
     cat('.')
     qs_df <- detection_events %>%
@@ -871,11 +860,29 @@ get_detection_levels_by_signal <- function(date_) {
 
 get_termination_type <- function(date_, conf, signals_list = NULL) {
 
-    df <- arrow::open_dataset(glue("gs://{conf$bucket}/{conf$key_prefix}/cycles/date={date_}")) %>%
-        select(
-            SignalID, CallPhase=Phase, EventCode, TermType) %>%
+    cycles_path <- glue("cycles/date={date_}")
+
+    if (dir.exists(cycles_path)) {
+        print('read cycles locally')
+        arrow_path <- cycles_path
+    } else if (!is.null(s3_list_objects(bucket = conf$bucket, prefix = file.path(conf$key_prefix, cycles_path)))) {
+        print('read cycles from s3')
+        arrow_path <- file.path("gs:/", conf$bucket, conf$key_prefix, cycles_path)
+    } else {
+        print(glue("No cycles data for {date_}"))
+        return(data.frame())
+    }
+
+    cd <- arrow::open_dataset(arrow_path) %>%
+        select(SignalID, CallPhase = Phase, EventCode, TermType)
+
+    if (!is.null(signals_list)) {
+        cd <- filter(cd, SignalID %in% signals_list)
+    }
+
+    cd %>%
         filter(
-            EventCode==1, TermType != 0) %>%
+            EventCode == 1, TermType != 0) %>%
         group_by(
             SignalID, CallPhase, TermType) %>%
         count() %>%
@@ -895,9 +902,4 @@ get_termination_type <- function(date_, conf, signals_list = NULL) {
             across(where(is.numeric), sum), .groups = "drop") %>%
         tibble::add_column(
             Date = as_date(date_), .after = "CallPhase")
-
-    if (!is.null(signals_list)) {
-        df <- filter(df, SignalID %in% signals_list)
-    }
-    df
 }

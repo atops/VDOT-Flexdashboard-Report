@@ -466,7 +466,7 @@ prep_db_for_adjusted_counts_arrow <- function(table, conf, date_range) {
     if (dir.exists(table)) unlink(table, recursive = TRUE)
     dir.create(table)
 
-    date_range <- fc_ds %>% distinct(date) %>% pull(date) %>% as_date()
+    date_range <- fc_ds %>% distinct(date) %>% collect() %>% pull(date) %>% as_date()
     mclapply(date_range, mc.cores = usable_cores, mc.preschedule = FALSE, FUN = function(date_) {
         date_str <- format(date_, "%F")
         cat('.')
