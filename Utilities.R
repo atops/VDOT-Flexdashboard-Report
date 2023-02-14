@@ -10,17 +10,21 @@ get_sig <- function() {
     s3read_using(qs::qread, bucket = conf$bucket, object = "sig_ec2.qs")
 }
 
+
 sizeof <- function(x) {
     format(object.size(x), units = "Mb")
 }
+
 
 apply_style <- function(filename) {
     styler::style_file(filename, transformers = styler::tidyverse_style(indent_by = 4))
 }
 
+
 get_most_recent_monday <- function(date_) {
     date_ + days(1 - lubridate::wday(date_, week_start = 1))
 }
+
 
 get_date_from_string <- function(x) {
     if (x == "yesterday") {
@@ -31,6 +35,11 @@ get_date_from_string <- function(x) {
     } else {
         x
     }
+}
+
+
+split_path <- function(path) {
+    setdiff(strsplit(path,"/|\\\\")[[1]], "")
 }
 
 
@@ -53,8 +62,6 @@ get_usable_cores <- function(GB=8) {
         stop("Unknown operating system.")
     }
 }
-
-
 
 
 split_wrapper <- function(FUN) {
