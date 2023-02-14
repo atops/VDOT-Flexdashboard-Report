@@ -64,8 +64,16 @@ def etl2(s, date_, det_config, conf):
             c, d = etl_main(df, det_config)
 
             if len(c) > 0 and len(d) > 0:
-                s3io.s3_write_parquet(c, bucket, posixpath.join(key_prefix, f'cycles/date={date_str}/cd_{s}_{date_str}.parquet'))
-                s3io.s3_write_parquet(d, bucket, posixpath.join(key_prefix, f'detections/date={date_str}/de_{s}_{date_str}.parquet')
+                s3io.s3_write_parquet(
+                    c, 
+                    bucket, 
+                    posixpath.join(key_prefix, f'cycles/date={date_str}/cd_{s}_{date_str}.parquet'), 
+                    allow_truncated_timestamps=True)
+                s3io.s3_write_parquet(
+                    d, 
+                    bucket, 
+                    posixpath.join(key_prefix, f'detections/date={date_str}/de_{s}_{date_str}.parquet'), 
+                    allow_truncated_timestamps=True)
 
             else:
                 print(f'{date_str} | {s} | No cycles')
