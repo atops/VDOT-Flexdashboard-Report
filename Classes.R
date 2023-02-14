@@ -184,11 +184,7 @@ get_valuebox_value <- function(metric, zone_group, corridor, month, quarter = NU
     }
 
     if (is.null(corridor)) {
-        if (zone_group %in% c("All RTOP", "RTOP1", "RTOP2", "Zone 7")) {
-            vals <- subset(vals, Zone_Group == zone_group)
-        } else if (is.null(corridor)) {
-            vals <- subset(vals, Zone_Group == Corridor)
-        }
+        vals <- subset(vals, Zone_Group == Corridor)
     }
     vals <- as.list(vals)
 
