@@ -38,8 +38,14 @@ get_date_from_string <- function(x) {
 }
 
 
-split_path <- function(path) {
-    setdiff(strsplit(path,"/|\\\\")[[1]], "")
+split_path <- function(...) {
+    path <- file.path(...)
+	parts <- setdiff(strsplit(path,"/|\\\\")[[1]], "")
+	if (length(parts) == 1) {
+	    list(bucket = parts, object = "")
+	} else {
+		list(bucket = parts[1], object = do.call(file.path, c(parts[2:length(parts)], list(fsep="/"))))
+	}
 }
 
 
