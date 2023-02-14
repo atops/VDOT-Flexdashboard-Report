@@ -783,10 +783,7 @@ get_ped_delay <- function(date_, cred, signals_list) {
     plan(sequential)
     plan(multisession)
 
-    s3bucket = conf$bucket
-    s3prefix = glue("atspm/date={date_}")
-
-    ds <- arrow::open_dataset(glue("s3://{s3bucket}/{s3prefix}"))
+    ds <- arrow::open_dataset(join_path("s3:/", conf$bucket, glue("atspm/date={date_}"))
 
     end_date_ <- date_ + days(1)
     pe <- ds %>%

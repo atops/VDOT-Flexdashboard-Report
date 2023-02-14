@@ -120,9 +120,9 @@ get_det_config_  <- function(bucket, folder, type = "det") {
         tryCatch({
             dss <- lapply(date_range, function(date_) {
                 arrow::open_dataset(
-                sources = glue("s3://{bucket}/{folder}/date={date_}"),
-                format="feather",
-                schema = arrow_schema
+                    sources = glue("s3://{bucket}/{folder}/date={date_}"),
+                    format="feather",
+                    schema = arrow_schema
                 ) %>%
                 mutate(
                     Date = date_,

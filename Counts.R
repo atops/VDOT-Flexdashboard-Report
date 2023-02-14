@@ -6,14 +6,14 @@ get_counts <- function(df, det_config, units = "hours", date_, event_code = 82, 
 
         df <- df %>%
             filter(eventcode == event_code)
-        
+
         # Group by hour using Athena/Presto SQL
         if (units == "hours") {
-            df <- df %>% 
+            df <- df %>%
                 group_by(timeperiod = date_trunc('hour', timestamp),
                          signalid,
                          eventparam)
-            
+
             # Group by 15 minute interval using Athena/Presto SQL
         } else if (units == "15min") {
             df <- df %>%
