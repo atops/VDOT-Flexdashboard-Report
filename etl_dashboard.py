@@ -51,8 +51,7 @@ def etl2(s, date_, det_config, conf):
 
     try:
         bucket = conf['bucket']
-        key = f'atspm/date={date_str}/atspm_{s}_{date_str}.parquet'
-        df = read_parquet_hive(bucket, key)
+        key_prefix = conf['key_prefix']
 
         if len(df)==0:
             print(f'{date_str} | {s} | No event data for this signal')

@@ -1,5 +1,4 @@
 suppressMessages({
-    library(aws.s3)
     library(dplyr)
     library(tidyr)
     library(stringr)
@@ -41,8 +40,7 @@ read_zipped_feather <- function(x) {
 
 get_alerts <- function(conf) {
 
-    objs <- aws.s3::get_bucket(bucket = conf$bucket,
-                               prefix = 'mark/watchdog')
+    objs <- s3_list_objects(bucket = conf$bucket, prefix = glue("{conf$key_prefix}/mark/watchdog"))
     lapply(objs, function(obj) {
         key <- obj$Key
         print(key)
@@ -55,9 +53,9 @@ get_alerts <- function(conf) {
             f <- read_fst
         }
         if (!is.null(f)) {
-            aws.s3::s3read_using(FUN = f,
-                                 object = key,
-                                 bucket = conf$bucket) %>%
+            s3read_using(FUN = f,
+                         object = key,
+                         bucket = conf$bucket) %>%
                 as_tibble() %>%
                 mutate(across(where(is.factor), as.character),
                        SignalID = as.integer(SignalID),
