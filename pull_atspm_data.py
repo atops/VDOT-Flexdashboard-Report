@@ -8,25 +8,21 @@ Created on Fri Nov 22 13:37:39 2019
 # -*- coding: utf-8 -*-
 
 from datetime import datetime, timedelta
-from multiprocessing import get_context, Pool
+from multiprocessing.dummy import Pool
+#from multiprocessing import Pool
 import pandas as pd
 import sqlalchemy as sq
-import pyodbc
 import sys
 import time
-import os
 import re
-import io
 import itertools
-import boto3
 import yaml
-import pprint
 import urllib.parse
-import urllib3
 
-from s3io import *
+# import urllib3
+# urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-pp = pprint.PrettyPrinter()
+import gcsio
 
 
 
@@ -47,7 +43,7 @@ pp = pprint.PrettyPrinter()
 '''
 
 
-def get_atspm_engine(username, password, hostname = None, database = None, dsn = None):
+def get_atspm_engine_(username, password, hostname = None, database = None, dsn = None):
     password = urllib.parse.quote_plus(password)
     if dsn is None:
         engine = sq.create_engine(rf'mssql+pymssql://{username}:{password}@{hostname}/{database}')
@@ -57,27 +53,32 @@ def get_atspm_engine(username, password, hostname = None, database = None, dsn =
     return engine
 
 
-def get_aurora_engine(credfile='Monthly_Report_AWS.yaml'):
-    with open(credfile) as f:
-        cred = yaml.load(f, Loader=yaml.Loader)
-    username=cred['RDS_USERNAME'] 
-    password=cred['RDS_PASSWORD'] 
-    hostname=cred['RDS_HOST'] 
-    database=cred['RDS_DATABASE']
+def get_atspm_engine(cred):
+    return get_atspm_engine_(
+        username=cred['ATSPM_UID'], 
+        password=cred['ATSPM_PWD'], 
+        hostname=cred['ATSPM_HOST'], 
+        database=cred['ATSPM_DB'],
+        dsn=cred['ATSPM_DSN'])
 
-    engine = sq.create_engine(f'mysql+pymysql://{username}:{password}@{hostname}/{database}')
+
+def get_aurora_engine_(username, password, hostname = None, database = None, dsn = None):
+    password = urllib.parse.quote_plus(password)
+    if dsn is None:
+        engine = sq.create_engine(rf'mysql+pymysql://{username}:{password}@{hostname}/{database}')
+    else:
+        # Should probably add some error handling here
+        engine = sq.create_engine(rf'mysql+pyodbc://{username}:{password}@{dsn}')
     return engine
 
 
-def get_asof(s, conn):
-    Asof = pd.read_sql_query(
-        f'''SELECT SignalID, MIN(Timestamp) as Asof 
-           FROM Controller_Event_Log 
-           WHERE EventCode = 0 AND SignalID = '{s}'
-           GROUP BY SignalID''', con=conn)
-    if len(Asof): 
-        Asof.Asof = Asof.Asof.dt.date
-    return Asof
+def get_aurora_engine(cred):
+    return get_aurora_engine_(
+        username=cred['RDS_USERNAME'], 
+        password=cred['RDS_PASSWORD'], 
+        hostname=cred['RDS_HOST'], 
+        database=cred['RDS_DATABASE'],
+        dsn=cred['RDS_DSN'])
 
 
 def add_barriers(df):
@@ -139,17 +140,19 @@ def pull_raw_atspm_data(s, date_, engine, conf):
                     con=conn)
 
             if len(df) == 0:
-                print(f'|{s} no event data for this signal on {date_str}.')
+                print('|{} no event data for this signal on {}.'.format(s, date_str))
 
             else:
 
                 df = add_barriers(df)
-                df.SignalID = df.SignalID.astype('int')
-                df.EventCode = df.EventCode.astype('int')
-                df.EventParam = df.EventParam.astype('int')
-                df = df.sort_values(['SignalID', 'Timestamp', 'EventCode', 'EventParam'])
+                df = (df.assign(
+                            SignalID = lambda x: x.SignalID.astype('int'),
+                            EventCode = lambda x: x.EventCode.astype('int'),
+                            EventParam = lambda x: x.EventParam.astype('int'))
+                        .sort_values(
+                    ['SignalID', 'Timestamp', 'EventCode', 'EventParam']))
 
-                print(f'writing to files...{len(df)} records')
+                print('writing to files...{} records'.format(len(df)))
                 
                 key = f"{conf['key_prefix']}/atspm/date={date_str}/atspm_{s}_{date_str}.parquet"
                 gcsio.s3_write_parquet(df, Bucket=conf['bucket'], Key=key)
@@ -167,35 +170,14 @@ if __name__ == '__main__':
         with open('Monthly_Report_AWS.yaml') as yaml_file:
             cred = yaml.load(yaml_file, Loader=yaml.Loader)
 
+        engine = get_atspm_engine(cred)
+
+        with engine.connect() as conn:
+            Signals = pd.read_sql_table('Signals', conn)
+
         with open('Monthly_Report.yaml') as yaml_file:
             conf = yaml.load(yaml_file, Loader=yaml.FullLoader)
 
-        engine = get_atspm_engine(
-            username=cred['ATSPM_UID'], 
-            password=cred['ATSPM_PWD'], 
-            hostname=cred['ATSPM_HOST'], 
-            database=cred['ATSPM_DB'],
-            dsn=cred['ATSPM_DSN'])
-
-        with engine.connect() as conn:
-            Signals = (pd.read_sql_table('Signals', conn)
-                        .sort_values(['SignalID', 'VersionID'])
-                        .groupby('SignalID')
-                        .tail(1))
-
-            asof = pd.concat([get_asof(s, conn) for s in Signals.SignalID.values])
-            Signals = pd.merge(Signals, asof, left_on='SignalID', right_on='SignalID', how='left')
-
-        bucket = conf['bucket']
-        region = conf['region']
-        atspm_table = conf['athena']['atspm_table']
-        athena_database = conf['athena']['database']
-        staging_dir = conf['athena']['staging_dir']
-        x = re.split('/+', staging_dir) # split path elements into a list
-        athena_bucket = x[1] # first path element that's not s3:
-        athena_prefix = '/'.join(x[2:])
-
-        Signals.to_parquet(f's3://{bucket}/Signals_{region}.parquet')
 
         if len(sys.argv) == 3:
             start_date = sys.argv[1]
@@ -233,33 +215,14 @@ if __name__ == '__main__':
 
         dates = pd.date_range(start_date, end_date, freq='1D')
 
-
-        #signalids = list(Signals[Signals.SignalID != 'null'].SignalID.astype('int').values)
-        signalids = [s.lstrip('0') for s in Signals.SignalID.values]
-        #signalids = list(Signals.SignalID.values)
-
         t0 = time.time()
         for date_ in dates:
-            # Workaround. Pool is failing silently. Can't troubleshoot.
-            for s in signalids:
-                pull_raw_atspm_data(s, date_, engine, conf)
-            # with get_context('spawn').Pool(2) as pool:
-            #     pool.starmap_async(pull_raw_atspm_data, list(itertools.product(signalids, [date_], [engine], [conf])))
-            #     pool.close()
-            #     pool.join()
+            procs = 2 # min(os.cpu_count()*2, 16)
+            with Pool(processes=procs) as pool: #18
+                pool.starmap_async(pull_raw_atspm_data, list(itertools.product(signalids, [date_], [engine], [conf])))
+                pool.close()
+                pool.join()
 
-            date_str = date_.strftime('%Y-%m-%d')
-
-            partition_query = f'''ALTER TABLE {atspm_table} ADD PARTITION (date="{date_str}")
-                                  location "s3://{bucket}/atspm/date={date_str}"'''
-
-            print('Update Athena partitions:')
-            response = athena.start_query_execution(
-                    QueryString = partition_query,
-                    QueryExecutionContext={'Database': athena_database},
-                    ResultConfiguration={'OutputLocation': staging_dir})
-            pp.pprint(response)
-
-        print(f'\n{len(signalids)} signals in {len(dates)} days. Done in {int((time.time()-t0)/60)} minutes')
+        print('\n{} signals in {} days. Done in {} minutes'.format(len(signalids), len(dates), int((time.time()-t0)/60)))
     except Exception as e:
         print(str(e))
