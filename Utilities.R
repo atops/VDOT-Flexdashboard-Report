@@ -10,17 +10,21 @@ get_sig <- function() {
     s3read_using(qs::qread, bucket = conf$bucket, object = "sig_ec2.qs")
 }
 
+
 sizeof <- function(x) {
     format(object.size(x), units = "Mb")
 }
+
 
 apply_style <- function(filename) {
     styler::style_file(filename, transformers = styler::tidyverse_style(indent_by = 4))
 }
 
+
 get_most_recent_monday <- function(date_) {
     date_ + days(1 - lubridate::wday(date_, week_start = 1))
 }
+
 
 get_date_from_string <- function(x) {
     if (x == "yesterday") {
@@ -34,26 +38,36 @@ get_date_from_string <- function(x) {
 }
 
 
+split_path <- function(...) {
+    path <- file.path(...)
+	parts <- setdiff(strsplit(path,"/|\\\\")[[1]], "")
+	if (length(parts) == 1) {
+	    list(bucket = parts, object = "")
+	} else {
+		list(bucket = parts[1], object = do.call(file.path, c(parts[2:length(parts)], list(fsep="/"))))
+	}
+}
+
+
 get_usable_cores <- function(GB=8) {
-    # Usable cores is one per 8 GB of RAM.
     # Get RAM from system file and divide
 
     if (Sys.info()["sysname"] == "Windows") {
         1
+
     } else if (Sys.info()["sysname"] == "Linux") {
         x <- readLines('/proc/meminfo')
 
-        memline <- x[grepl("MemTotal", x)]
+        memline <- x[grepl("MemAvailable", x)]
         mem <- stringr::str_extract(string =  memline, pattern = "\\d+")
         mem <- as.integer(mem)
         mem <- round(mem, -6)
-        min(max(floor(mem/(GB*1e6)), 1), parallel::detectCores() - 1)
+        max(floor(mem/GB*1e6), 1)
 
     } else {
         stop("Unknown operating system.")
     }
 }
-
 
 
 split_wrapper <- function(FUN) {
@@ -106,21 +120,27 @@ read_zipped_feather <- function(x) {
 }
 
 
+keep_trying <- function(func, n_tries, ..., sleep = 1, timeout = Inf) {
 
-keep_trying <- function(func, n_tries, ..., timeout = Inf) {
+    safely_func = purrr::safely(func, otherwise = NULL)
 
-    possibly_func = purrr::possibly(func, otherwise = NULL)
+    result <- NULL
+    error <- 1
+    try_number <- 1
 
-    result = NULL
-    try_number = 1
-    sleep = 1
-
-    while(is.null(result) && try_number <= n_tries) {
+    while((!is.null(error) || is.null(result)) && try_number <= n_tries) {
         if (try_number > 1) {
             print(glue("{deparse(substitute(func))} Attempt: {try_number}"))
         }
+
         try_number = try_number + 1
-        result = R.utils::withTimeout(possibly_func(...), timeout=timeout, onTimeout="error")
+        x <- R.utils::withTimeout(safely_func(...), timeout=timeout, onTimeout="error")
+
+        result <- x$result
+        error <- x$error
+        if (!is.null(error)) {
+            print(error)
+        }
 
         Sys.sleep(sleep)
         sleep = sleep + 1
@@ -154,6 +174,10 @@ convert_to_utc <- function(df) {
     df
 }
 
+
+convert_to_local_tz <- function(df) {
+    df %>% mutate(across(where(is.POSIXct), ~force_tz(., conf$timezone)))
+}
 
 
 week <- function(d) {
@@ -210,15 +234,14 @@ addtoRDS <- function(df, fn, delta_var, rsd, csd) {
         if (class(csd) == "character") csd <- as_date(csd)
 
         # Extract aggregation period from the data fields
-        periods <- intersect(c("Quarter", "Month", "Date", "Hour"), names(df0))
+        periods <- intersect(c("Quarter", "Month", "Date", "Hour", "Timeperiod"), names(df0))
+        per_ <- as.name(periods)
 
-        if (periods == "Quarter") {
-            # For quarterly data, always replace the whole thing with the new data.
-            df0 = df0[0, ]
+        if ("Quarter" %in% periods) {
+            x <- df
         } else {
-            per_ <- as.name(periods)
-
-            # Remove everything after calcs_start_date (csd) in original df
+            # Remove everything after calcs_start_date (csd)
+            # and before report_start_date (rsd) in original df
             df0 <- df0 %>% filter(!!per_ >= rsd, !!per_ < csd)
 
             # Make sure new data starts on csd
@@ -226,39 +249,39 @@ addtoRDS <- function(df, fn, delta_var, rsd, csd) {
             # and we've run calcs going back to the start of the week, which is in
             # the previous month, e.g., 3/31/2020 is a Tuesday.
             df <- df %>% filter(!!per_ >= csd)
+
+            # Extract aggregation groupings from the data fields
+            # to calculate period-to-period deltas
+
+            groupings <- intersect(c("Zone_Group", "Corridor", "SignalID"), names(df0))
+            groups_ <- sapply(groupings, as.name)
+
+            group_arrange <- c(periods, groupings) %>%
+                sapply(as.name)
+
+            var_ <- as.name(delta_var)
+
+            # Combine old and new
+            x <- bind_rows_keep_factors(list(df0, df)) %>%
+
+                # Recalculate deltas from prior periods over combined df
+                group_by(!!!groups_) %>%
+                arrange(!!!group_arrange) %>%
+                mutate(lag_ = lag(!!var_),
+                       delta = ((!!var_) - lag_)/lag_) %>%
+                ungroup() %>%
+                dplyr::select(-lag_)
         }
-
-        # Extract aggregation groupings from the data fields
-        # to calculate period-to-period deltas
-        groupings <- intersect(c("Zone_Group", "Corridor", "SignalID"), names(df0))
-        groups_ <- sapply(groupings, as.name)
-
-        group_arrange <- c(periods, groupings) %>%
-            sapply(as.name)
-
-        var_ <- as.name(delta_var)
-
-        # Combine old and new
-        x <- bind_rows_keep_factors(list(df0, df)) %>%
-
-            # Recalculate deltas from prior periods over combined df
-            group_by(!!!groups_) %>%
-            arrange(!!!group_arrange) %>%
-            mutate(lag_ = lag(!!var_),
-                   delta = ((!!var_) - lag_)/lag_) %>%
-            ungroup() %>%
-            dplyr::select(-lag_)
-
         x
     }
 
     if (tools::file_ext(fn)=="rds") {
         read_func <- readRDS
         write_func <- saveRDS
-	} else if (tools::file_ext(fn)=="parquet") {
+    } else if (tools::file_ext(fn)=="parquet") {
         read_func <- read_parquet
-	    write_func <- write_parquet
-	}
+        write_func <- write_parquet
+    }
 
     if (!file.exists(fn)) {
         if (!file.exists(dirname(fn))) {
@@ -269,7 +292,7 @@ addtoRDS <- function(df, fn, delta_var, rsd, csd) {
         df0 <- read_func(fn)
         if (is.list(df) && is.list(df0) &&
             !is.data.frame(df) && !is.data.frame(df0) &&
-            (names(df) == names(df0))) {
+            identical(names(df), names(df0))) {
             x <- purrr::map2(df0, df, combine_dfs, delta_var, rsd, csd)
         } else {
             x <- combine_dfs(df0, df, delta_var, rsd, csd)
@@ -298,6 +321,8 @@ write_fst_ <- function(df, fn, append = FALSE) {
 }
 
 
+
+
 get_unique_timestamps <- function(df) {
     df %>%
         dplyr::select(Timestamp) %>%
@@ -306,6 +331,9 @@ get_unique_timestamps <- function(df) {
         mutate(SignalID = 0) %>%
         dplyr::select(SignalID, Timestamp)
 }
+
+
+
 
 
 multicore_decorator <- function(FUN) {
@@ -324,9 +352,7 @@ multicore_decorator <- function(FUN) {
 get_Tuesdays <- function(df) {
     dates_ <- seq(min(df$Date) - days(6), max(df$Date) + days(6), by = "days")
     tuesdays <- dates_[wday(dates_) == 3]
-
-    tuesdays <- pmax(min(df$Date), tuesdays) # unsure of this. need to test
-    #tuesdays <- tuesdays[between(tuesdays, min(df$Date), max(df$Date))]
+    tuesdays <- pmax(min(df$Date), tuesdays)
 
     data.frame(Week = week(tuesdays), Date = tuesdays)
 }
@@ -368,10 +394,9 @@ walk_nested_list <- function(df, src, name=deparse(substitute(df)), indent=0) {
                 }
             }
 
-    	    aws.s3::s3write_using(dfp, qsave, bucket = conf$bucket, object = glue("{src}/{name}.qs"))
-    	    #readr::write_csv(dfp, paste0(name, ".csv"))
+            s3write_using(dfp, qsave, bucket = conf$bucket, object = glue("{src}/{name}.qs"))
+        }
 
-    	}
         for (n in names(df)) {
             if (!is.null(names(df[[n]]))) {
                 walk_nested_list(df[[n]], src, name = paste(name, n, sep="-"), indent = indent+10)
@@ -438,74 +463,94 @@ get_corridor_summary_data <- function(cor) {
 }
 
 
+# TODO: This function has a problem in that it can't handle missing data
 write_signal_details <- function(plot_date, conf, signals_list = NULL) {
-    print(plot_date)
-    #--- This takes approx one minute per day -----------------------
-    rc <- s3_read_parquet(
-        bucket = conf$bucket,
-        object = glue("mark/counts_1hr/date={plot_date}/counts_1hr_{plot_date}.parquet")) %>%
-        convert_to_utc() %>%
-        select(
-            SignalID, Date, Timeperiod, Detector, CallPhase, vol)
 
-    fc <- s3_read_parquet(
-        bucket = conf$bucket,
-        object = glue("mark/filtered_counts_1hr/date={plot_date}/filtered_counts_1hr_{plot_date}.parquet")) %>%
-        convert_to_utc() %>%
-        select(
-            SignalID, Date, Timeperiod, Detector, CallPhase, Good_Day)
+    print(glue("Writing signal details for {plot_date}"))
 
-    ac <- s3_read_parquet(
-        bucket = conf$bucket,
-        object = glue("mark/adjusted_counts_1hr/date={plot_date}/adjusted_counts_1hr_{plot_date}.parquet")) %>%
-        convert_to_utc() %>%
-        select(
-            SignalID, Date, Timeperiod, Detector, CallPhase, vol)
+    tryCatch({
+        #--- This takes approx one minute per day -----------------------
+        rc <- s3_read_parquet(
+            bucket = conf$bucket,
+            object = glue("{conf$key_prefix}/mark/counts_1hr/date={plot_date}/counts_1hr_{plot_date}.parquet"))
+        if (nrow(rc) > 0) {
+            rc <- rc %>%
+            convert_to_utc() %>%
+            select(
+                SignalID, Date, Timeperiod, Detector, CallPhase, vol)
+        } else {
+            return(NULL)
+        }
 
-    if (!is.null(signals_list)) {
-        rc <- rc %>%
-            filter(as.character(SignalID) %in% signals_list)
-        fc <- fc %>%
-            filter(as.character(SignalID) %in% signals_list)
-        ac <- ac %>%
-            filter(as.character(SignalID) %in% signals_list)
-    }
+        fc <- s3_read_parquet(
+            bucket = conf$bucket,
+            object = glue("{conf$key_prefix}/mark/filtered_counts_1hr/date={plot_date}/filtered_counts_1hr_{plot_date}.parquet"))
+        if (nrow(fc) > 0) {
+            fc <- fc %>%
+            convert_to_utc() %>%
+            select(
+                SignalID, Date, Timeperiod, Detector, CallPhase, Good_Day)
+        } else {
+            return(NULL)
+        }
 
-    df <- list(
-        rename(rc, vol_rc = vol),
-        fc,
-        rename(ac, vol_ac = vol)) %>%
-        reduce(full_join, by = c("SignalID", "Date", "Timeperiod", "Detector", "CallPhase")
-        ) %>%
-        mutate(bad_day = if_else(Good_Day==0, TRUE, FALSE)) %>%
-        transmute(
-            SignalID = as.integer(SignalID),
-            Timeperiod = Timeperiod,
-            Detector = as.integer(Detector),
-            CallPhase = as.integer(CallPhase),
-            vol_rc = as.integer(vol_rc),
-            vol_ac = ifelse(bad_day, as.integer(vol_ac), NA),
-            bad_day) %>%
-        arrange(
-            SignalID,
-            Detector,
-            Timeperiod)
-    #----------------------------------------------------------------
+        ac <- s3_read_parquet(
+            bucket = conf$bucket,
+            object = glue("{conf$key_prefix}/mark/adjusted_counts_1hr/date={plot_date}/adjusted_counts_1hr_{plot_date}.parquet"))
+        if (nrow(ac) > 0) {
+            ac <- ac %>%
+            convert_to_utc() %>%
+            select(
+                SignalID, Date, Timeperiod, Detector, CallPhase, vol)
+        } else {
+            return(NULL)
+        }
 
-    df <- df %>% mutate(
-        Hour = hour(Timeperiod)) %>%
-        select(-Timeperiod) %>%
-        relocate(Hour) %>%
-        nest(data = -c(SignalID))
+        if (!is.null(signals_list)) {
+            rc <- rc %>%
+                filter(as.character(SignalID) %in% signals_list)
+            fc <- fc %>%
+                filter(as.character(SignalID) %in% signals_list)
+            ac <- ac %>%
+                filter(as.character(SignalID) %in% signals_list)
+        }
 
-    s3write_using(
-        df,
-        write_parquet,
-        bucket = conf$bucket,
-        object = glue("mark/signal_details/date={plot_date}/sg_{plot_date}.parquet"),
-        opts = list(multipart=TRUE))
+        df <- list(
+            rename(rc, vol_rc = vol),
+            fc,
+            rename(ac, vol_ac = vol)) %>%
+            reduce(full_join, by = c("SignalID", "Date", "Timeperiod", "Detector", "CallPhase")
+            ) %>%
+            mutate(bad_day = if_else(Good_Day==0, TRUE, FALSE)) %>%
+            transmute(
+                SignalID = SignalID,
+                Timeperiod = Timeperiod,
+                Detector = as.integer(Detector),
+                CallPhase = as.integer(CallPhase),
+                vol_rc = as.integer(vol_rc),
+                vol_ac = ifelse(bad_day, as.integer(vol_ac), NA),
+                bad_day) %>%
+            arrange(
+                SignalID,
+                Detector,
+                Timeperiod)
+        #----------------------------------------------------------------
 
-    add_partition(conf, "signal_details", plot_date)
+        df <- df %>% mutate(
+            Hour = hour(Timeperiod)) %>%
+            select(-Timeperiod) %>%
+            relocate(Hour) %>%
+            nest(data = -c(SignalID))
+
+        s3write_using(
+            df,
+            write_parquet,
+            bucket = conf$bucket,
+            object = glue("{conf$key_prefix}/mark/signal_details/date={plot_date}/sg_{plot_date}.parquet"))
+
+    }, error = function(e) {
+        print(glue("Can't write signal details for {plot_date}"))
+    })
 }
 
 
@@ -574,55 +619,6 @@ show_largest_objects <- function(n=20) {
         ) %>% as.data.frame()
     names(df) <- c('Size')
     df %>% arrange(desc(Size)) %>% head(n)
-}
-
-
-
-sigify <- function(df, cor_df, corridors, identifier = "SignalID") {
-    if (identifier == "SignalID") {
-        df_ <- df %>%
-            left_join(distinct(corridors, SignalID, Corridor, Name), by = c("SignalID")) %>%
-            rename(Zone_Group = Corridor, Corridor = SignalID) %>%
-            ungroup() %>%
-            mutate(Corridor = factor(Corridor))
-    } else if (identifier == "CameraID") {
-        corridors <- rename(corridors, Name = Location)
-        df_ <- df %>%
-            select(
-                -matches("Subcorridor"),
-                -matches("Zone_Group")
-            ) %>%
-            left_join(distinct(corridors, CameraID, Corridor, Name), by = c("Corridor", "CameraID")) %>%
-            rename(
-                Zone_Group = Corridor,
-                Corridor = CameraID
-            ) %>%
-            ungroup() %>%
-            mutate(Corridor = factor(Corridor))
-    } else {
-        stop("bad identifier. Must be SignalID (default) or CameraID")
-    }
-
-    cor_df_ <- cor_df %>%
-        filter(Corridor %in% unique(df_$Zone_Group)) %>%
-        mutate(Zone_Group = Corridor) %>%
-        select(-matches("Subcorridor"))
-
-    br <- bind_rows(df_, cor_df_) %>%
-        mutate(Corridor = factor(Corridor))
-
-    if ("Zone_Group" %in% names(br)) {
-        br <- br %>%
-            mutate(Zone_Group = factor(Zone_Group))
-    }
-
-    if ("Month" %in% names(br)) {
-        br %>% arrange(Zone_Group, Corridor, Month)
-    } else if ("Hour" %in% names(br)) {
-        br %>% arrange(Zone_Group, Corridor, Hour)
-    } else if ("Date" %in% names(br)) {
-        br %>% arrange(Zone_Group, Corridor, Date)
-    }
 }
 
 

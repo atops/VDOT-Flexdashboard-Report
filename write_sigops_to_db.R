@@ -1,22 +1,15 @@
 
-library(aws.s3)
 library(qs)
 
 
 load_bulk_data <- function(conn, table_name, df_) {
 
-    if (class(conn) == "MySQLConnection" | class(conn)[[1]] == "MariaDBConnection") { # Aurora
-        filename <- tempfile(pattern = table_name, fileext = ".csv")
-        filename <- gsub("\\\\", "/", filename)
-        data.table::fwrite(df_, filename)
-        dbExecute(conn, glue("LOAD DATA LOCAL INFILE '{filename}' INTO TABLE {table_name} FIELDS TERMINATED BY ',' IGNORE 1 LINES"))
-    } else if (class(conn) == "duckdb_connection") {
-        filename <- tempfile(pattern = table_name, fileext = ".parquet")
-        arrow::write_parquet(df_, filename)
-        dbExecute(conn, glue("INSERT INTO {table_name} SELECT * FROM parquet_scan('{filename}');"))
-    }
+    dbcols <- dbListFields(conn, table_name)
+    dfcols <- names(df_)
+    cols_ <- intersect(dbcols, dfcols)  # Columns common to both df and db tables
+    df_ <- df_[cols_]  # Put columns in the right order
 
-    file.remove(filename)
+    mydbAppendTable(conn, table_name, df_)
 }
 
 
@@ -33,16 +26,8 @@ write_dataframe_to_db <- function(conn, df, table_name, recreate, calcs_start_da
     }
 
     tryCatch({
-        if (recreate) {
-            print(glue("{Sys.time()} Writing {table_name} | 3 | recreate = {recreate}"))
-            # Overwrite to create initial data types
-            DBI::dbWriteTable(
-                conn,
-                table_name,
-                head(df, 3),
-                overwrite = TRUE,
-                row.names = FALSE)
-            dbExecute(conn, glue("TRUNCATE TABLE {table_name}"))
+        if (recreate | (!table_name %in% dbListTables(conn))) {
+            recreate_table(conn, df, table_name)
         } else {
             if (table_name %in% dbListTables(conn)) {
                 # Clear head of table prior to report start date
@@ -179,28 +164,27 @@ set_index_aurora <- function(aurora, table_name) {
         return(0)
     }
 
+    indexes <- dbGetQuery(aurora, glue("SHOW INDEXES FROM {table_name}"))
+
     # Indexes on Zone Group and Period
-    index_exists <- dbGetQuery(aurora, glue(paste(
-        "SELECT * FROM INFORMATION_SCHEMA.STATISTICS",
-        "WHERE table_schema=DATABASE()",
-        "AND table_name='{table_name}'",
-        "AND index_name='idx_{table_name}_zone_period';")))
-    if (nrow(index_exists) == 0) {
+    if (!glue("idx_{table_name}_zone_period") %in% indexes$Key_name) {
         dbExecute(aurora, glue(paste(
             "CREATE INDEX idx_{table_name}_zone_period",
-            "on {table_name} (Zone_Group, {period})")))
+            "ON {table_name} (Zone_Group, {period})")))
     }
 
     # Indexes on Corridor and Period
-    index_exists <- dbGetQuery(aurora, glue(paste(
-        "SELECT * FROM INFORMATION_SCHEMA.STATISTICS",
-        "WHERE table_schema=DATABASE()",
-        "AND table_name='{table_name}'",
-        "AND index_name='idx_{table_name}_corridor_period';")))
-    if (nrow(index_exists) == 0) {
+    if (!glue("idx_{table_name}_corridor_period") %in% indexes$Key_name) {
         dbExecute(aurora, glue(paste(
             "CREATE INDEX idx_{table_name}_corridor_period",
-            "on {table_name} (Corridor, {period})")))
+            "ON {table_name} (Corridor, {period})")))
+    }
+
+    # Unique Index on Period, Zone Group and Corridor
+    if (!glue("idx_{table_name}_unique") %in% indexes$Key_name) {
+        dbExecute(aurora, glue(paste(
+            "CREATE UNIQUE INDEX idx_{table_name}_unique",
+            "ON {table_name} ({period}, Zone_Group, Corridor)")))
     }
 }
 
@@ -212,44 +196,6 @@ convert_to_key_value_df <- function(key, df) {
         data = rjson::toJSON(df),
         stringsAsFactors = FALSE)
 
-}
-
-
-
-recreate_table <- function (conn, df, table_name) {
-    write_dataframe_to_db(conn, df, table_name, recreate=TRUE, calcs_start_date=NULL, report_start_date=NULL, report_end_date=NULL)
-    create_statement <- dbGetQuery(conn, glue("show create table {table_name};"))[["Create Table"]]
-
-    # Modify CREATE TABLE Statements
-    # To change text to VARCHAR with fixed size because this is required for indexing these fields
-    # This is needed for Aurora
-    for (swap in list(
-        c("bigint[^ ,]+", "INT"),
-        c("varchar[^ ,]+", "VARCHAR(128)"),
-        c("`Zone_Group` [^ ,]+", "`Zone_Group` VARCHAR(128)"),
-        c("`Corridor` [^ ,]+", "`Corridor` VARCHAR(128)"),
-        c("`Quarter` [^ ,]+", "`Quarter` VARCHAR(8)"),
-        c("`Date` [^ ,]+", "`Date` DATE"),
-        c("`Month` [^ ,]+", "`Month` DATE"),
-        c("`Hour` [^ ,]+", "`Hour` DATETIME"),
-        c("`Timeperiod` [^ ,]+", "`Timeperiod` DATETIME"),
-        c( "delta` [^ ,]+", "delta` DOUBLE"),
-        c("`ones` [^ ,]+", "`ones` DOUBLE"),
-        c("`data` [^ ,]+", "`data` mediumtext"),
-        c("`Description` [^ ,]+", "`Description` VARCHAR(128)"),
-        c( "Score` [^ ,]+", "Score` DOUBLE")
-    )
-    ) {
-        create_statement <- stringr::str_replace_all(create_statement, swap[1], swap[2])
-    }
-
-    # Delete and recreate with proper data types
-    try(dbRemoveTable(conn, table_name))
-
-    try(dbExecute(conn, create_statement))
-
-    # Create Indexes
-    try(set_index_aurora(conn, table_name))
 }
 
 
@@ -300,6 +246,54 @@ recreate_database <- function(conn, df, dfname) {
 }
 
 
+
+
+recreate_table <- function(conn, df, table_name) {
+
+    print(glue("{Sys.time()} Writing {table_name} | 3 | recreate = TRUE"))
+
+    # Overwrite to create initial data types
+    DBI::dbWriteTable(
+        conn,
+        table_name,
+        head(df, 3),
+        overwrite = TRUE,
+        row.names = FALSE)
+    dbExecute(conn, glue("TRUNCATE TABLE {table_name}"))
+
+    create_statement <- dbGetQuery(conn, glue("show create table {table_name};"))$`Create Table`
+
+    # Modify CREATE TABLE Statements
+    # To change text to VARCHAR with fixed size because this is required for indexing these fields
+    # This is needed for Aurora
+    for (swap in list(
+        c("bigint[^ ,]+", "INT"),
+        c("varchar[^ ,]+", "VARCHAR(128)"),
+        c("`SignalID` [^ ,]+", "`SignalID` VARCHAR(12)"),
+        c("`Zone_Group` [^ ,]+", "`Zone_Group` VARCHAR(128)"),
+        c("`Corridor` [^ ,]+", "`Corridor` VARCHAR(128)"),
+        c("`Quarter` [^ ,]+", "`Quarter` VARCHAR(8)"),
+        c("`Date` [^ ,]+", "`Date` DATE"),
+        c("`Month` [^ ,]+", "`Month` DATE"),
+        c("`Hour` [^ ,]+", "`Hour` DATETIME"),
+        c("`Timeperiod` [^ ,]+", "`Timeperiod` DATETIME"),
+        c( "delta` [^ ,]+", "delta` DOUBLE"),
+        c("`ones` [^ ,]+", "`ones` DOUBLE"),
+        c("`data` [^ ,]+", "`data` mediumtext"),
+        c("`Description` [^ ,]+", "`Description` VARCHAR(128)"),
+        c( "Score` [^ ,]+", "Score` DOUBLE")
+    )
+    ) {
+        create_statement <- stringr::str_replace_all(create_statement, swap[1], swap[2])
+    }
+
+    # Delete and recreate with proper data types
+    try(dbRemoveTable(conn, table_name))
+    try(dbExecute(conn, create_statement))
+
+    # Create Indexes
+    try(set_index_aurora(conn, table_name))
+}
 
 
 
@@ -353,7 +347,7 @@ append_to_database <- function(
 
     # This is a more complex data structure. Convert to a JSON string that can be unwound on query.
     if ("udc_trend_table" %in% names(df$mo)) {
-        if (names(df$mo$udc_trend_table) != c("key", "data")) {
+        if (length(intersect(names(df$mo$udc_trend_table), c("key", "data"))) < 2) {
             df$mo$udc_trend_table <- convert_to_key_value_df("udc", df$mo$udc_trend_table)
         }
     }

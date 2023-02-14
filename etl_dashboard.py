@@ -12,32 +12,31 @@ import sqlalchemy as sq
 import time
 import os
 import itertools
-import boto3
 import yaml
-import io
 import re
 import psutil
 
+import gcsio
 from spm_events import etl_main
-from parquet_lib import read_parquet_hive
-from s3io import *
 from config import get_date_from_string
+from pull_atspm_data import get_atspm_engine, get_aurora_engine
 
 '''
     df:
-        SignalID [int64]
+        SignalID [str]
         TimeStamp [datetime]
         EventCode [str or int64]
         EventParam [str or int64]
 
     det_config:
-        SignalID [int64]
+        SignalID [str]
         IP [str]
         PrimaryName [str]
         SecondaryName [str]
         Detector [int64]
         Call Phase [int64]
 '''
+
 
 def etl2(s, date_, det_config, conf):
 
@@ -46,7 +45,7 @@ def etl2(s, date_, det_config, conf):
     det_config = det_config[det_config.SignalID==s]
 
     start_date = date_
-    end_date = date_ + pd.DateOffset(days=1) - pd.DateOffset(seconds=0.1)
+    end_date = date_ + pd.DateOffset(days=1)
 
     t0 = time.time()
 
@@ -66,12 +65,8 @@ def etl2(s, date_, det_config, conf):
             c, d = etl_main(df, det_config)
 
             if len(c) > 0 and len(d) > 0:
-
-                c.to_parquet(f's3://{bucket}/cycles/date={date_str}/cd_{s}_{date_str}.parquet',
-                             allow_truncated_timestamps=True)
-
-                d.to_parquet(f's3://{bucket}/detections/date={date_str}/de_{s}_{date_str}.parquet',
-                             allow_truncated_timestamps=True)
+                gcsio.s3_write_parquet(c, bucket, f'{key_prefix}/cycles/date={date_str}/cd_{s}_{date_str}.parquet')
+                gcsio.s3_write_parquet(d, bucket, f'{key_prefix}/detections/date={date_str}/de_{s}_{date_str}.parquet')
 
             else:
                 print(f'{date_str} | {s} | No cycles')
@@ -95,15 +90,15 @@ def main(start_date, end_date, conf):
 
     dates = pd.date_range(start_date, end_date, freq='1D')
 
-    bucket = conf['bucket']
-   
-    corridors_filename = re.sub('\..*', '.parquet', conf['corridors_filename_s3'])
-    corridors = pd.read_parquet(f's3://{bucket}/{corridors_filename}')
-    corridors = corridors[~corridors.SignalID.isna()]
+    with open('Monthly_Report_AWS.yaml') as yaml_file:
+        cred = yaml.load(yaml_file, Loader=yaml.Loader)
 
-    signalids = list(corridors.SignalID.astype('int').values)
-  
-    bucket = conf['bucket']
+    engine = get_aurora_engine(cred)
+    with engine.connect() as conn:
+        corridors = pd.read_sql_table('Corridors', conn)
+
+    signalids = list(corridors.SignalID.values)
+
     athena_database = conf['athena']['database']
     staging_dir = conf['athena']['staging_dir']
     x = re.split('/+', staging_dir) # split path elements into a list
@@ -123,11 +118,10 @@ def main(start_date, end_date, conf):
         date_str = date_.strftime('%Y-%m-%d')
         print(date_str)
 
-        det_config = (get_det_config(date_, conf)
-                     .rename(columns={'CallPhase': 'Call Phase'})
-                     .groupby(['SignalID','Call Phase'])
-                     .apply(lambda group: group.assign(CountDetector = group.CountPriority == group.CountPriority.min()))
-                     .reset_index())
+        det_config = gcsio.get_det_config(date_, conf)
+        det_config = det_config.rename(columns={'CallPhase': 'Call Phase'})
+        dcg = det_config.groupby(['SignalID', 'Call Phase'])['CountPriority']
+        det_config = det_config.assign(CountDetector = det_config.CountPriority == dcg.transform(min))
 
         if len(det_config) > 0:
             nthreads = round(psutil.virtual_memory().total/1e9)  # ensure 1 MB memory per thread
@@ -200,11 +194,8 @@ if __name__=='__main__':
         start_date = conf['start_date']
         end_date = conf['end_date']
 
-    start_date = conf['start_date']
-    end_date = conf['end_date']
-    
     start_date = get_date_from_string(start_date)
     end_date = get_date_from_string(end_date)
-    
+
     main(start_date, end_date, conf)
 

@@ -1,16 +1,16 @@
 
 # Monthly_Report_Package_init.R
 
-library(yaml)
-library(glue)
-library(future)
+source("renv/activate.R")
 
-
-print(glue("{Sys.time()} Starting Package Script"))
 
 source("write_sigops_to_db.R")
 source("Monthly_Report_Functions.R")
 source("Classes.R")
+
+
+print(glue("{Sys.time()} Starting Package Script"))
+
 
 if (interactive()) {
     plan(multisession)
@@ -22,19 +22,11 @@ usable_cores <- get_usable_cores()
 doParallel::registerDoParallel(cores = usable_cores)
 
 
-qs_filename <- sub("\\..*", ".qs", conf$corridors_filename_s3)
-corridors <- s3read_using(
-    qs::qread,
-    object = qs_filename,
-    bucket = conf$bucket
-)
+aurora <- get_aurora_connection()
 
-qs_all_filename <- sub("\\..*", ".qs", paste0("all_", conf$corridors_filename_s3))
-all_corridors <- s3read_using(
-    qs::qread,
-    object = qs_all_filename,
-    bucket = conf$bucket
-)
+corridors <- dbReadTable(aurora, "Corridors")
+all_corridors <- dbReadTable(aurora, "AllCorridors")
+
 
 
 signals_list <- unique(corridors$SignalID)
@@ -47,13 +39,6 @@ subcorridors <- corridors %>%
         Zone = Corridor, 
         Corridor = Subcorridor) 
 
-
-conn <- get_athena_connection(conf)
-
-# cam_config <- get_cam_config(
-#     object = conf$cctv_config_filename, 
-#     bucket = conf$bucket,
-#     corridors = all_corridors)
 
 
 usable_cores <- get_usable_cores()
@@ -69,6 +54,12 @@ doParallel::registerDoParallel(cores = usable_cores)
 # report_end_date <- floor_date(today() - days(6), unit = "months")
 report_end_date <- Sys.Date() - days(1)
 report_start_date <- floor_date(report_end_date - months(12), unit = "months")
+
+if (conf$report_end_date == "yesterday") {
+    report_end_date <- Sys.Date() - days(1)
+} else {
+    report_end_date <- conf$report_end_date
+}
 
 calcs_end_date <- Sys.Date() - days(1)
 if (conf$calcs_start_date == "auto") {

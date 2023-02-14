@@ -127,7 +127,7 @@ def pull_raw_atspm_data(s, date_, engine, conf):
 
         t0 = time.time()
         date_str = date_.strftime('%Y-%m-%d')
-        print(f'{s} | {date_str} Starting...')
+        print('{} | {} Starting...'.format(s, date_str))
 
         try:
             with engine.connect() as conn:
@@ -142,7 +142,6 @@ def pull_raw_atspm_data(s, date_, engine, conf):
                 print(f'|{s} no event data for this signal on {date_str}.')
 
             else:
-                bucket = conf['bucket']
 
                 df = add_barriers(df)
                 df.SignalID = df.SignalID.astype('int')
@@ -152,9 +151,9 @@ def pull_raw_atspm_data(s, date_, engine, conf):
 
                 print(f'writing to files...{len(df)} records')
                 
-                df.to_parquet(f's3://{bucket}/atspm/date={date_str}/atspm_{s}_{date_str}.parquet')
-                
-                print(f'{s}: {round(time.time()-t0, 1)} seconds')
+                key = f"{conf['key_prefix']}/atspm/date={date_str}/atspm_{s}_{date_str}.parquet"
+                gcsio.s3_write_parquet(df, Bucket=conf['bucket'], Key=key)
+                print('{}: {} seconds'.format(s, round(time.time()-t0, 1)))
 
         except Exception as e:
             print(s, e)
@@ -211,12 +210,14 @@ if __name__ == '__main__':
             if start_date == 'yesterday':
                 start_date = datetime.today().date() - timedelta(days=1)
                 while True:
-                    keys = get_keys(s3, bucket, prefix="atspm/date={}".format(start_date.strftime('%Y-%m-%d')))
-                    try:
-                        next(keys)
-                        start_date = start_date + timedelta(days=1)
+                    keys = gcsio.s3_list_objects(
+                        Bucket=conf['bucket'],
+                        Prefix="{conf['key_prefix']}atspm/date={start_date.strftime('%Y-%m-%d')}",
+                        max_results=1)
+                    if len(keys) > 0:
+                        start_date = (start_date + timedelta(days=1))
                         break
-                    except StopIteration:
+                    else:
                         start_date = start_date - timedelta(days=1)
                 start_date = min(start_date, datetime.today().date() - timedelta(days=1))
             end_date = conf['end_date']

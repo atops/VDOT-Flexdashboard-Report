@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 import time
 
 
+
 def get_incld(conn, query, date_):
     t0 = time.time()
 
@@ -27,6 +28,8 @@ def get_incld(conn, query, date_):
 
     print('{} sec'.format(time.time() - t0))
     return df
+
+
 
 def get_included_detectors(engine, date_string):
 
@@ -48,7 +51,6 @@ def get_included_detectors(engine, date_string):
 
         dfs = [get_incld(conn, query, date_) for date_ in dates]
         df = pd.concat(dfs)[['SignalID','Detector']].drop_duplicates()
-        df.SignalID = df.SignalID.astype('int')
 
         df = df.sort_values(['SignalID','Detector'])\
                .set_index(['SignalID','Detector'])

@@ -57,19 +57,19 @@ def get_aog(signalid, date_, det_config, conf, per='H'):
                       .count()[['Arrivals']])
             df_aog['All_Arrivals'] = df_aog.groupby(level=[0, 1, 2]).transform('sum')
             df_aog['AOG'] = df_aog['Arrivals']/df_aog['All_Arrivals']
-    
+
             aog = (df_aog.reset_index('Interval')
                    .query('Interval == 1')
                    .drop(columns=['Interval'])
                    .rename(columns={'Arrivals': 'Green_Arrivals'}))
-    
+
             df_gc = (df[['SignalID', 'Phase', 'PhaseStart', 'EventCode']]
                      .drop_duplicates()
                      .rename(columns={'PhaseStart': 'IntervalStart',
                                       'EventCode': 'Interval'})
                      .assign(IntervalDuration=0)
                      .set_index(['SignalID', 'Phase', 'IntervalStart']))
-    
+
             x = pd.DataFrame(
                     data={'Interval': None, 'IntervalDuration': 0},
                     index=pd.MultiIndex.from_product(
@@ -77,30 +77,30 @@ def get_aog(signalid, date_, det_config, conf, per='H'):
                              df_gc.index.levels[1],
                              all_hours],
                             names=['SignalID', 'Phase', 'IntervalStart']))
-    
+
             df_gc = (pd.concat([df_gc, x])
                      .sort_index()
                      .ffill() # fill forward missing Intervals for on the hour rows
                      .reset_index(level=['IntervalStart']))
-            df_gc['IntervalEnd'] = df_gc.groupby(level=['SignalID','Phase']).shift(-1)['IntervalStart']
+            df_gc['IntervalEnd'] = df_gc.groupby(level=['SignalID', 'Phase']).shift(-1)['IntervalStart']
             df_gc['IntervalDuration'] = (df_gc.IntervalEnd - df_gc.IntervalStart).dt.total_seconds()
             df_gc['Hour'] = df_gc.IntervalStart.dt.floor(per)
-            df_gc = df_gc.groupby(['Hour', 'SignalID', 'Phase', 'Interval']).sum()
-    
-            df_gc['Duration'] = df_gc.groupby(level=[0, 1, 2]).transform('sum')
+            df_gc = df_gc.groupby(['Hour', 'SignalID', 'Phase', 'Interval']).sum(numeric_only=True)
+
+            df_gc['Duration'] = df_gc.groupby(level=['Hour', 'SignalID', 'Phase']).transform('sum')
             df_gc['gC'] = df_gc['IntervalDuration']/df_gc['Duration']
             gC = (df_gc.reset_index('Interval')
                   .query('Interval == 1')
                   .drop(columns=['Interval'])
                   .rename(columns={'IntervalDuration': 'Green_Duration'}))
-    
+
             aog = pd.concat([aog, gC], axis=1).assign(pr=lambda x: x.AOG/x.gC)
             aog = aog[~aog.Green_Arrivals.isna()]
-            
+
             print('.', end='')
-    
+
             return aog
-    
+
     except Exception as e:
         print('{s}|{d}: Error--{e}'.format(e=e, s=signalid, d=date_str))
         return pd.DataFrame()
@@ -108,29 +108,26 @@ def get_aog(signalid, date_, det_config, conf, per='H'):
 
 def main(start_date, end_date, conf):
 
-    #-----------------------------------------------------------------------------------------
-    # Placeholder for manual override of start/end dates
-    # start_date = '2021-05-04'
-    # end_date = '2021-05-04'
-    #-----------------------------------------------------------------------------------------
-
     dates = pd.date_range(start_date, end_date, freq='1D')
 
     for date_ in dates:
         try:
             t0 = time.time()
+
             date_str = date_.strftime('%Y-%m-%d')
             print(date_str)
-    
-            det_config = get_det_config(date_, conf)
-            signalids = get_signalids(date_, conf)
+
+            signalids = gcsio.get_signalids(date_, conf)
+            det_config = gcsio.get_det_config(date_, conf)
+
 
 
             print('1 hour')
-            with get_context('spawn').Pool(24) as pool:
+            nthreads = round(psutil.virtual_memory().total/1e9)  # ensure 1 MB memory per thread
+            with get_context('spawn').Pool(processes=nthreads) as pool:
                 results = pool.starmap_async(
                     get_aog,
-                    list(itertools.product(signalids, [date_], [det_config], [conf])))
+                    list(itertools.product(signalids, [date_], [det_config], [conf], ['H'])))
                 pool.close()
                 pool.join()
 
@@ -148,26 +145,55 @@ def main(start_date, end_date, conf):
                           CallPhase=lambda x: x.CallPhase.astype('str'),
                           vol=lambda x: x.vol.astype('int32')))
 
-            write_parquet(
+            bucket = conf['bucket']
+            key_prefix = conf['key_prefix']
+
+            gcsio.s3_write_parquet(
                 df,
-                Bucket=conf['bucket'], 
-                Key=f'mark/arrivals_on_green/date={date_str}/aog_{date_str}.parquet')
-
-            partition_query = '''ALTER TABLE arrivals_on_green add partition (date="{d}")
-                                 location "s3://{b}/mark/arrivals_on_green/date={d}/"
-                              '''.format(b=conf['bucket'], d=date_.date())
-
-            response = athena.start_query_execution(
-                    QueryString = partition_query,
-                    QueryExecutionContext={'Database': conf['athena']['staging_dir']},
-                    ResultConfiguration={'OutputLocation': conf['athena']['staging_dir']})
-            print('')
-            print('Update Athena partitions:')
-            pp.pprint(response)
+                Bucket=bucket,
+                Key=f'{key_prefix}/mark/arrivals_on_green/date={date_str}/aog_{date_str}.parquet')
 
             num_signals = len(list(set(df.SignalID.values)))
             t1 = round(time.time() - t0, 1)
             print(f'\n{num_signals} signals done in {t1} seconds.')
+
+
+
+            print('\n15 minutes')
+            nthreads = round(psutil.virtual_memory().total/1e9)  # ensure 1 MB memory per thread
+            with get_context('spawn').Pool(processes=nthreads) as pool:
+                results = pool.starmap_async(
+                    get_aog,
+                    list(itertools.product(signalids, [date_], [det_config], [conf], ['15min'])))
+                pool.close()
+                pool.join()
+
+            dfs = results.get()
+
+            df = (pd.concat(dfs)
+                  .reset_index()[['SignalID', 'Phase', 'Hour', 'AOG', 'pr', 'All_Arrivals']]
+                  .rename(columns={'Phase': 'CallPhase',
+                                   'Hour': 'Date_Period',
+                                   'AOG': 'aog',
+                                   'All_Arrivals': 'vol'})
+                  .sort_values(['SignalID', 'Date_Period', 'CallPhase'])
+                  .fillna(value={'vol': 0})
+                  .assign(SignalID=lambda x: x.SignalID.astype('str'),
+                          CallPhase=lambda x: x.CallPhase.astype('str'),
+                          vol=lambda x: x.vol.astype('int32')))
+
+            bucket = conf['bucket']
+            key_prefix = conf['key_prefix']
+
+            gcsio.s3_write_parquet(
+                df,
+                Bucket=bucket,
+                Key=f'{key_prefix}/mark/arrivals_on_green_15min/date={date_str}/aog_{date_str}.parquet')
+
+            num_signals = len(list(set(df.SignalID.values)))
+            t1 = round(time.time() - t0, 1)
+            print(f'\n{num_signals} signals done in {t1} seconds.')
+
 
         except Exception as e:
             print(f'{date_}: Error: {e}')
@@ -175,7 +201,7 @@ def main(start_date, end_date, conf):
 
 
 if __name__=='__main__':
-    
+
     with open('Monthly_Report.yaml') as yaml_file:
         conf = yaml.load(yaml_file, Loader=yaml.Loader)
 
@@ -186,11 +212,10 @@ if __name__=='__main__':
     else:
         start_date = conf['start_date']
         end_date = conf['end_date']
-    
-    if start_date == 'yesterday': 
-        start_date = (datetime.today() - timedelta(days=1)).strftime('%Y-%m-%d')
-    if end_date == 'yesterday': 
-        end_date = (datetime.today() - timedelta(days=1)).strftime('%Y-%m-%d')
+
+    start_date = get_date_from_string(start_date)
+    end_date = get_date_from_string(end_date)
+
 
     main(start_date, end_date, conf)
 

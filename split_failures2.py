@@ -105,7 +105,7 @@ def get_split_failures(start_date, end_date, signals_string):
 
     return sf
 
-def helper(date_):
+def helper(date_, conf):
     start_date = date_
     end_date = start_date #+ pd.DateOffset(days=1) - pd.DateOffset(seconds=0.1)
 
@@ -113,8 +113,7 @@ def helper(date_):
 
     # Moved into function since we're doing so many days. Reduce memory footprint
     if len(sf) > 0:
-        sf = sf[sf.Hour != pd.to_datetime('2018-03-11 02:00:00')]
-        sf.Hour = sf.Hour.dt.tz_localize('US/Eastern', ambiguous=True)
+        sf.Hour = sf.Hour.dt.tz_localize(conf['timezone'], ambiguous=True)
         sf = sf.reset_index(drop=True)
         sf.to_feather('sf_{}.feather'.format(date_.strftime('%Y-%m-%d')))
 
@@ -143,7 +142,7 @@ if __name__=='__main__':
 
     results = []
     for d in dates:
-        x = delayed(helper)(d)
+        x = delayed(helper)(d, conf)
         results.append(x)
     compute(*results)
 
