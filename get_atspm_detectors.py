@@ -6,8 +6,6 @@ Created on Wed Nov 27 10:49:03 2019
 """
 
 import pandas as pd
-import os
-import pyodbc
 import sqlalchemy as sq
 from datetime import datetime, timedelta
 

@@ -5,24 +5,21 @@ Created on Sat Feb 15 15:15:31 2020
 @author: Alan.Toppen
 """
 
+import os
+import psutil
 import yaml
 import time
 import sys
 from datetime import datetime, timedelta
-import boto3
 import pandas as pd
 import io
 import re
 from multiprocessing import get_context
 import itertools
-import pprint
-import urllib3
+from config import get_date_from_string
 
-from s3io import *
-
-
-pp = pprint.PrettyPrinter()
-
+import gcsio
+from pull_atspm_data import get_aurora_engine
 
 
 def get_aog(signalid, date_, det_config, conf, per='H'):
@@ -31,21 +28,26 @@ def get_aog(signalid, date_, det_config, conf, per='H'):
     '''
     try:
         bucket = conf['bucket']
-    
+        key_prefix = conf['key_prefix']
+
         date_str = date_.strftime('%Y-%m-%d')
-        all_hours = pd.date_range(date_, periods=25, freq='H')
-    
-        detection_events = read_parquet(
-            Bucket=bucket, 
-            Key=f'detections/date={date_str}/de_{signalid}_{date_str}.parquet')
-    
+        all_hours = pd.date_range(date_, date_ + pd.Timedelta(1, unit='days'), freq=per, inclusive='left')
+
+        de_fn = f'../detections/Date={date_str}/SignalID={signalid}/de_{signalid}_{date_str}.parquet'
+        if os.path.exists(de_fn):
+            detection_events = pd.read_parquet(de_fn).drop_duplicates()
+        else:
+            detection_events = gcsio.s3_read_parquet(
+                Bucket=bucket,
+                Key=f'{key_prefix}/detections/date={date_str}/de_{signalid}_{date_str}.parquet')
+
         df = (pd.merge(
                 detection_events,
                 det_config[det_config.DetectionTypeDesc.str.contains('Advanced Count')],
                 on=['SignalID', 'Detector'],
                 how='left'))
         df = df[~df.DetectionTypeDesc.isna()]
-    
+
         if df.empty:
             print('#', end='')
             return pd.DataFrame()
