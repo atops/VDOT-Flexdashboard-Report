@@ -60,14 +60,14 @@ s3_write_parquet <- function(df, bucket, object) {
 
 
 s3_upload_parquet <- function(df, date_, fn, bucket, table_name, conf) {
-    
+
     df <- ungroup(df)
-    
+
     if ("Date" %in% names(df)) {
         df <- df %>% select(-Date)
     }
 
-    
+
     if ("Detector" %in% names(df)) {
         df <- mutate(df, Detector = as.character(Detector))
     }
@@ -77,7 +77,7 @@ s3_upload_parquet <- function(df, date_, fn, bucket, table_name, conf) {
     if ("SignalID" %in% names(df)) {
         df <- mutate(df, SignalID = as.character(SignalID))
     }
-    
+
     keep_trying(
         gcs_upload,
         n_tries = 5,
@@ -91,7 +91,7 @@ s3_upload_parquet <- function(df, date_, fn, bucket, table_name, conf) {
 
 
 s3_upload_parquet_date_split <- function(df, prefix, bucket, table_name, conf, parallel = TRUE) {
-    
+
     if (!("Date" %in% names(df))) {
         if ("Timeperiod" %in% names(df)) {
             df <- mutate(df, Date = date(Timeperiod))
@@ -99,7 +99,7 @@ s3_upload_parquet_date_split <- function(df, prefix, bucket, table_name, conf, p
             df <- mutate(df, Date = date(Hour))
         }
     }
-    
+
     d <- unique(df$Date)
     if (length(d) == 1) { # just one date. upload.
         date_ <- d
@@ -138,7 +138,7 @@ s3_upload_parquet_date_split <- function(df, prefix, bucket, table_name, conf, p
 
 
 s3_read_parquet <- function(bucket, object, date_ = NULL) {
-    
+
     if (is.null(date_)) {
         date_ <- str_extract(object, "\\d{4}-\\d{2}-\\d{2}")
     }
@@ -164,9 +164,9 @@ s3_read_parquet_parallel <- function(table_name,
                                      conf,
                                      callback = function(x) {x},
                                      parallel = FALSE) {
-    
+
     dates <- seq(ymd(start_date), ymd(end_date), by = "1 day")
-    
+
     func <- function(date_) {
         prefix <- join_path(conf$key_prefix, glue("mark/{table_name}/date={date_}"))
         objects = s3_list_objects(bucket = bucket, prefix = prefix)$Key
@@ -191,12 +191,12 @@ s3_read_parquet_parallel <- function(table_name,
 
 aurora_write_parquet <- function(conn, df, date_, table_name) {
     fieldnames <- dbListFields(conn, table_name)
-    
+
     # clear existing data for the given table and date
     response <- dbSendQuery(
         conn,
         glue("delete from {table_name} where Date = {date_}"))
-    
+
     # Write data to Aurora database for the given day.
     # Append to table.
     dbWriteTable(
