@@ -1,6 +1,7 @@
 
 import pandas as pd
 import io
+import posixpath
 import re
 from google.cloud import storage
 
@@ -97,8 +98,8 @@ def get_corridors(bucket, key, keep_signalids_as_strings = True):
 def get_signalids(date_, conf):
     date_str = date_.strftime('%Y-%m-%d')
     bucket = conf['bucket']
-    key_prefix = conf['key_prefix']
-    prefix = f'{key_prefix}/detections/date={date_str}'
+    key_prefix = conf['key_prefix'] or ''
+    prefix = posixpath.join(key_prefix, f'detections/date={date_str}')
     keys = s3_list_objects(Bucket=bucket, Prefix=prefix)
     return [re.search('(?<=de_)\d+(?=_)', k).group() for k in keys]
 
@@ -117,14 +118,14 @@ def get_det_config(date_, conf):
     date_str = date_.strftime('%Y-%m-%d')
 
     bucket = conf['bucket']
-    key_prefix = conf['key_prefix']
+    key_prefix = conf['key_prefix'] or ''
 
-    dc_prefix = f'{key_prefix}/config/atspm_det_config_good/date={date_str}'
+    dc_prefix = posixpath.join(key_prefix, f'config/atspm_det_config_good/date={date_str}')
     dc_keys = s3_list_objects(bucket, dc_prefix)
 
     dc = pd.concat(list(map(lambda k: read_det_config(bucket, k), dc_keys)))
 
-    bd_key = f'{key_prefix}/mark/bad_detectors/date={date_str}/bad_detectors_{date_str}.parquet'
+    bd_key = posixpath.join(key_prefix, f'mark/bad_detectors/date={date_str}/bad_detectors_{date_str}.parquet')
     if len(s3_list_objects(Bucket=bucket, Prefix=bd_key)) > 0:
         bd = s3_read_parquet(Bucket=bucket, Key=bd_key)
         bd.Detector = bd.Detector.astype('int64')

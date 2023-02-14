@@ -83,7 +83,7 @@ s3_upload_parquet <- function(df, date_, fn, bucket, table_name, conf) {
         n_tries = 5,
         df,
         bucket = bucket,
-        name = glue("{conf$key_prefix}/mark/{table_name}/date={date_}/{fn}.parquet"),
+        name = join_path(conf$key_prefix, glue("mark/{table_name}/date={date_}/{fn}.parquet")),
         object_function = function(input, output) write_parquet(x = input, sink = output),
         predefinedAcl = "bucketLevel")
 }
@@ -168,7 +168,7 @@ s3_read_parquet_parallel <- function(table_name,
     dates <- seq(ymd(start_date), ymd(end_date), by = "1 day")
     
     func <- function(date_) {
-        prefix <- glue("{conf$key_prefix}/mark/{table_name}/date={date_}")
+        prefix <- join_path(conf$key_prefix, glue("mark/{table_name}/date={date_}"))
         objects = s3_list_objects(bucket = bucket, prefix = prefix)$Key
         lapply(objects, function(obj) {
             s3_read_parquet(bucket = bucket, object = obj, date_) %>%

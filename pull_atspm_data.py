@@ -13,14 +13,12 @@ from multiprocessing.dummy import Pool
 import pandas as pd
 import sqlalchemy as sq
 import sys
+import posixpath
 import time
 import re
 import itertools
 import yaml
 import urllib.parse
-
-# import urllib3
-# urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 import s3io
 
@@ -28,13 +26,13 @@ import s3io
 
 '''
     df:
-        SignalID [int64]
+        SignalID [str]
         TimeStamp [datetime]
         EventCode [str or int64]
         EventParam [str or int64]
 
     det_config:
-        SignalID [int64]
+        SignalID [str]
         IP [str]
         PrimaryName [str]
         SecondaryName [str]
@@ -128,7 +126,9 @@ def pull_raw_atspm_data(s, date_, engine, conf):
 
         t0 = time.time()
         date_str = date_.strftime('%Y-%m-%d')
-        print('{} | {} Starting...'.format(s, date_str))
+        print(f'{s} | {date_str} Starting...')
+
+        key_prefix = conf['key_prefix'] or ''
 
         try:
             with engine.connect() as conn:
@@ -143,18 +143,14 @@ def pull_raw_atspm_data(s, date_, engine, conf):
                 print('|{} no event data for this signal on {}.'.format(s, date_str))
 
             else:
-
                 df = add_barriers(df)
-                df = (df.assign(
-                            SignalID = lambda x: x.SignalID.astype('int'),
-                            EventCode = lambda x: x.EventCode.astype('int'),
-                            EventParam = lambda x: x.EventParam.astype('int'))
-                        .sort_values(
-                    ['SignalID', 'Timestamp', 'EventCode', 'EventParam']))
+                df.EventCode = df.EventCode.astype('int')
+                df.EventParam = df.EventParam.astype('int')
+                df = df.sort_values(['SignalID', 'Timestamp', 'EventCode', 'EventParam'])
 
                 print('writing to files...{} records'.format(len(df)))
                 
-                key = f"{conf['key_prefix']}/atspm/date={date_str}/atspm_{s}_{date_str}.parquet"
+                key = posixpath.join(key_prefix, f'atspm/date={date_str}/atspm_{s}_{date_str}.parquet')
                 s3io.s3_write_parquet(df, Bucket=conf['bucket'], Key=key)
                 print('{}: {} seconds'.format(s, round(time.time()-t0, 1)))
 
@@ -167,6 +163,9 @@ def pull_raw_atspm_data(s, date_, engine, conf):
 
 if __name__ == '__main__':
     try:
+        with open('Monthly_Report.yaml') as yaml_file:
+            conf = yaml.load(yaml_file, Loader=yaml.FullLoader)
+
         with open('Monthly_Report_AWS.yaml') as yaml_file:
             cred = yaml.load(yaml_file, Loader=yaml.Loader)
 
@@ -175,9 +174,8 @@ if __name__ == '__main__':
         with engine.connect() as conn:
             Signals = pd.read_sql_table('Signals', conn)
 
-        with open('Monthly_Report.yaml') as yaml_file:
-            conf = yaml.load(yaml_file, Loader=yaml.FullLoader)
-
+        bucket = conf['bucket']
+        key_prefix = conf['key_prefix'] or ''
 
         if len(sys.argv) == 3:
             start_date = sys.argv[1]
@@ -193,8 +191,8 @@ if __name__ == '__main__':
                 start_date = datetime.today().date() - timedelta(days=1)
                 while True:
                     keys = s3io.s3_list_objects(
-                        Bucket=conf['bucket'],
-                        Prefix="{conf['key_prefix']}atspm/date={start_date.strftime('%Y-%m-%d')}",
+                        Bucket=bucket,
+                        Prefix=posixpath.join(key_prefix, f"atspm/date={start_date.strftime('%Y-%m-%d')}",
                         max_results=1)
                     if len(keys) > 0:
                         start_date = (start_date + timedelta(days=1))

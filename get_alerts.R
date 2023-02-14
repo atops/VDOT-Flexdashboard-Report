@@ -40,7 +40,7 @@ read_zipped_feather <- function(x) {
 
 get_alerts <- function(conf) {
 
-    objs <- s3_list_objects(bucket = conf$bucket, prefix = glue("{conf$key_prefix}/mark/watchdog"))
+    objs <- s3_list_objects(bucket = conf$bucket, prefix = join_path(conf$key_prefix, mark, watchdog))
     lapply(objs, function(obj) {
         key <- obj$Key
         print(key)
@@ -110,13 +110,13 @@ tryCatch({
         alerts,
         write_parquet,
         bucket = conf$bucket,
-        object = glue("{conf$key_prefix}/mark/watchdog/alerts.parquet"),
+        object = join_path(conf$key_prefix, mark, watchdog, alerts.parquet),
         opts = list(multipart = TRUE))
 
     write(
         glue(paste0(
             "{format(now(), '%F %H:%M:%S')}|SUCCESS|get_alerts.R|get_alerts|Line 173|",
-            "Uploaded {conf$bucket}/{conf$key_prefix}/mark/watchdog/alerts.parquet")),
+            "Uploaded {join_path(conf$bucket, conf$key_prefix, mark, watchdog, alerts.parquet)}")),
         file.path(base_path, glue("logs/get_alerts_{today()}.log")),
         append = TRUE
     )

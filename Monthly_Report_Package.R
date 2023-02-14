@@ -350,7 +350,7 @@ tryCatch(
         # Zone_Group | Zone | Corridor | SignalID/CameraID | CallPhase | DetectorID | Date | Alert | Name
         s3_write_parquet(
             bad_det,
-            object = file.path(conf$key_prefix, "mark/watchdog/bad_detectors.parquet", fsep = "/"),
+            object = join_path(conf$key_prefix, "mark/watchdog/bad_detectors.parquet"),
             bucket = conf$bucket
         )
         rm(bad_det)
@@ -385,7 +385,7 @@ tryCatch(
                 )
             s3_write_parquet(
                 bad_ped,
-                object = file.path(conf$key_prefix, "mark/watchdog/bad_ped_pushbuttons.parquet", fsep = "/"),
+                object = join_path(conf$key_prefix, "mark/watchdog/bad_ped_pushbuttons.parquet"),
                 bucket = conf$bucket)
         }
         rm(bad_ped)
@@ -427,7 +427,7 @@ tryCatch(
 
             s3_write_parquet(
                 bad_comm,
-                object = file.path(conf$key_prefix, "mark/watchdog/bad_comm.parquet", fsep = "/"),
+                object = join_path(conf$key_prefix, "mark/watchdog/bad_comm.parquet"),
                 bucket = conf$bucket)
 
         }

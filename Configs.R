@@ -49,9 +49,9 @@ ped_config_arrow_schema <- schema(
 get_corridors <- function(corr_fn, filter_signals = TRUE) {
 
     # Keep this up to date to reflect the Corridors_Latest.xlsx file
+    cols <- list(SignalID = "text",
                  Zone_Group = "text",
                  Zone = "text",
-    cols <- list(SignalID = "text",  # "numeric",
                  Corridor = "text",
                  Subcorridor = "text",
                  Agency = "text",
@@ -140,8 +140,8 @@ get_det_config_  <- function(bucket, folder, type = "det") {
     }
 }
 
-get_det_config <- get_det_config_(conf$bucket, file.path(conf$key_prefix, "config/atspm_det_config_good"), type = "det")
-get_ped_config <- get_det_config_(conf$bucket, file.path(conf$key_prefix, "config/atspm_ped_config"), type = "ped")
+get_det_config <- get_det_config_(conf$bucket, join_path(conf$key_prefix, config, atspm_det_config_good), type = "det")
+get_ped_config <- get_det_config_(conf$bucket, join_path(conf$key_prefix, config, atspm_ped_config), type = "ped")
 
 
 
@@ -185,7 +185,7 @@ get_det_config_qs <- function(date_) {
     # Bad detectors
     bd <- s3_read_parquet(
         bucket = conf$bucket,
-        object = glue("{conf$key_prefix}/mark/bad_detectors/date={date_}/bad_detectors_{date_}.parquet")) %>%
+        object = join_path(conf$key_prefix, glue("mark/bad_detectors/date={date_}/bad_detectors_{date_}.parquet")) %>%
         transmute(SignalID = factor(SignalID),
                   Detector = factor(Detector),
                   Good_Day)

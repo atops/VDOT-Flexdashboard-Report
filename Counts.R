@@ -446,7 +446,7 @@ get_adjusted_counts <- function(df) {
 prep_db_for_adjusted_counts_arrow <- function(table, conf, date_range) {
 
     fc_ds <- arrow::open_dataset(
-        sources = glue("gs://{conf$bucket}/{conf$key_prefix}/mark/{table}/"),
+        sources = join_path("s3:/", conf$bucket, conf$key_prefix, mark, table),
         schema = schema(
             SignalID = string(),
             Timeperiod = timestamp(unit = "ms", timezone = "GMT"),

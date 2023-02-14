@@ -40,7 +40,7 @@ month_abbrs <- get_month_abbrs(start_date, end_date)
 
 # -- Code to update corridors file/table from Excel file
 
-xlsx_filename <- file.path(conf$key_prefix, conf$corridors_filename_s3)
+xlsx_filename <- join_path(conf$key_prefix, conf$corridors_filename_s3)
 x <- get_bucket(bucket = conf$bucket, prefix = xlsx_filename)
 xlsx_last_modified <- if (!is.null(x)) {
     x$Contents$LastModified

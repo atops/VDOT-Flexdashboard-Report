@@ -49,6 +49,12 @@ split_path <- function(...) {
 }
 
 
+join_path <- function(...) {
+    z = paste(..., sep = "/")
+    stringr::str_replace(z, "/+", "/")
+}
+
+
 get_usable_cores <- function(GB=8) {
     # Get RAM from system file and divide
 
@@ -472,7 +478,7 @@ write_signal_details <- function(plot_date, conf, signals_list = NULL) {
         #--- This takes approx one minute per day -----------------------
         rc <- s3_read_parquet(
             bucket = conf$bucket,
-            object = glue("{conf$key_prefix}/mark/counts_1hr/date={plot_date}/counts_1hr_{plot_date}.parquet"))
+            object = join_path(conf$key_prefix, glue("mark/counts_1hr/date={plot_date}/counts_1hr_{plot_date}.parquet")))
         if (nrow(rc) > 0) {
             rc <- rc %>%
             convert_to_utc() %>%
@@ -484,7 +490,7 @@ write_signal_details <- function(plot_date, conf, signals_list = NULL) {
 
         fc <- s3_read_parquet(
             bucket = conf$bucket,
-            object = glue("{conf$key_prefix}/mark/filtered_counts_1hr/date={plot_date}/filtered_counts_1hr_{plot_date}.parquet"))
+            object = join_path(conf$key_prefix, glue("mark/filtered_counts_1hr/date={plot_date}/filtered_counts_1hr_{plot_date}.parquet"))
         if (nrow(fc) > 0) {
             fc <- fc %>%
             convert_to_utc() %>%
@@ -496,7 +502,7 @@ write_signal_details <- function(plot_date, conf, signals_list = NULL) {
 
         ac <- s3_read_parquet(
             bucket = conf$bucket,
-            object = glue("{conf$key_prefix}/mark/adjusted_counts_1hr/date={plot_date}/adjusted_counts_1hr_{plot_date}.parquet"))
+            object = join_path(conf$key_prefix, glue("mark/adjusted_counts_1hr/date={plot_date}/adjusted_counts_1hr_{plot_date}.parquet"))
         if (nrow(ac) > 0) {
             ac <- ac %>%
             convert_to_utc() %>%
@@ -546,7 +552,7 @@ write_signal_details <- function(plot_date, conf, signals_list = NULL) {
             df,
             write_parquet,
             bucket = conf$bucket,
-            object = glue("{conf$key_prefix}/mark/signal_details/date={plot_date}/sg_{plot_date}.parquet"))
+            object = join_path(conf$key_prefix, glue("mark/signal_details/date={plot_date}/sg_{plot_date}.parquet"))
 
     }, error = function(e) {
         print(glue("Can't write signal details for {plot_date}"))

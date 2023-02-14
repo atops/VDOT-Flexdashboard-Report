@@ -128,9 +128,9 @@ get_detection_events_arrow <- function(date_, conf, signals_list = NULL, callbac
     if (dir.exists(detections_path)) {
         print('read detections locally')
         arrow_path <- detections_path
-    } else if (!is.null(s3_list_objects(bucket = conf$bucket, prefix = file.path(conf$key_prefix, detections_path)))) {
+    } else if (!is.null(s3_list_objects(bucket = conf$bucket, prefix = join_path(conf$key_prefix, detections_path)))) {
         print('read detections from s3')
-        arrow_path <- file.path("gs:/", conf$bucket, conf$key_prefix, detections_path)
+        arrow_path <- join_path("s3:/", conf$bucket, conf$key_prefix, detections_path)
     } else {
         print(glue("No detections data for {date_}"))
         return(data.frame())
@@ -170,9 +170,9 @@ get_cycle_data_arrow <- function(date_, conf, signals_list = NULL, callback = fu
     if (dir.exists(cycles_path)) {
         print('read cycles locally')
         arrow_path <- cycles_path
-    } else if (!is.null(s3_list_objects(bucket = conf$bucket, prefix = file.path(conf$key_prefix, cycles_path)))) {
+    } else if (!is.null(s3_list_objects(bucket = conf$bucket, prefix = join_path(conf$key_prefix, cycles_path)))) {
         print('read cycles from s3')
-        arrow_path <- file.path("gs:/", conf$bucket, conf$key_prefix, cycles_path)
+        arrow_path <- join_path("s3:/", conf$bucket, conf$key_prefix, cycles_path)
     } else {
         print(glue("No cycles data for {date_}"))
         return(data.frame())
@@ -898,9 +898,9 @@ get_termination_type <- function(date_, conf, signals_list = NULL) {
     if (dir.exists(cycles_path)) {
         print('read cycles locally')
         arrow_path <- cycles_path
-    } else if (!is.null(s3_list_objects(bucket = conf$bucket, prefix = file.path(conf$key_prefix, cycles_path)))) {
+    } else if (!is.null(s3_list_objects(bucket = conf$bucket, prefix = join_path(conf$key_prefix, cycles_path)))) {
         print('read cycles from s3')
-        arrow_path <- file.path("gs:/", conf$bucket, conf$key_prefix, cycles_path)
+        arrow_path <- join_path("s3:/", conf$bucket, conf$key_prefix, cycles_path)
     } else {
         print(glue("No cycles data for {date_}"))
         return(data.frame())

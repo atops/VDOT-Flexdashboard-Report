@@ -10,7 +10,7 @@ from multiprocessing import get_context, Pool
 import pandas as pd
 import sqlalchemy as sq
 import time
-import os
+import posixpath
 import itertools
 import yaml
 import re
@@ -51,7 +51,7 @@ def etl2(s, date_, det_config, conf):
 
     try:
         bucket = conf['bucket']
-        key_prefix = conf['key_prefix']
+        key_prefix = conf['key_prefix'] or ''
 
         if len(df)==0:
             print(f'{date_str} | {s} | No event data for this signal')
@@ -64,8 +64,8 @@ def etl2(s, date_, det_config, conf):
             c, d = etl_main(df, det_config)
 
             if len(c) > 0 and len(d) > 0:
-                s3io.s3_write_parquet(c, bucket, f'{key_prefix}/cycles/date={date_str}/cd_{s}_{date_str}.parquet')
-                s3io.s3_write_parquet(d, bucket, f'{key_prefix}/detections/date={date_str}/de_{s}_{date_str}.parquet')
+                s3io.s3_write_parquet(c, bucket, posixpath.join(key_prefix, f'cycles/date={date_str}/cd_{s}_{date_str}.parquet'))
+                s3io.s3_write_parquet(d, bucket, posixpath.join(key_prefix, f'detections/date={date_str}/de_{s}_{date_str}.parquet')
 
             else:
                 print(f'{date_str} | {s} | No cycles')
@@ -168,10 +168,10 @@ def main(start_date, end_date, conf):
     while True:
         response1 = s3.list_objects(
             Bucket=athena_bucket,
-            Prefix=os.path.join(athena_prefix, response_repair_cycledata['QueryExecutionId']))
+            Prefix=posixpath.join(athena_prefix, response_repair_cycledata['QueryExecutionId']))
         response2 = s3.list_objects(
             Bucket=athena_bucket,
-            Prefix=os.path.join(athena_prefix, response_repair_detection_events['QueryExecutionId']))
+            Prefix=posixpath.join(athena_prefix, response_repair_detection_events['QueryExecutionId']))
 
         if 'Contents' in response1 and 'Contents' in response2:
             print('done.')

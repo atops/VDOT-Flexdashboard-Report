@@ -64,7 +64,7 @@ s3_upload_parquet <- function(df, date_, fn, bucket, table_name, conf) {
         df,
         use_deprecated_int96_timestamps = TRUE,
         bucket = bucket,
-        object = glue("{conf$key_prefix}/mark/{table_name}/date={date_}/{fn}.parquet"),
+        object = join_path(conf$key_prefix, glue("mark/{table_name}/date={date_}/{fn}.parquet")),
         opts = list(multipart = TRUE)
     )
     

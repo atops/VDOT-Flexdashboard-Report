@@ -10,6 +10,7 @@ Created on Thu Jul 26 14:36:14 2018
 import pandas as pd
 import numpy as np
 import sqlalchemy as sq
+import posixpath
 import yaml
 from datetime import datetime
 
@@ -28,14 +29,16 @@ logger = mark1_logger(os.path.join(logs_path, f'get_watchdog_alerts_{datetime.to
 
 
 # Upload watchdog alerts to predetermined location in S3
-def s3_upload_watchdog_alerts(df, bucket, region):
+def s3_upload_watchdog_alerts(df, conf)
 
-    key_prefix = ''
+    bucket = conf['bucket']
+    region = conf['region']
+    key_prefix = conf['key_prefix'] or ''
 
     s3io.s3_write_parquet(
         df, 
         Bucket=bucket, 
-        Key=f'{key_prefix}/mark/watchdog/SPMWatchDogErrorEvents_{region}.parquet')
+        Key=posixpath.join(key_prefix, f'mark/watchdog/SPMWatchDogErrorEvents_{region}.parquet'))
 
 
 def get_watchdog_alerts(engine, corridors):
@@ -113,7 +116,7 @@ def main():
 
         try:
             # Write to Feather file - WatchDog
-            s3_upload_watchdog_alerts(wd, conf['bucket'], conf['region'])
+            s3_upload_watchdog_alerts(wd, conf)
             print(f'{now} - successfully uploaded to s3')
         except Exception as e:
             print(f'{now} - ERROR: Could not upload to s3 - {str(e)}')

@@ -2,6 +2,7 @@
 import pandas as pd
 import io
 import os
+import posixpath
 import re
 import boto3
 import yaml
@@ -113,8 +114,8 @@ def get_keys(s3, bucket, prefix, callback=lambda x: x):
 def get_signalids(date_, conf):
     date_str = date_.strftime('%Y-%m-%d')
     bucket = conf['bucket']
-    key_prefix = conf['key_prefix']
-    prefix = f'detections/date={date_str}'
+    key_prefix = conf['key_prefix'] or ''
+    prefix = posixpath.join(key_prefix, f'detections/date={date_str}')
     keys = get_keys(s3, bucket, prefix, callback = lambda k: re.search('(?<=_)\d+(?=_)', k).group())
     return keys
 
