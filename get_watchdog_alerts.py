@@ -13,7 +13,7 @@ import sqlalchemy as sq
 import yaml
 from datetime import datetime
 
-import gcsio
+import s3io
 from pull_atspm_data import get_atspm_engine
 from mark1_logger import mark1_logger
 
@@ -32,7 +32,7 @@ def s3_upload_watchdog_alerts(df, bucket, region):
 
     key_prefix = ''
 
-    gcsio.s3_write_parquet(
+    s3io.s3_write_parquet(
         df, 
         Bucket=bucket, 
         Key=f'{key_prefix}/mark/watchdog/SPMWatchDogErrorEvents_{region}.parquet')
@@ -104,7 +104,7 @@ def main():
         logger.success('Watchdog alerts successfully uploaded to s3')
         engine = get_atspm_engine(cred)
 
-        corridors = gcsio.get_corridors(
+        corridors = s3io.get_corridors(
                 conf['bucket'],
                 conf['corridors_filename_s3'].replace('.xlsx', '.parquet'))
 

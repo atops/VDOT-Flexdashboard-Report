@@ -22,7 +22,7 @@ import urllib.parse
 # import urllib3
 # urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-import gcsio
+import s3io
 
 
 
@@ -155,7 +155,7 @@ def pull_raw_atspm_data(s, date_, engine, conf):
                 print('writing to files...{} records'.format(len(df)))
                 
                 key = f"{conf['key_prefix']}/atspm/date={date_str}/atspm_{s}_{date_str}.parquet"
-                gcsio.s3_write_parquet(df, Bucket=conf['bucket'], Key=key)
+                s3io.s3_write_parquet(df, Bucket=conf['bucket'], Key=key)
                 print('{}: {} seconds'.format(s, round(time.time()-t0, 1)))
 
         except Exception as e:
@@ -192,7 +192,7 @@ if __name__ == '__main__':
             if start_date == 'yesterday':
                 start_date = datetime.today().date() - timedelta(days=1)
                 while True:
-                    keys = gcsio.s3_list_objects(
+                    keys = s3io.s3_list_objects(
                         Bucket=conf['bucket'],
                         Prefix="{conf['key_prefix']}atspm/date={start_date.strftime('%Y-%m-%d')}",
                         max_results=1)

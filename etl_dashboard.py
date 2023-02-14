@@ -16,7 +16,7 @@ import yaml
 import re
 import psutil
 
-import gcsio
+import s3io
 from spm_events import etl_main
 from config import get_date_from_string
 from pull_atspm_data import get_atspm_engine, get_aurora_engine
@@ -64,8 +64,8 @@ def etl2(s, date_, det_config, conf):
             c, d = etl_main(df, det_config)
 
             if len(c) > 0 and len(d) > 0:
-                gcsio.s3_write_parquet(c, bucket, f'{key_prefix}/cycles/date={date_str}/cd_{s}_{date_str}.parquet')
-                gcsio.s3_write_parquet(d, bucket, f'{key_prefix}/detections/date={date_str}/de_{s}_{date_str}.parquet')
+                s3io.s3_write_parquet(c, bucket, f'{key_prefix}/cycles/date={date_str}/cd_{s}_{date_str}.parquet')
+                s3io.s3_write_parquet(d, bucket, f'{key_prefix}/detections/date={date_str}/de_{s}_{date_str}.parquet')
 
             else:
                 print(f'{date_str} | {s} | No cycles')
@@ -117,7 +117,7 @@ def main(start_date, end_date, conf):
         date_str = date_.strftime('%Y-%m-%d')
         print(date_str)
 
-        det_config = gcsio.get_det_config(date_, conf)
+        det_config = s3io.get_det_config(date_, conf)
         det_config = det_config.rename(columns={'CallPhase': 'Call Phase'})
         dcg = det_config.groupby(['SignalID', 'Call Phase'])['CountPriority']
         det_config = det_config.assign(CountDetector = det_config.CountPriority == dcg.transform(min))

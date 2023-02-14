@@ -3,9 +3,11 @@
 
 agency: VDOT
 bucket: vdot-spm2
+key_prefix: 
 profile: KH_VDOT
 aws_region: us-east-2
 region: 
+timezone: America/New_York
 athena:
     staging_dir: s3://vdot-spm2/athena
     database: vdot_spm

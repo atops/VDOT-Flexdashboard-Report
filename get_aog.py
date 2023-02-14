@@ -18,7 +18,7 @@ from multiprocessing import get_context
 import itertools
 from config import get_date_from_string
 
-import gcsio
+import s3io
 from pull_atspm_data import get_aurora_engine
 
 
@@ -37,7 +37,7 @@ def get_aog(signalid, date_, det_config, conf, per='H'):
         if os.path.exists(de_fn):
             detection_events = pd.read_parquet(de_fn).drop_duplicates()
         else:
-            detection_events = gcsio.s3_read_parquet(
+            detection_events = s3io.s3_read_parquet(
                 Bucket=bucket,
                 Key=f'{key_prefix}/detections/date={date_str}/de_{signalid}_{date_str}.parquet')
 
@@ -119,8 +119,8 @@ def main(start_date, end_date, conf):
             date_str = date_.strftime('%Y-%m-%d')
             print(date_str)
 
-            signalids = gcsio.get_signalids(date_, conf)
-            det_config = gcsio.get_det_config(date_, conf)
+            signalids = s3io.get_signalids(date_, conf)
+            det_config = s3io.get_det_config(date_, conf)
 
 
 
@@ -150,7 +150,7 @@ def main(start_date, end_date, conf):
             bucket = conf['bucket']
             key_prefix = conf['key_prefix']
 
-            gcsio.s3_write_parquet(
+            s3io.s3_write_parquet(
                 df,
                 Bucket=bucket,
                 Key=f'{key_prefix}/mark/arrivals_on_green/date={date_str}/aog_{date_str}.parquet')
@@ -187,7 +187,7 @@ def main(start_date, end_date, conf):
             bucket = conf['bucket']
             key_prefix = conf['key_prefix']
 
-            gcsio.s3_write_parquet(
+            s3io.s3_write_parquet(
                 df,
                 Bucket=bucket,
                 Key=f'{key_prefix}/mark/arrivals_on_green_15min/date={date_str}/aog_{date_str}.parquet')
