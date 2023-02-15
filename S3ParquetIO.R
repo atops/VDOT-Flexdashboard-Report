@@ -35,7 +35,7 @@ s3write_using <- aws.s3::s3write_using
 
 
 s3_write_parquet <- function(df, bucket, object, ...) {
-    s3write_using(df, write_parquet, ..., bucket, object)
+    s3write_using(df, write_parquet, bucket, object, ...)
 }
 
 
@@ -59,9 +59,10 @@ s3_upload_parquet <- function(df, date_, fn, bucket, table_name, conf) {
     }
     
     keep_trying(
-        s3_write_parquet,
+        s3write_using,
         n_tries = 5,
         df,
+        write_parquet,
         use_deprecated_int96_timestamps = TRUE,
         bucket = bucket,
         object = join_path(conf$key_prefix, glue("mark/{table_name}/date={date_}/{fn}.parquet")),
