@@ -173,6 +173,7 @@ if __name__ == '__main__':
 
         with engine.connect() as conn:
             Signals = pd.read_sql_table('Signals', conn)
+        signalids = Signals.SignalID.values
 
         bucket = conf['bucket']
         key_prefix = conf['key_prefix'] or ''
@@ -192,8 +193,8 @@ if __name__ == '__main__':
                 while True:
                     keys = s3io.s3_list_objects(
                         Bucket=bucket,
-                        Prefix=posixpath.join(key_prefix, f"atspm/date={start_date.strftime('%Y-%m-%d')}",
-                        max_results=1)
+                        Prefix=posixpath.join(key_prefix, f"atspm/date={start_date.strftime('%Y-%m-%d')}"),
+                        MaxKeys=1)
                     if len(keys) > 0:
                         start_date = (start_date + timedelta(days=1))
                         break
