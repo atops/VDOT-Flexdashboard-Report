@@ -212,12 +212,10 @@ get_counts2 <- function(date_, bucket, conf, uptime = TRUE, counts = TRUE) {
                 conf = conf)
         }
         
-        conn <- get_athena_connection(conf)
-
-	# get 15min ped counts
+        # get 15min ped counts
         print("15-minute pedestrian counts")
         counts_ped_15min <- get_counts(
-            tbl(conn, atspm_query), 
+            df, # tbl(conn, atspm_query), 
             ped_config, 
             "15min", 
             date_, 
@@ -226,17 +224,14 @@ get_counts2 <- function(date_, bucket, conf, uptime = TRUE, counts = TRUE) {
         ) %>% 
             arrange(SignalID, Detector, Timeperiod)
         
-        dbDisconnect(conn)
-        
         s3_upload_parquet(counts_ped_15min, date_, 
                           fn = counts_ped_15min_fn, 
                           bucket = bucket,
                           table_name = "counts_ped_15min", 
                           conf = conf)
         rm(counts_ped_15min)
-        
-        
     }
+    dbDisconnect(conn)
 }
 
 

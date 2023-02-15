@@ -5,7 +5,6 @@ suppressMessages({
     library(RMariaDB)
     library(yaml)
     library(duckdb)
-    library(tictoc)
     library(stringr)
 })
 
@@ -106,7 +105,7 @@ add_partition <- function(conf, table_name, date_) {
     }, error = function(e) {
         print(stringr::str_extract(as.character(e), "message:.*?\\."))
     }, finally = {
-        dbDisconnect(conn_)
+        try(dbDisconnect(conn_))
     })
 }
 

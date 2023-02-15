@@ -437,7 +437,7 @@ get_counts_based_measures <- function(month_abbrs) {
                 table_name = "ped_actuations_ph",
                 conf = conf
             )
-	}
+        }
 
         #-----------------------------------------------
         # 15-min pedestrian activation counts
