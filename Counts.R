@@ -5,34 +5,33 @@ get_counts <- function(df, det_config, units = "hours", date_, event_code = 82, 
     if (lubridate::wday(date_, label = TRUE) %in% c("Tue", "Wed", "Thu") || (TWR_only == FALSE)) {
 
         df <- df %>%
-            filter(eventcode == event_code)
+            filter(EventCode == event_code)
 
         # Group by hour using Athena/Presto SQL
         if (units == "hours") {
             df <- df %>%
-                group_by(timeperiod = date_trunc('hour', timestamp),
-                         signalid,
-                         eventparam)
+                group_by(Timeperiod = date_trunc('hour', Timestamp),
+                         SignalID,
+                         EventParam)
 
             # Group by 15 minute interval using Athena/Presto SQL
         } else if (units == "15min") {
             df <- df %>%
-                mutate(timeperiod = date_trunc('minute', timestamp)) %>%
-                group_by(timeperiod = date_add('second',
-                                               as.integer(-1 * mod(to_unixtime(timeperiod), 15*60)),
-                                               timeperiod),
-                         # group_by(timeperiod = dateadd(MINUTE, floor(datediff(MINUTE, 0, timestamp)/15.0) * 15, 0),
-                         signalid,
-                         eventparam)
+                mutate(Timeperiod = date_trunc('minute', Timestamp)) %>%
+                group_by(Timeperiod = date_add('second',
+                                               as.integer(-1 * mod(to_unixtime(Timeperiod), 15*60)),
+                                               Timeperiod),
+                         SignalID,
+                         EventParam)
         }
 
         df <- df %>%
             count() %>%
             ungroup() %>%
             collect() %>%
-            transmute(Timeperiod = ymd_hms(timeperiod),
-                      SignalID = factor(signalid),
-                      Detector = factor(eventparam),
+            transmute(Timeperiod = as_datetime(Timeperiod),
+                      SignalID = factor(SignalID),
+                      Detector = factor(EventParam),
                       vol = as.integer(n)) %>%
             left_join(det_config, by = c("SignalID", "Detector")) %>%
 
@@ -46,9 +45,9 @@ get_counts <- function(df, det_config, units = "hours", date_, event_code = 82, 
 }
 
 
-get_counts2 <- function(date_, bucket, cred, uptime = TRUE, counts = TRUE) {
+get_counts2 <- function(date_, bucket, conf, uptime = TRUE, counts = TRUE) {
 
-    conn <- get_atspm_connection(cred)
+    conn <- get_athena_connection(conf)
 
     end_time <- format(date(date_) + days(1) - seconds(0.1), "%Y-%m-%d %H:%M:%S.9")
 
@@ -65,9 +64,9 @@ get_counts2 <- function(date_, bucket, cred, uptime = TRUE, counts = TRUE) {
     }
 
     atspm_query <- sql(glue(paste(
-        "SELECT DISTINCT Timestamp, SignalID, EventCode, EventParam",
-        "FROM Controller_Event_Log",
-        "WHERE Timestamp >= '{date_}' AND Timestamp < '{date_ + days(1)}'")))
+        "select distinct timestamp as Timestamp, CAST(signalid as VARCHAR) as SignalID, eventcode as EventCode, eventparam as EventParam",
+        "from {conf$athena$database}.{conf$athena$atspm_table}",
+        "where date = '{date_}'")))
 
     df <- tbl(conn, atspm_query)
 
@@ -446,7 +445,7 @@ get_adjusted_counts <- function(df) {
 prep_db_for_adjusted_counts_arrow <- function(table, conf, date_range) {
 
     fc_ds <- arrow::open_dataset(
-        sources = join_path("s3:/", conf$bucket, conf$key_prefix, mark, table),
+        sources = join_path("s3://", conf$bucket, conf$key_prefix, mark, table),
         schema = schema(
             SignalID = string(),
             Timeperiod = timestamp(unit = "ms", timezone = "GMT"),

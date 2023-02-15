@@ -18,7 +18,7 @@ echo
 
 echo --- R Scripts -------------------------
 cd /home/atoppen/Code/VDOT/scheduled_tasks
-Rscript Monthly_Report_Calcs_ec2.R
+Rscript Monthly_Report_Calcs.R
 Rscript Monthly_Report_Package.R
 
 

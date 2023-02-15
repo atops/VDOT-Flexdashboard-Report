@@ -120,7 +120,7 @@ get_det_config_  <- function(bucket, folder, type = "det") {
         tryCatch({
             dss <- lapply(date_range, function(date_) {
                 arrow::open_dataset(
-                    sources = glue("s3://{bucket}/{folder}/date={date_}"),
+                    sources = join_path("s3://", bucket, folder, glue("date={date_}")),
                     format="feather",
                     schema = arrow_schema
                 ) %>%
@@ -140,8 +140,8 @@ get_det_config_  <- function(bucket, folder, type = "det") {
     }
 }
 
-get_det_config <- get_det_config_(conf$bucket, join_path(conf$key_prefix, config, atspm_det_config_good), type = "det")
-get_ped_config <- get_det_config_(conf$bucket, join_path(conf$key_prefix, config, atspm_ped_config), type = "ped")
+get_det_config <- get_det_config_(conf$bucket, join_path(conf$key_prefix, "atspm_det_config_good"), type = "det")
+get_ped_config <- get_det_config_(conf$bucket, join_path(conf$key_prefix, "atspm_ped_config"), type = "ped")
 
 
 
@@ -185,7 +185,7 @@ get_det_config_qs <- function(date_) {
     # Bad detectors
     bd <- s3_read_parquet(
         bucket = conf$bucket,
-        object = join_path(conf$key_prefix, glue("mark/bad_detectors/date={date_}/bad_detectors_{date_}.parquet")) %>%
+        object = join_path(conf$key_prefix, glue("mark/bad_detectors/date={date_}/bad_detectors_{date_}.parquet"))) %>%
         transmute(SignalID = factor(SignalID),
                   Detector = factor(Detector),
                   Good_Day)

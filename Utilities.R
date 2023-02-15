@@ -50,8 +50,10 @@ split_path <- function(...) {
 
 
 join_path <- function(...) {
-    z = paste(..., sep = "/")
-    stringr::str_replace(z, "/+", "/")
+    paste(..., sep = "/") %>%
+        stringr::str_replace("/+", "/") %>%
+        stringr::str_remove("^/") %>%
+        stringr::str_replace(":/+", "://")
 }
 
 
@@ -68,7 +70,7 @@ get_usable_cores <- function(GB=8) {
         mem <- stringr::str_extract(string =  memline, pattern = "\\d+")
         mem <- as.integer(mem)
         mem <- round(mem, -6)
-        max(floor(mem/GB*1e6), 1)
+        max(floor(mem/(GB*1e6)), 1)
 
     } else {
         stop("Unknown operating system.")
@@ -490,7 +492,7 @@ write_signal_details <- function(plot_date, conf, signals_list = NULL) {
 
         fc <- s3_read_parquet(
             bucket = conf$bucket,
-            object = join_path(conf$key_prefix, glue("mark/filtered_counts_1hr/date={plot_date}/filtered_counts_1hr_{plot_date}.parquet"))
+            object = join_path(conf$key_prefix, glue("mark/filtered_counts_1hr/date={plot_date}/filtered_counts_1hr_{plot_date}.parquet")))
         if (nrow(fc) > 0) {
             fc <- fc %>%
             convert_to_utc() %>%
@@ -502,7 +504,7 @@ write_signal_details <- function(plot_date, conf, signals_list = NULL) {
 
         ac <- s3_read_parquet(
             bucket = conf$bucket,
-            object = join_path(conf$key_prefix, glue("mark/adjusted_counts_1hr/date={plot_date}/adjusted_counts_1hr_{plot_date}.parquet"))
+            object = join_path(conf$key_prefix, glue("mark/adjusted_counts_1hr/date={plot_date}/adjusted_counts_1hr_{plot_date}.parquet")))
         if (nrow(ac) > 0) {
             ac <- ac %>%
             convert_to_utc() %>%
@@ -552,7 +554,7 @@ write_signal_details <- function(plot_date, conf, signals_list = NULL) {
             df,
             write_parquet,
             bucket = conf$bucket,
-            object = join_path(conf$key_prefix, glue("mark/signal_details/date={plot_date}/sg_{plot_date}.parquet"))
+            object = join_path(conf$key_prefix, glue("mark/signal_details/date={plot_date}/sg_{plot_date}.parquet")))
 
     }, error = function(e) {
         print(glue("Can't write signal details for {plot_date}"))

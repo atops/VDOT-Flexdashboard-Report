@@ -16,8 +16,8 @@ if (interactive()) {
 } else {
     plan(multicore)
 }
-# usable_cores <- get_usable_cores(4)
-usable_cores <- 1
+usable_cores <- get_usable_cores(4)
+# usable_cores <- 1
 doParallel::registerDoParallel(cores = usable_cores)
 
 

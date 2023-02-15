@@ -38,16 +38,6 @@ suppressMessages({
     library(future.apply)
 })
 
-source("Utilities.R")
-source("S3ParquetIO.R")
-source("Configs.R")
-source("Counts.R")
-source("Metrics.R")
-source("Map.R")
-source("Aggregations.R")
-source("Database_Functions.R")
-
-
 #options(dplyr.summarise.inform = FALSE)
 
 select <- dplyr::select
@@ -56,12 +46,13 @@ filter <- dplyr::filter
 options(future.rng.onMisue = "ignore")
 
 conf <- read_yaml("Monthly_Report.yaml")
+credentials <- read_yaml("Monthly_Report_AWS.yaml")
 
 conf$athena$uid <- credentials$AWS_ACCESS_KEY_ID
 conf$athena$pwd <- credentials$AWS_SECRET_ACCESS_KEY
 conf$athena$region <- conf$region
 
-aws_conf <- read_yaml("Monthly_Report_AWS.yaml")
+
 
 if (Sys.info()["sysname"] == "Windows") {
     home_path <- dirname(path.expand("~"))
@@ -98,6 +89,15 @@ AM_PEAK_HOURS = conf$AM_PEAK_HOURS
 PM_PEAK_HOURS = conf$PM_PEAK_HOURS
 
 Sys.setenv(TZ = conf$timezone)
+
+source("Utilities.R")
+source("S3ParquetIO.R")
+source("Configs.R")
+source("Counts.R")
+source("Metrics.R")
+source("Map.R")
+source("Aggregations.R")
+source("Database_Functions.R")
 
 
 

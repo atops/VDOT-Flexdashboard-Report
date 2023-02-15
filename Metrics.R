@@ -2,8 +2,8 @@
 get_uptime <- function(df, start_date, end_time) {
 
     ts_sig <- df %>%
-        mutate(timestamp = date_trunc('minute', timestamp)) %>%
-        distinct(signalid, timestamp) %>%
+        mutate(Timestamp = date_trunc('minute', Timestamp)) %>%
+        distinct(SignalID, Timestamp) %>%
         collect()
 
     signals <- unique(ts_sig$SignalID)
@@ -40,28 +40,6 @@ get_uptime <- function(df, start_date, end_time) {
     uptime$all <- uptime$all %>%
         dplyr::select(-SignalID) %>% rename(uptime_all = uptime)
     uptime
-}
-
-
-
-get_spm_data_atspm <- function(start_date, end_date, signals_list, conf_atspm, table, TWR_only=TRUE) {
-
-    conn <- get_atspm_connection(conf_atspm)
-
-    if (TWR_only==TRUE) {
-        query_where <- "WHERE DATEPART(dw, CycleStart) in (3,4,5)"
-    } else {
-        query_where <- ""
-    }
-
-    query <- paste("SELECT * FROM", table, query_where)
-
-    df <- tbl(conn, sql(query))
-
-    end_date1 <- as.character(ymd(end_date) + days(1))
-
-    dplyr::filter(df, CycleStart >= start_date & CycleStart < end_date1 &
-                      SignalID %in% signals_list)
 }
 
 
@@ -130,7 +108,7 @@ get_detection_events_arrow <- function(date_, conf, signals_list = NULL, callbac
         arrow_path <- detections_path
     } else if (!is.null(s3_list_objects(bucket = conf$bucket, prefix = join_path(conf$key_prefix, detections_path)))) {
         print('read detections from s3')
-        arrow_path <- join_path("s3:/", conf$bucket, conf$key_prefix, detections_path)
+        arrow_path <- join_path("s3://", conf$bucket, conf$key_prefix, detections_path)
     } else {
         print(glue("No detections data for {date_}"))
         return(data.frame())
@@ -172,7 +150,7 @@ get_cycle_data_arrow <- function(date_, conf, signals_list = NULL, callback = fu
         arrow_path <- cycles_path
     } else if (!is.null(s3_list_objects(bucket = conf$bucket, prefix = join_path(conf$key_prefix, cycles_path)))) {
         print('read cycles from s3')
-        arrow_path <- join_path("s3:/", conf$bucket, conf$key_prefix, cycles_path)
+        arrow_path <- join_path("s3://", conf$bucket, conf$key_prefix, cycles_path)
     } else {
         print(glue("No cycles data for {date_}"))
         return(data.frame())
@@ -783,7 +761,7 @@ get_ped_delay <- function(date_, cred, signals_list) {
     plan(sequential)
     plan(multisession)
 
-    ds <- arrow::open_dataset(join_path("s3:/", conf$bucket, glue("atspm/date={date_}"))
+    ds <- arrow::open_dataset(join_path("s3://", conf$bucket, glue("atspm/date={date_}")))
 
     end_date_ <- date_ + days(1)
     pe <- ds %>%
@@ -897,7 +875,7 @@ get_termination_type <- function(date_, conf, signals_list = NULL) {
         arrow_path <- cycles_path
     } else if (!is.null(s3_list_objects(bucket = conf$bucket, prefix = join_path(conf$key_prefix, cycles_path)))) {
         print('read cycles from s3')
-        arrow_path <- join_path("s3:/", conf$bucket, conf$key_prefix, cycles_path)
+        arrow_path <- join_path("s3://", conf$bucket, conf$key_prefix, cycles_path)
     } else {
         print(glue("No cycles data for {date_}"))
         return(data.frame())
