@@ -73,18 +73,21 @@ def nightly_config(engine, date_, conf):
 
     print("ATSPM Vehicle Detectors [1 of 3]")
     ad = get_atspm_detectors(engine, date_)
-    key = posixpath.join(key_prefix, f'atspm_det_config/date={date_string}/ATSPM_Det_Config_{REGION}.parquet')
-    s3io.s3_write_parquet(ad, Bucket=BUCKET, Key=key)
+    key = posixpath.join(KEY_PREFIX, f'atspm_det_config/date={date_string}/ATSPM_Det_Config_{REGION}.parquet')
+    #s3io.s3_write_parquet(ad, Bucket=BUCKET, Key=key)
+    s3io.s3_write_feather(ad, Bucket=BUCKET, Key=key.replace('parquet', 'feather'))
 
     print("ATSPM Vehicle Detector Config [2 of 3]")
     det_config = get_det_config(ad, engine, date_string)
-    key = posixpath.join(key_prefix, f'atspm_det_config_good/date={date_string}/ATSPM_Det_Config_Good_{REGION}.parquet')
-    s3io.s3_write_parquet(det_config, Bucket=BUCKET, Key=key)
+    key = posixpath.join(KEY_PREFIX, f'atspm_det_config_good/date={date_string}/ATSPM_Det_Config_Good_{REGION}.parquet')
+    #s3io.s3_write_parquet(det_config, Bucket=BUCKET, Key=key)
+    s3io.s3_write_feather(ad, Bucket=BUCKET, Key=key.replace('parquet', 'feather'))
     
     print("ATSPM Pedestrian Detectors [3 of 3]")
     ped_config = get_atspm_ped_detectors(engine, date_)
-    key = posixpath.join(key_prefix, f'atspm_ped_config/date={date_string}/ATSPM_Ped_Config_{REGION}.parquet')
-    s3io.s3_write_parquet(ped_config, Bucket=BUCKET, Key=key)
+    key = posixpath.join(KEY_PREFIX, f'atspm_ped_config/date={date_string}/ATSPM_Ped_Config_{REGION}.parquet')
+    #s3io.s3_write_parquet(ped_config, Bucket=BUCKET, Key=key)
+    s3io.s3_write_feather(ad, Bucket=BUCKET, Key=key.replace('parquet', 'feather'))
     
 
 if __name__=='__main__':
