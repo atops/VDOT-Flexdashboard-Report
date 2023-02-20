@@ -51,7 +51,7 @@ split_path <- function(...) {
 
 join_path <- function(...) {
     paste(..., sep = "/") %>%
-        stringr::str_replace("/+", "/") %>%
+        stringr::str_replace_all("/+", "/") %>%
         stringr::str_remove("^/") %>%
         stringr::str_replace(":/+", "://")
 }

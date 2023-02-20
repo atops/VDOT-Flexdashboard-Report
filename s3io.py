@@ -135,7 +135,7 @@ def get_det_config(date_, conf):
 
     bucket = conf['bucket']
 
-    bd = read_parquet(Bucket=bucket, Key=f'mark/bad_detectors/date={date_str}/bad_detectors_{date_str}.parquet')
+    bd = s3_read_parquet(Bucket=bucket, Key=f'mark/bad_detectors/date={date_str}/bad_detectors_{date_str}.parquet')
     bd.Detector = bd.Detector.astype('int64')
 
     dc_prefix = f'atspm_det_config_good/date={date_str}'
