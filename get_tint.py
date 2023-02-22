@@ -1,5 +1,11 @@
+import sys
+import yaml
 import pandas as pd
-import dask.dataframe as dd
+import posixpath
+from config import get_date_from_string
+import gcsio
+from pull_atspm_data import get_atspm_engine 
+
 
 def time_in_transition(df):
     df = df[df.EventCode==150].sort_values(['SignalID', 'Timestamp'])
@@ -32,17 +38,54 @@ def time_in_transition(df):
     return df
 
 
+def main(start_date, end_date, conf, engine):
+
+    dates = pd.date_range(start_date, end_date, freq='1D')
+
+    for date_ in dates:
+
+        date_str = date_.strftime('%F')
+        print(date_str)
+
+        query = f"""SELECT * FROM Controller_Event_Log
+                    WHERE Timestamp >= '{date_str}' 
+                    AND Timestamp < '{(date_ + pd.Timedelta(1, unit='D')).strftime('%F')}' 
+                    AND EventCode = 150 
+                    ORDER BY SignalID, Timestamp"""
+    
+        with engine.connect() as conn:
+            df = pd.read_sql_query(query, con=conn)
+            
+        tints = time_in_transition(df)
+        tints = tints[['SignalID', 'tint_s']].groupby(['SignalID']).agg(['sum', 'std', 'count'])['tint_s'].fillna(0)
+        tints['std'] = tints['std'].round(1)
+        
+        gcsio.s3_write_parquet(
+            tints,
+            Bucket=conf['bucket'],
+            Key=posixpath.join(conf['key_prefix'], f'mark/time_in_transition/date={date_str}/tint_{date_str}.parquet'))
+        print(tints.head())
+    
+
+
 if __name__=='__main__':
 
-    from distributed import Client
+    with open('Monthly_Report.yaml') as yaml_file:
+        conf = yaml.load(yaml_file, Loader=yaml.Loader)
+    
+    with open('Monthly_Report_AWS.yaml') as yaml_file:
+        cred = yaml.load(yaml_file, Loader=yaml.Loader)
+    
+    if len(sys.argv) > 1:
+        start_date = sys.argv[1]
+        end_date = sys.argv[2]
+    else:
+        start_date = conf['start_date']
+        end_date = conf['end_date']
 
-    client = Client()
-    print(client.dashboard_link)
+    start_date = get_date_from_string(start_date)
+    end_date = get_date_from_string(end_date)
+    
+    engine = get_atspm_engine(cred)
 
-    df = dd.read_parquet('s3://vdot-spm2/atspm/date=2022-12-02/*', storage_options={'profile': 'KH_VDOT'})
-    transitions = df[df.EventCode==150].compute().sort_values(['SignalID', 'Timestamp'])
-
-    tints = time_in_transition(transitions)
-
-    tints = tints[['SignalID', 'tint_s']].groupby(['SignalID']).agg(['sum', 'std', 'count'])['tint_s'].fillna(0)
-    tints['std'] = tints['std'].round(1)
+    main(start_date, end_date, conf, engine)
