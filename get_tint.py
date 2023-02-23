@@ -11,10 +11,19 @@ def time_in_transition(df):
     df = df[df.EventCode==150].sort_values(['SignalID', 'Timestamp'])
     df['Date'] = df.Timestamp.dt.date
 
+    # Start of Transition
     p0 = df[df.EventParam.isin([2,3,4])].sort_values('Timestamp').reset_index(drop=True)
-    p1 = df[(df.EventParam==5) & (df.EventParam.shift(1)==1)].sort_values('Timestamp').reset_index(drop=True)
+
+    # End of Transition
+    p1 = df[(df.EventParam==5) & (df.groupby('SignalID').EventParam.shift(1)==1)].sort_values('Timestamp').reset_index(drop=True)
     p1['endTimestamp'] = p1['Timestamp']
 
+    # Cycle Lengths
+    pc = df[(df.EventCode==150) & (df.EventParam==5)].sort_values(['SignalID', 'Timestamp'])
+    pc['CycleLength'] = (pc.Timestamp - pc.groupby('SignalID').shift(1).Timestamp).dt.total_seconds()
+    pc = pc.rename(columns={'Timestamp': 'endTimestamp'})[['SignalID', 'endTimestamp', 'CycleLength']]
+
+    # Create Transition Periods from start/end transitions
     df = pd.merge_asof(
         left=p0,
         right=p1,
@@ -32,8 +41,18 @@ def time_in_transition(df):
     idx = df.groupby(['SignalID', 'endTimestamp'])['TimeInTransition'].transform(max) == df['TimeInTransition']
     df = df[idx]
 
-    df = df.groupby(['SignalID', 'Date'])['TimeInTransition'].agg(['sum', 'count']).reset_index()
-    df = df.rename(columns={'sum': 'tint_s', 'count': 'n'})
+    # Append cycle length we're transitioning into, to get number of cycles of each transition
+    df = pd.merge(
+        left=df,
+        right=pc,
+        on=['SignalID', 'endTimestamp']
+    )
+    df['CyclesInTransition'] = np.ceil(df.TimeInTransition/df.CycleLength)
+    df.loc[df.CyclesInTransition.isna(), 'CyclesInTransition'] = 1
+
+    # Summarize for output
+    df = df.groupby(['SignalID', 'Date'])[['TimeInTransition', 'CyclesInTransition']].agg(['min', 'median', 'max', 'count', 'sum'])
+    df.columns = ['_'.join(col) for col in df.columns.to_flat_index()]
 
     return df
 
