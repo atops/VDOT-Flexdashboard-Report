@@ -115,8 +115,8 @@ print(glue("{Sys.time()} Ped Pushbutton Uptime [2 of 23]"))
 tryCatch(
     {
         pau_start_date <- pmin(
-            ymd(calcs_start_date),
-            floor_date(ymd(report_end_date) - as.duration("6 months"), "month")
+            as_date(calcs_start_date),
+            pmax(as_date("2022-10-01"), floor_date(as_date(report_end_date) - as.duration("6 months"), "month"))
         ) %>%
             format("%F")
 
@@ -395,6 +395,8 @@ tryCatch(
 
         # -- Alerts: Comm downtime --
 
+	#### We don't have a way to get comm uptime from the ATMS right now. Don't calculate, for now. ####
+	if (FALSE) {
         bad_comm <- s3_read_parquet_parallel(
             bucket = conf$bucket,
             table_name = "comm_quality",
@@ -432,7 +434,7 @@ tryCatch(
 
         }
         rm(bad_comm)
-
+	}  # end if (FALSE)
 
         # -- Watchdog Alerts --
 
@@ -699,8 +701,9 @@ tryCatch(
         rm(sub_monthly_comm_uptime)
     },
     error = function(e) {
-        print("ENCOUNTERED AN ERROR:")
-        print(e)
+        # print("ENCOUNTERED AN ERROR:")
+        # print(e)
+	print("Not running comm uptimes right now. No data from the ATMS.")
     }
 )
 
@@ -1612,7 +1615,7 @@ tryCatch(
                 Week = week(Date)
             )
 
-            aurora <- keep_trying(get_aurora_connection, n_tries = 5)
+        aurora <- keep_trying(get_aurora_connection, n_tries = 5)
 
         for (metric in list(gap_outs, max_outs, force_offs)) {
 
