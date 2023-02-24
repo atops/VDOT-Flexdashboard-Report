@@ -395,8 +395,8 @@ tryCatch(
 
         # -- Alerts: Comm downtime --
 
-	#### We don't have a way to get comm uptime from the ATMS right now. Don't calculate, for now. ####
-	if (FALSE) {
+        #### We don't have a way to get comm uptime from the ATMS right now. Don't calculate, for now. ####
+        if (FALSE) {
         bad_comm <- s3_read_parquet_parallel(
             bucket = conf$bucket,
             table_name = "comm_quality",
@@ -434,7 +434,7 @@ tryCatch(
 
         }
         rm(bad_comm)
-	}  # end if (FALSE)
+        }  # end if (FALSE)
 
         # -- Watchdog Alerts --
 
@@ -703,7 +703,7 @@ tryCatch(
     error = function(e) {
         # print("ENCOUNTERED AN ERROR:")
         # print(e)
-	print("Not running comm uptimes right now. No data from the ATMS.")
+        print("Not running comm uptimes right now. No data from the ATMS.")
     }
 )
 
@@ -1620,7 +1620,7 @@ tryCatch(
         for (metric in list(gap_outs, max_outs, force_offs)) {
             aggregate(metric, daily, aurora)
         }
-        
+
         dbDisconnect(aurora)
     },
     error = function(e) {
@@ -1684,9 +1684,10 @@ tryCatch(
             signals_list = signals_list,
             conf = conf
         ) %>%
+            get_daily_avg(metric$variable, metric$weight) %>%
             mutate(
                 SignalID = factor(SignalID),
-                CallPhase = 0,
+                CallPhase = factor(0),
                 Week = week(Date)
             )
 
