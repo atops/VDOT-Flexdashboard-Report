@@ -1638,12 +1638,6 @@ print(glue("{Sys.time()} Time in Transition [22 of 25]"))
 tryCatch(
     {
         metric <- time_in_transition
-        # metric <- list(
-        #     variable = "TimeInTransition_sum",
-        #     weight = "ones",
-        #     peak_only = FALSE,
-        #     table = "tint",
-        #     s3table = "time_in_transition")
 
         daily <- s3_read_parquet_parallel(
             bucket = conf$bucket,
@@ -1657,6 +1651,7 @@ tryCatch(
                 SignalID = factor(SignalID),
                 CallPhase = 0,
                 Week = week(Date),
+                tint = TimeInTransition_sum, # total minutes in transition
                 ones = 1
             )
 
@@ -1680,12 +1675,6 @@ print(glue("{Sys.time()} Approach Delay [23 of 25]"))
 tryCatch(
     {
         metric <- approach_delay
-        # metric <- list(
-        #     variable = "delay",
-        #     weight = "vol",
-        #     peak_only = FALSE,
-        #     table = "ad",
-        #     s3table = "approach_delay_1hr")
 
         daily <- s3_read_parquet_parallel(
             bucket = conf$bucket,

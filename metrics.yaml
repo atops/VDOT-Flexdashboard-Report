@@ -163,7 +163,7 @@ time_in_transition:
     goal: NULL
     hourly_table: NULL
     has_weekly: True
-    peak_only:
+    peak_only: False
     palette: "Reds"
 
 approach_delay:
@@ -178,7 +178,7 @@ approach_delay:
     goal: NULL
     hourly_table: adh
     has_weekly: True
-    peak_only:
+    peak_only: False
     palette: "Reds"
 
 travel_time_index:

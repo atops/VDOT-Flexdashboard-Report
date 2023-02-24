@@ -46,6 +46,12 @@ progression_ratio <- structure(
 queue_spillback_rate <- structure(
     metrics[["queue_spillback_rate"]], class = "metric"
 )
+time_in_transition <- structure(
+    metrics[["time_in_transition"]], class = "metric"
+)
+approach_delay <- structure(
+    metrics[["approach_delay"]], class = "metric"
+)
 peak_period_split_failures <- structure(
     metrics[["peak_period_split_failures"]], class = "metric"
 )
