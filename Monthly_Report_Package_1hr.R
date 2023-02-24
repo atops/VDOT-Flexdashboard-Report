@@ -322,7 +322,7 @@ tryCatch(
         qs <- s3_read_parquet_parallel(
             bucket = conf$bucket,
             table_name = "queue_spillback",
-            start_date = calcs_start_date,
+            start_date = rds_start_date,
             end_date = report_end_date,
             signals_list = signals_list,
             conf = conf
@@ -379,28 +379,28 @@ print(glue("{Sys.time()} Approach Delay [7 of 9(3)]"))
 
 tryCatch(
     {
-        rm(daily)
-        rm(hourly)
-        rm(cor_hourly)
-        rm(sub_hourly)
+        ifrm(df)
+        ifrm(hourly)
+        ifrm(cor_hourly)
+        ifrm(sub_hourly)
 
         metric <- approach_delay
 
-        daily <- s3_read_parquet_parallel(
+        df <- s3_read_parquet_parallel(
             bucket = conf$bucket,
             table_name = metric$s3table,
-            start_date = wk_calcs_start_date,
+            start_date = rds_start_date,
             end_date = report_end_date,
             signals_list = signals_list,
             conf = conf
         ) %>%
             mutate(
                 SignalID = factor(SignalID),
-                CallPhase = 0,
+                CallPhase = factor(0),
                 Week = week(Date)
             )
 
-        hourly <- daily %>%
+        hourly <- df %>%
             get_period_avg(metric$variable, "Hour", metric$weight)
 
         cor_hourly <- get_cor_monthly_avg_by_period(
@@ -421,10 +421,10 @@ tryCatch(
             sub_hourly, glue("sub_hourly_{metric$table}.rds"), metric$variable, rds_start_date, calcs_start_date
         )
 
-        rm(daily)
-        rm(hourly)
-        rm(cor_hourly)
-        rm(sub_hourly)
+        ifrm(df)
+        ifrm(hourly)
+        ifrm(cor_hourly)
+        ifrm(sub_hourly)
     },
     error = function(e) {
         print("ENCOUNTERED AN ERROR:")
