@@ -151,6 +151,36 @@ off_peak_split_failures:
     has_weekly: True
     peak_only:
 
+time_in_transition:
+    label: Time in Transition [min]
+    table: tint
+    s3table: time_in_transition
+    variable: tint
+    weight: ones
+    data_type: numeric
+    highlight_color: "#007338"
+    fill_color: "#99E6BF"
+    goal: NULL
+    hourly_table: NULL
+    has_weekly: True
+    peak_only:
+    palette: "Reds"
+
+approach_delay:
+    label: Approach Delay [min]
+    table: ad
+    s3table: approach_delay_1hr
+    variable: delay
+    weight: vol
+    data_type: numeric
+    highlight_color: "#007338"
+    fill_color: "#99E6BF"
+    goal: NULL
+    hourly_table: adh
+    has_weekly: True
+    peak_only:
+    palette: "Reds"
+
 travel_time_index:
     label: Travel Time Index (TTI)
     table: tti

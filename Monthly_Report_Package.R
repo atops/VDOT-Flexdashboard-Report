@@ -7,7 +7,7 @@ source("Monthly_Report_Package_init.R")
 
 # # DETECTOR UPTIME ###########################################################
 
-print(glue("{Sys.time()} Vehicle Detector Uptime [1 of 23]"))
+print(glue("{Sys.time()} Vehicle Detector Uptime [1 of 25]"))
 
 tryCatch(
     {
@@ -110,7 +110,7 @@ tryCatch(
 
 # DAILY PEDESTRIAN PUSHBUTTON UPTIME ###############################################
 
-print(glue("{Sys.time()} Ped Pushbutton Uptime [2 of 23]"))
+print(glue("{Sys.time()} Ped Pushbutton Uptime [2 of 25]"))
 
 tryCatch(
     {
@@ -285,7 +285,7 @@ tryCatch(
 
 # # WATCHDOG ###########################################################
 
-print(glue("{Sys.time()} watchdog alerts [3 of 23]"))
+print(glue("{Sys.time()} watchdog alerts [3 of 25]"))
 
 tryCatch(
     {
@@ -456,7 +456,7 @@ tryCatch(
 
 # DAILY PEDESTRIAN ACTIVATIONS ################################################
 
-print(glue("{Sys.time()} Daily Pedestrian Activations [4 of 23]"))
+print(glue("{Sys.time()} Daily Pedestrian Activations [4 of 25]"))
 
 tryCatch(
     {
@@ -509,7 +509,7 @@ tryCatch(
 
 # HOURLY PEDESTRIAN ACTIVATIONS ###############################################
 
-print(glue("{Sys.time()} Hourly Pedestrian Activations [5 of 23]"))
+print(glue("{Sys.time()} Hourly Pedestrian Activations [5 of 25]"))
 
 tryCatch(
     {
@@ -551,7 +551,7 @@ tryCatch(
 
 # GET PEDESTRIAN DELAY ###################################################
 
-print(glue("{Sys.time()} Pedestrian Delay [6 of 23]"))
+print(glue("{Sys.time()} Pedestrian Delay [6 of 25]"))
 
 tryCatch(
     {
@@ -629,7 +629,7 @@ tryCatch(
 
 # GET COMMUNICATIONS UPTIME ###################################################
 
-print(glue("{Sys.time()} Communication Uptime [7 of 23]"))
+print(glue("{Sys.time()} Communication Uptime [7 of 25]"))
 
 tryCatch(
     {
@@ -711,7 +711,7 @@ tryCatch(
 
 # DAILY VOLUMES ###############################################################
 
-print(glue("{Sys.time()} Daily Volumes [8 of 23]"))
+print(glue("{Sys.time()} Daily Volumes [8 of 25]"))
 
 tryCatch(
     {
@@ -780,7 +780,7 @@ tryCatch(
 
 # HOURLY VOLUMES ##############################################################
 
-print(glue("{Sys.time()} Hourly Volumes [9 of 23]"))
+print(glue("{Sys.time()} Hourly Volumes [9 of 25]"))
 
 tryCatch(
     {
@@ -905,7 +905,7 @@ tryCatch(
 
 # DAILY THROUGHPUT ############################################################
 
-print(glue("{Sys.time()} Daily Throughput [10 of 23]"))
+print(glue("{Sys.time()} Daily Throughput [10 of 25]"))
 
 tryCatch(
     {
@@ -974,7 +974,7 @@ tryCatch(
 
 # DAILY ARRIVALS ON GREEN #####################################################
 
-print(glue("{Sys.time()} Daily AOG [11 of 23]"))
+print(glue("{Sys.time()} Daily AOG [11 of 25]"))
 
 tryCatch(
     {
@@ -1037,7 +1037,7 @@ tryCatch(
 
 # HOURLY ARRIVALS ON GREEN ####################################################
 
-print(glue("{Sys.time()} Hourly AOG [12 of 23]"))
+print(glue("{Sys.time()} Hourly AOG [12 of 25]"))
 
 tryCatch(
     {
@@ -1071,7 +1071,7 @@ tryCatch(
 
 # DAILY PROGRESSION RATIO #####################################################
 
-print(glue("{Sys.time()} Daily Progression Ratio [13 of 23]"))
+print(glue("{Sys.time()} Daily Progression Ratio [13 of 25]"))
 
 tryCatch(
     {
@@ -1120,7 +1120,7 @@ tryCatch(
 
 # HOURLY PROGESSION RATIO ####################################################
 
-print(glue("{Sys.time()} Hourly Progression Ratio [14 of 23]"))
+print(glue("{Sys.time()} Hourly Progression Ratio [14 of 25]"))
 
 tryCatch(
     {
@@ -1158,7 +1158,7 @@ tryCatch(
 
 tryCatch(
     {
-        print(glue("{Sys.time()} Daily Split Failures [15 of 23]"))
+        print(glue("{Sys.time()} Daily Split Failures [15 of 25]"))
 
         sf <- s3_read_parquet_parallel(
             bucket = conf$bucket,
@@ -1276,7 +1276,7 @@ tryCatch(
 
 # HOURLY SPLIT FAILURES #######################################################
 
-print(glue("{Sys.time()} Hourly Split Failures [16 of 23]"))
+print(glue("{Sys.time()} Hourly Split Failures [16 of 25]"))
 
 tryCatch(
     {
@@ -1308,7 +1308,7 @@ tryCatch(
 
 # DAILY QUEUE SPILLBACK #######################################################
 
-print(glue("{Sys.time()} Daily Queue Spillback [17 of 23]"))
+print(glue("{Sys.time()} Daily Queue Spillback [17 of 25]"))
 
 tryCatch(
     {
@@ -1372,7 +1372,7 @@ tryCatch(
 
 # HOURLY QUEUE SPILLBACK ######################################################
 
-print(glue("{Sys.time()} Hourly Queue Spillback [18 of 23]"))
+print(glue("{Sys.time()} Hourly Queue Spillback [18 of 25]"))
 
 tryCatch(
     {
@@ -1404,7 +1404,7 @@ tryCatch(
 
 # TRAVEL TIME AND BUFFER TIME INDEXES #########################################
 
-print(glue("{Sys.time()} Travel Time Indexes [19 of 23]"))
+print(glue("{Sys.time()} Travel Time Indexes [19 of 25]"))
 if (FALSE) {
 tryCatch(
     {
@@ -1538,7 +1538,7 @@ tryCatch(
 
 tryCatch(
     {
-        print(glue("{Sys.time()} Daily Detection Levels [20 of 23]"))
+        print(glue("{Sys.time()} Daily Detection Levels [20 of 25]"))
 
         dl <- s3_read_parquet_parallel(
             bucket = conf$bucket,
@@ -1596,7 +1596,7 @@ tryCatch(
 
 # GREEN PHASE TERMINATIONS ############################################################
 
-print(glue("{Sys.time()} Termination Types [21 of 23]"))
+print(glue("{Sys.time()} Termination Types [21 of 25]"))
 
 tryCatch(
     {
@@ -1618,59 +1618,9 @@ tryCatch(
         aurora <- keep_trying(get_aurora_connection, n_tries = 5)
 
         for (metric in list(gap_outs, max_outs, force_offs)) {
-
-            weekly <- get_weekly_avg_by_day(daily, metric$variable, metric$weight, metric$peak_only)
-            monthly <- get_monthly_avg_by_day(daily, metric$variable, metric$weight, metric$peak_only)
-
-            sub_daily <- get_cor_weekly_avg_by_day(
-                daily, subcorridors, metric$variable, metric$weight)
-            cor_daily <- get_cor_weekly_avg_by_day(
-                daily, corridors, metric$variable, metric$weight)
-            avg_daily <- sigify(daily, cor_daily, corridors) %>%
-                select(Zone_Group, Corridor, Date, !!as.name(metric$variable), delta) %>%
-                filter(!is.na(Zone_Group))
-
-            sub_weekly <- get_cor_weekly_avg_by_day(weekly, subcorridors, metric$variable, metric$weight)
-            cor_weekly <- get_cor_weekly_avg_by_day(weekly, corridors, metric$variable, metric$weight)
-            avg_weekly <- sigify(weekly, cor_weekly, corridors) %>%
-                select(Zone_Group, Corridor, Date, !!as.name(metric$variable), delta) %>%
-                filter(!is.na(Zone_Group))
-
-            sub_monthly <- get_cor_monthly_avg_by_day(monthly, subcorridors, metric$variable, metric$weight)
-            cor_monthly <- get_cor_monthly_avg_by_day(monthly, corridors, metric$variable, metric$weight)
-            avg_monthly <- sigify(monthly, cor_monthly, corridors) %>%
-                select(Zone_Group, Corridor, Month, !!as.name(metric$variable), delta) %>%
-                filter(!is.na(Zone_Group))
-
-            corr_levels <- c("sig", "sub", "cor")
-            pers <- c("dy", "wk", "mo")
-
-            td <- tibble(
-                data = list(avg_daily, sub_daily, cor_daily,
-                            avg_weekly, sub_weekly, cor_weekly,
-                            avg_monthly, sub_monthly, cor_monthly),
-                fn = paste0(apply(expand.grid(corr_levels, pers, metric$table), 1, paste, collapse="/"), ".parquet"),
-                var = metric$variable,
-                rsd = report_start_date,
-                csd = c(rep(as_date(calcs_start_date), 3),
-                        rep(wk_calcs_start_date, 3),
-                        rep(as_date(calcs_start_date), 3))
-            )
-
-            write_aggregations(aurora, td)
-
-            td <- tibble(
-                data = lapply(glue("{corr_levels}/mo/{metric$table}.parquet"), function(fn) {
-                   get_quarterly(read_parquet(fn), metric$variable)}
-                ),
-                fn = glue("{corr_levels}/qu/{metric$table}.parquet"),
-                var = metric$variable,
-                rsd = report_start_date,
-                csd = report_start_date
-            )
-
-            write_aggregations(aurora, td)
+            aggregate(metric, daily, aurora)
         }
+        
         dbDisconnect(aurora)
     },
     error = function(e) {
@@ -1681,12 +1631,93 @@ tryCatch(
 
 
 
+# TIME IN TRANSITION ##################################################################
+
+print(glue("{Sys.time()} Time in Transition [22 of 25]"))
+
+tryCatch(
+    {
+        metric <- time_in_transition
+        # metric <- list(
+        #     variable = "TimeInTransition_sum",
+        #     weight = "ones",
+        #     peak_only = FALSE,
+        #     table = "tint",
+        #     s3table = "time_in_transition")
+
+        daily <- s3_read_parquet_parallel(
+            bucket = conf$bucket,
+            table_name = metric$s3table,
+            start_date = wk_calcs_start_date,
+            end_date = report_end_date,
+            signals_list = signals_list,
+            conf = conf
+        ) %>%
+            mutate(
+                SignalID = factor(SignalID),
+                CallPhase = 0,
+                Week = week(Date),
+                ones = 1
+            )
+
+        aurora <- keep_trying(get_aurora_connection, n_tries = 5)
+
+        aggregate(metric, daily, aurora)
+
+        dbDisconnect(aurora)
+    },
+    error = function(e) {
+        print("ENCOUNTERED AN ERROR:")
+        print(e)
+    }
+)
+
+
+# APPROACH DELAY ######################################################################
+
+print(glue("{Sys.time()} Approach Delay [23 of 25]"))
+
+tryCatch(
+    {
+        metric <- approach_delay
+        # metric <- list(
+        #     variable = "delay",
+        #     weight = "vol",
+        #     peak_only = FALSE,
+        #     table = "ad",
+        #     s3table = "approach_delay_1hr")
+
+        daily <- s3_read_parquet_parallel(
+            bucket = conf$bucket,
+            table_name = metric$s3table,
+            start_date = wk_calcs_start_date,
+            end_date = report_end_date,
+            signals_list = signals_list,
+            conf = conf
+        ) %>%
+            mutate(
+                SignalID = factor(SignalID),
+                CallPhase = 0,
+                Week = week(Date)
+            )
+
+        aurora <- keep_trying(get_aurora_connection, n_tries = 5)
+
+        aggregate(metric, daily, aurora)
+
+        dbDisconnect(aurora)
+    },
+    error = function(e) {
+        print("ENCOUNTERED AN ERROR:")
+        print(e)
+    }
+)
 
 
 
 # Package up for Flexdashboard
 
-print(glue("{Sys.time()} Package for Monthly Report [22 of 23]"))
+print(glue("{Sys.time()} Package for Monthly Report [24 of 25]"))
 
 
 tryCatch(
@@ -2043,7 +2074,7 @@ qsave(sig, "sig.qs")
 qsave(sub, "sub.qs")
 
 
-print(glue("{Sys.time()} Write to Database [23 of 23]"))
+print(glue("{Sys.time()} Write to Database [25 of 25]"))
 
 aurora <- keep_trying(get_aurora_connection, n_tries = 5)
 
