@@ -1,6 +1,7 @@
 import sys
 import yaml
 import pandas as pd
+import numpy as np
 import posixpath
 from config import get_date_from_string
 import gcsio
@@ -50,6 +51,8 @@ def time_in_transition(df):
     df['CyclesInTransition'] = np.ceil(df.TimeInTransition/df.CycleLength)
     df.loc[df.CyclesInTransition.isna(), 'CyclesInTransition'] = 1
 
+    df['TimeInTransition'] = df.TimeInTransition/60 # convert seconds to minutes
+
     # Summarize for output
     df = df.groupby(['SignalID', 'Date'])[['TimeInTransition', 'CyclesInTransition']].agg(['min', 'median', 'max', 'count', 'sum'])
     df.columns = ['_'.join(col) for col in df.columns.to_flat_index()]
@@ -76,8 +79,6 @@ def main(start_date, end_date, conf, engine):
             df = pd.read_sql_query(query, con=conn)
             
         tints = time_in_transition(df)
-        tints = tints[['SignalID', 'tint_s']].groupby(['SignalID']).agg(['sum', 'std', 'count'])['tint_s'].fillna(0)
-        tints['std'] = tints['std'].round(1)
         
         gcsio.s3_write_parquet(
             tints,
