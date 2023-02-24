@@ -23,7 +23,7 @@ run:
     ped_delay: TRUE
     split_failures: TRUE
     phase_termination: TRUE
-    time_in_transition: FALSE
+    time_in_transition: TRUE
     approach_delay: TRUE
 
 start_date: 2 days ago
