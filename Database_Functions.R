@@ -20,7 +20,7 @@ mydbAppendTable <- function(conn, name, value, chunksize = 1e4) {
             across(where(is.factor), as.character),
             across(where(is.character), ~replace(., is.na(.), "")),
             across(where(is.character), ~str_replace_all(., "'", "\\\\'")),
-            across(where(is.character), function(s) glue("'{s}'")),
+            across(where(is.character), ~str_replace_all(., "^|$", "'")),
             across(where(is.numeric), ~replace(., !is.finite(.), NA)))
 
     table_name <- name
