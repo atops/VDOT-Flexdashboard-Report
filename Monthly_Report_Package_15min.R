@@ -36,7 +36,8 @@ tryCatch(
                 DOW = wday(Date),
                 Week = week(Date),
                 vol = as.numeric(vol)
-            )
+            ) %>%
+            filter(SignalID %in% corridors$SignalID)
 
         bad_ped_detectors <- s3_read_parquet_parallel(
             bucket = conf$bucket,
@@ -340,7 +341,7 @@ tryCatch(
                 Timeperiod = seq(as_datetime(rds_start_date), as_datetime(report_end_date) - minutes(15), by = "15 min"),
                 fill = list(qs_freq = 0)
             ) %>%
-            filter(Date == as_date(Hour)) %>%  # This is new. Need to test.
+            filter(Date == as_date(Timeperiod)) %>%  # This is new. Need to test.
             get_period_avg("qs_freq", "Timeperiod")
 
         cor_15min_qs <- get_cor_monthly_avg_by_period(qs_15min, corridors, "qs_freq", "Timeperiod")
@@ -377,14 +378,14 @@ print(glue("{Sys.time()} Approach Delay [7 of 9(4)]"))
 
 tryCatch(
     {
-        rm(daily)
-        rm(df_15min)
-        rm(cor_15min)
-        rm(sub_15min)
+        ifrm(df)
+        ifrm(df_15min)
+        ifrm(cor_15min)
+        ifrm(sub_15min)
 
         metric <- approach_delay
 
-        daily <- s3_read_parquet_parallel(
+        df <- s3_read_parquet_parallel(
             bucket = conf$bucket,
             table_name = "approach_delay_15min",
             start_date = rds_start_date,
@@ -396,10 +397,10 @@ tryCatch(
                 SignalID = factor(SignalID),
                 CallPhase = factor(0),
                 Date = date(Date)
-            )
+            ) %>%
+            rename(Timeperiod = Hour)
 
-        df_15min <- daily %>%
-            rename(Timeperiod = Hour) %>%
+        df_15min <- df %>%
             get_period_avg(metric$variable, "Timeperiod", metric$weight)
 
         cor_15min <- get_cor_monthly_avg_by_period(
@@ -411,7 +412,7 @@ tryCatch(
                 select(all_of(c("Zone_Group", "Corridor", "Timeperiod", metric$variable, "delta")))
 
         addtoRDS(
-            df_15min, glue("hourly_{metric$table}.rds"), metric$variable, rds_start_date, calcs_start_date
+            df_15min, glue("{metric$table}_15min.rds"), metric$variable, rds_start_date, calcs_start_date
         )
         addtoRDS(
             cor_15min, glue("cor_15min_{metric$table}.rds"), metric$variable, rds_start_date, calcs_start_date
@@ -420,10 +421,10 @@ tryCatch(
             sub_15min, glue("sub_15min_{metric$table}.rds"), metric$variable, rds_start_date, calcs_start_date
         )
 
-        rm(daily)
-        rm(df_15min)
-        rm(cor_15min)
-        rm(sub_15min)
+        ifrm(daily)
+        ifrm(df_15min)
+        ifrm(cor_15min)
+        ifrm(sub_15min)
     },
     error = function(e) {
         print("ENCOUNTERED AN ERROR:")
@@ -432,9 +433,14 @@ tryCatch(
 )
 
 
+
+
+
 # Package up for Flexdashboard
 
 print(glue("{Sys.time()} Package for Monthly Report [8 of 9(4)]"))
+
+aurora <- keep_trying(func = get_aurora_connection, n_tries = 5)
 
 tryCatch(
     {
@@ -454,6 +460,10 @@ tryCatch(
         print(e)
     }
 )
+
+append_to_database(
+    aurora, cor2, "cor", calcs_start_date, report_start_date = report_start_date, report_end_date = NULL)
+ifrm(cor2)
 
 
 tryCatch(
@@ -475,6 +485,9 @@ tryCatch(
     }
 )
 
+append_to_database(
+    aurora, sub2, "sub", calcs_start_date, report_start_date = report_start_date, report_end_date = NULL)
+ifrm(sub2)
 
 
 tryCatch(
@@ -496,23 +509,8 @@ tryCatch(
     }
 )
 
-
-
-
-
-print(glue("{Sys.time()} Write to Database [9 of 9(4)]"))
-
-source("write_sigops_to_db.R")
-
-# Update Aurora Nightly
-aurora <- keep_trying(func = get_aurora_connection, n_tries = 5)
-# recreate_database(conn)
-
-append_to_database(
-    aurora, cor2, "cor", calcs_start_date, report_start_date = report_start_date, report_end_date = NULL)
-append_to_database(
-    aurora, sub2, "sub", calcs_start_date, report_start_date = report_start_date, report_end_date = NULL)
 append_to_database(
     aurora, sig2, "sig", calcs_start_date, report_start_date = report_start_date, report_end_date = NULL)
+ifrm(sig2)
 
 dbDisconnect(aurora)
