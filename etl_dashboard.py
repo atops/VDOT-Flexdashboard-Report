@@ -10,7 +10,7 @@ from multiprocessing import get_context, Pool
 import pandas as pd
 import sqlalchemy as sq
 import time
-import os
+import posixpath
 import itertools
 import yaml
 import re
@@ -51,7 +51,7 @@ def etl2(s, date_, det_config, conf):
 
     try:
         bucket = conf['bucket']
-        key_prefix = conf['key_prefix']
+        key_prefix = conf['key_prefix'] or ''
 
         with open('Monthly_Report_AWS.yaml') as yaml_file:
             cred = yaml.load(yaml_file, Loader=yaml.Loader)
@@ -79,8 +79,14 @@ def etl2(s, date_, det_config, conf):
             c, d = etl_main(df, det_config)
 
             if len(c) > 0 and len(d) > 0:
-                gcsio.s3_write_parquet(c, bucket, f'{key_prefix}/cycles/date={date_str}/cd_{s}_{date_str}.parquet')
-                gcsio.s3_write_parquet(d, bucket, f'{key_prefix}/detections/date={date_str}/de_{s}_{date_str}.parquet')
+                gcsio.s3_write_parquet(
+                    c, 
+                    bucket, 
+                    posixpath.join(key_prefix, f'cycles/date={date_str}/cd_{s}_{date_str}.parquet')) 
+                gcsio.s3_write_parquet(
+                    d, 
+                    bucket, 
+                    posixpath.join(key_prefix, f'detections/date={date_str}/de_{s}_{date_str}.parquet')) 
 
             else:
                 print(f'{date_str} | {s} | No cycles')
