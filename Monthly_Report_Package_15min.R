@@ -12,25 +12,9 @@ calcs_start_date <- max(calcs_start_date, as_date(get_date_from_string(conf$star
 rds_start_date <- calcs_start_date - days(1)
 
 
-# # DETECTOR UPTIME ###########################################################
+# 15 MINUTE PEDESTRIAN ACTIVATIONS ###############################################
 
-print(glue("{Sys.time()} Vehicle Detector Uptime [1 of 29(4)]"))
-
-# DAILY PEDESTRIAN PUSHBUTTON UPTIME ##########################################
-
-print(glue("{Sys.time()} Ped Pushbutton Uptime [2 of 29(4)]"))
-
-# # WATCHDOG ##################################################################
-
-print(glue("{Sys.time()} watchdog alerts [3 of 29(4)]"))
-
-# DAILY PEDESTRIAN ACTIVATIONS ################################################
-
-print(glue("{Sys.time()} Daily Pedestrian Activations [4 of 29(4)]"))
-
-# HOURLY PEDESTRIAN ACTIVATIONS ###############################################
-
-print(glue("{Sys.time()} 15-Minute Pedestrian Activations [5 of 29(4)]"))
+print(glue("{Sys.time()} 15-Minute Pedestrian Activations [1 of 9(4)]"))
 
 tryCatch(
     {
@@ -52,7 +36,8 @@ tryCatch(
                 DOW = wday(Date),
                 Week = week(Date),
                 vol = as.numeric(vol)
-            )
+            ) %>%
+            filter(SignalID %in% corridors$SignalID)
 
         bad_ped_detectors <- s3_read_parquet_parallel(
             bucket = conf$bucket,
@@ -108,21 +93,9 @@ tryCatch(
     }
 )
 
-# GET PEDESTRIAN DELAY ########################################################
+# 15 MINUTE VOLUMES ##############################################################
 
-print(glue("{Sys.time()} Pedestrian Delay [6 of 29(4)]"))
-
-# GET COMMUNICATIONS UPTIME ###################################################
-
-print(glue("{Sys.time()} Communication Uptime [7 of 29(4)]"))
-
-# DAILY VOLUMES ###############################################################
-
-print(glue("{Sys.time()} Daily Volumes [8 of 29(4)]"))
-
-# HOURLY VOLUMES ##############################################################
-
-print(glue("{Sys.time()} 15-Minute Volumes [9 of 29(4)]"))
+print(glue("{Sys.time()} 15-Minute Volumes [2 of 9(4)]"))
 
 tryCatch(
     {
@@ -169,17 +142,9 @@ tryCatch(
     }
 )
 
-# DAILY THROUGHPUT ############################################################
+# 15 MINUTE ARRIVALS ON GREEN ####################################################
 
-print(glue("{Sys.time()} Daily Throughput [10 of 29(4)]"))
-
-# DAILY ARRIVALS ON GREEN #####################################################
-
-print(glue("{Sys.time()} Daily AOG [11 of 29(4)]"))
-
-# HOURLY ARRIVALS ON GREEN ####################################################
-
-print(glue("{Sys.time()} 15-Minute AOG [12 of 29(4)]"))
+print(glue("{Sys.time()} 15-Minute AOG [3 of 9(4)]"))
 
 tryCatch(
     {
@@ -241,13 +206,9 @@ tryCatch(
     }
 )
 
-# DAILY PROGRESSION RATIO #####################################################
+# 15 MINUTE PROGESSION RATIO #####################################################
 
-print(glue("{Sys.time()} Daily Progression Ratio [13 of 29(4)]"))
-
-# HOURLY PROGESSION RATIO #####################################################
-
-print(glue("{Sys.time()} 15-Minute Progression Ratio [14 of 29(4)]"))
+print(glue("{Sys.time()} 15-Minute Progression Ratio [4 of 9(4)]"))
 
 tryCatch(
     {
@@ -288,13 +249,9 @@ tryCatch(
     }
 )
 
-# DAILY SPLIT FAILURES ########################################################
+# 15 MINUTE SPLIT FAILURES #######################################################
 
-print(glue("{Sys.time()} Daily Split Failures [15 of 29(4)]"))
-
-# HOURLY SPLIT FAILURES #######################################################
-
-print(glue("{Sys.time()} 15-Minute Split Failures [16 of 29(4)]"))
+print(glue("{Sys.time()} 15-Minute Split Failures [5 of 9(4)]"))
 
 tryCatch(
     {
@@ -353,13 +310,9 @@ tryCatch(
     }
 )
 
-# DAILY QUEUE SPILLBACK #######################################################
+# 15 MINUTE QUEUE SPILLBACK ######################################################
 
-print(glue("{Sys.time()} Daily Queue Spillback [17 of 29(4)]"))
-
-# HOURLY QUEUE SPILLBACK ######################################################
-
-print(glue("{Sys.time()} 15-Minute Queue Spillback [18 of 29(4)]"))
+print(glue("{Sys.time()} 15-Minute Queue Spillback [6 of 9(4)]"))
 
 tryCatch(
     {
@@ -380,12 +333,15 @@ tryCatch(
             rename(Timeperiod = Date_Hour) %>%
             select(SignalID, CallPhase, Timeperiod, qs_freq, Date)
 
+        # TODO: Not sure this "complete" logic is correct. Revisit.
+        # It may fill in Hours that don't correspond to the date field.
         qs_15min <- qs %>%
             complete(
                 nesting(SignalID, Date, CallPhase),
                 Timeperiod = seq(as_datetime(rds_start_date), as_datetime(report_end_date) - minutes(15), by = "15 min"),
                 fill = list(qs_freq = 0)
             ) %>%
+            filter(Date == as_date(Timeperiod)) %>%  # This is new. Need to test.
             get_period_avg("qs_freq", "Timeperiod")
 
         cor_15min_qs <- get_cor_monthly_avg_by_period(qs_15min, corridors, "qs_freq", "Timeperiod")
@@ -416,37 +372,65 @@ tryCatch(
     }
 )
 
-# TRAVEL TIME AND BUFFER TIME INDEXES #########################################
+# 15 MINUTE APPROACH DELAY ######################################################################
 
-print(glue("{Sys.time()} Travel Time Indexes [19 of 29(4)]"))
+print(glue("{Sys.time()} Approach Delay [7 of 9(4)]"))
 
-# CCTV UPTIME From 511 and Encoders
+tryCatch(
+    {
+        ifrm(df)
+        ifrm(df_15min)
+        ifrm(cor_15min)
+        ifrm(sub_15min)
 
-print(glue("{Sys.time()} CCTV Uptimes [20 of 29(4)]"))
+        metric <- approach_delay
 
-# ACTIVITIES ##################################################################
+        df <- s3_read_parquet_parallel(
+            bucket = conf$bucket,
+            table_name = "approach_delay_15min",
+            start_date = rds_start_date,
+            end_date = report_end_date,
+            signals_list = signals_list,
+            conf = conf
+        ) %>%
+            mutate(
+                SignalID = factor(SignalID),
+                CallPhase = factor(0),
+                Date = date(Date)
+            ) %>%
+            rename(Timeperiod = Hour)
 
-print(glue("{Sys.time()} TEAMS [21 of 29(4)]"))
+        df_15min <- df %>%
+            get_period_avg(metric$variable, "Timeperiod", metric$weight)
 
-# USER DELAY COSTS   ##########################################################
+        cor_15min <- get_cor_monthly_avg_by_period(
+            df_15min, corridors, metric$variable, "Timeperiod", metric$weight)
+        sub_15min <- get_cor_monthly_avg_by_period(
+            df_15min, subcorridors, metric$variable, "Timeperiod", metric$weight)
 
-print(glue("{Sys.time()} User Delay Costs [22 of 29(4)]"))
+        df_15min <- sigify(df_15min, cor_15min, corridors) %>%
+                select(all_of(c("Zone_Group", "Corridor", "Timeperiod", metric$variable, "delta")))
 
-# Flash Events ################################################################
+        addtoRDS(
+            df_15min, glue("{metric$table}_15min.rds"), metric$variable, rds_start_date, calcs_start_date
+        )
+        addtoRDS(
+            cor_15min, glue("cor_15min_{metric$table}.rds"), metric$variable, rds_start_date, calcs_start_date
+        )
+        addtoRDS(
+            sub_15min, glue("sub_15min_{metric$table}.rds"), metric$variable, rds_start_date, calcs_start_date
+        )
 
-print(glue("{Sys.time()} Flash Events [23 of 29(4)]"))
-
-# BIKE/PED SAFETY INDEX #######################################################
-
-print(glue("{Sys.time()} Bike/Ped Safety Index [24 of 29(4)]"))
-
-# RELATIVE SPEED INDEX ########################################################
-
-print(glue("{Sys.time()} Relative Speed Index [25 of 29(4)]"))
-
-# CRASH INDICES ###############################################################
-
-print(glue("{Sys.time()} Crash Indices [26 of 29(4)]"))
+        ifrm(daily)
+        ifrm(df_15min)
+        ifrm(cor_15min)
+        ifrm(sub_15min)
+    },
+    error = function(e) {
+        print("ENCOUNTERED AN ERROR:")
+        print(e)
+    }
+)
 
 
 
@@ -454,7 +438,9 @@ print(glue("{Sys.time()} Crash Indices [26 of 29(4)]"))
 
 # Package up for Flexdashboard
 
-print(glue("{Sys.time()} Package for Monthly Report [27 of 29(4)]"))
+print(glue("{Sys.time()} Package for Monthly Report [8 of 9(4)]"))
+
+aurora <- keep_trying(func = get_aurora_connection, n_tries = 5)
 
 tryCatch(
     {
@@ -465,7 +451,8 @@ tryCatch(
             "aogh" = readRDS("cor_15min_aog.rds"),
             "prh" = readRDS("cor_15min_pr.rds"),
             "sfh" = readRDS("cor_15min_sf.rds"),
-            "qsh" = readRDS("cor_15min_qs.rds")
+            "qsh" = readRDS("cor_15min_qs.rds"),
+            "adh" = readRDS("cor_15min_ad.rds")
         )
     },
     error = function(e) {
@@ -473,6 +460,10 @@ tryCatch(
         print(e)
     }
 )
+
+append_to_database(
+    aurora, cor2, "cor", calcs_start_date, report_start_date = report_start_date, report_end_date = NULL)
+ifrm(cor2)
 
 
 tryCatch(
@@ -484,7 +475,8 @@ tryCatch(
             "aogh" = readRDS("sub_15min_aog.rds"),
             "prh" = readRDS("sub_15min_pr.rds"),
             "sfh" = readRDS("sub_15min_sf.rds"),
-            "qsh" = readRDS("sub_15min_qs.rds")
+            "qsh" = readRDS("sub_15min_qs.rds"),
+            "adh" = readRDS("sub_15min_ad.rds")
         )
     },
     error = function(e) {
@@ -493,6 +485,9 @@ tryCatch(
     }
 )
 
+append_to_database(
+    aurora, sub2, "sub", calcs_start_date, report_start_date = report_start_date, report_end_date = NULL)
+ifrm(sub2)
 
 
 tryCatch(
@@ -504,7 +499,8 @@ tryCatch(
             "aogh" = readRDS("aog_15min.rds"),
             "prh" = readRDS("pr_15min.rds"),
             "sfh" = readRDS("sf_15min.rds"),
-            "qsh" = readRDS("qs_15min.rds")
+            "qsh" = readRDS("qs_15min.rds"),
+            "adh" = readRDS("ad_15min.rds")
         )
     },
     error = function(e) {
@@ -513,26 +509,8 @@ tryCatch(
     }
 )
 
-
-
-
-
-print(glue("{Sys.time()} Upload to AWS [28 of 29(4)]"))
-
-
-print(glue("{Sys.time()} Write to Database [29 of 29(4)]"))
-
-source("write_sigops_to_db.R")
-
-# Update Aurora Nightly
-aurora <- keep_trying(func = get_aurora_connection, n_tries = 5)
-# recreate_database(conn)
-
-append_to_database(
-    aurora, cor2, "cor", calcs_start_date, report_start_date = report_start_date, report_end_date = NULL)
-append_to_database(
-    aurora, sub2, "sub", calcs_start_date, report_start_date = report_start_date, report_end_date = NULL)
 append_to_database(
     aurora, sig2, "sig", calcs_start_date, report_start_date = report_start_date, report_end_date = NULL)
+ifrm(sig2)
 
 dbDisconnect(aurora)

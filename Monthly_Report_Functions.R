@@ -38,6 +38,7 @@ suppressMessages({
     library(future.apply)
 })
 
+
 #options(dplyr.summarise.inform = FALSE)
 
 select <- dplyr::select
@@ -89,6 +90,7 @@ AM_PEAK_HOURS = conf$AM_PEAK_HOURS
 PM_PEAK_HOURS = conf$PM_PEAK_HOURS
 
 Sys.setenv(TZ = conf$timezone)
+
 
 source("Utilities.R")
 source("S3ParquetIO.R")

@@ -11,6 +11,14 @@ get_sig <- function() {
 }
 
 
+ifrm <- function(obj, env = globalenv()) {
+    obj <- deparse(substitute(obj))
+    if(exists(obj, envir = env)) {
+        rm(list = obj, envir = env)
+    }
+}
+
+
 sizeof <- function(x) {
     format(object.size(x), units = "Mb")
 }

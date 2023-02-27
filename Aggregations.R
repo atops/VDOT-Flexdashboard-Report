@@ -1245,3 +1245,58 @@ sigify <- function(df, cor_df, corridors, identifier = "SignalID") {
     }
 }
 
+
+aggregate <- function(metric, daily, aurora) {
+
+    weekly <- get_weekly_avg_by_day(daily, metric$variable, metric$weight, metric$peak_only)
+    monthly <- get_monthly_avg_by_day(daily, metric$variable, metric$weight, metric$peak_only)
+
+    sub_daily <- get_cor_weekly_avg_by_day(
+        daily, subcorridors, metric$variable, metric$weight)
+    cor_daily <- get_cor_weekly_avg_by_day(
+        daily, corridors, metric$variable, metric$weight)
+    avg_daily <- sigify(daily, cor_daily, corridors) %>%
+        select(Zone_Group, Corridor, Date, !!as.name(metric$variable), delta) %>%
+        filter(!is.na(Zone_Group))
+
+    sub_weekly <- get_cor_weekly_avg_by_day(weekly, subcorridors, metric$variable, metric$weight)
+    cor_weekly <- get_cor_weekly_avg_by_day(weekly, corridors, metric$variable, metric$weight)
+    avg_weekly <- sigify(weekly, cor_weekly, corridors) %>%
+        select(Zone_Group, Corridor, Date, !!as.name(metric$variable), delta) %>%
+        filter(!is.na(Zone_Group))
+
+    sub_monthly <- get_cor_monthly_avg_by_day(monthly, subcorridors, metric$variable, metric$weight)
+    cor_monthly <- get_cor_monthly_avg_by_day(monthly, corridors, metric$variable, metric$weight)
+    avg_monthly <- sigify(monthly, cor_monthly, corridors) %>%
+        select(Zone_Group, Corridor, Month, !!as.name(metric$variable), delta) %>%
+        filter(!is.na(Zone_Group))
+
+    corr_levels <- c("sig", "sub", "cor")
+    pers <- c("dy", "wk", "mo")
+
+    td <- tibble(
+        data = list(avg_daily, sub_daily, cor_daily,
+                    avg_weekly, sub_weekly, cor_weekly,
+                    avg_monthly, sub_monthly, cor_monthly),
+        fn = paste0(apply(expand.grid(corr_levels, pers, metric$table), 1, paste, collapse="/"), ".parquet"),
+        var = metric$variable,
+        rsd = report_start_date,
+        csd = c(rep(as_date(calcs_start_date), 3),
+                rep(wk_calcs_start_date, 3),
+                rep(as_date(calcs_start_date), 3))
+    )
+
+    write_aggregations(aurora, td)
+
+    td <- tibble(
+        data = lapply(glue("{corr_levels}/mo/{metric$table}.parquet"), function(fn) {
+            get_quarterly(read_parquet(fn), metric$variable)}
+        ),
+        fn = glue("{corr_levels}/qu/{metric$table}.parquet"),
+        var = metric$variable,
+        rsd = report_start_date,
+        csd = report_start_date
+    )
+
+    write_aggregations(aurora, td)
+}

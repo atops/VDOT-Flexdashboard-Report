@@ -43,7 +43,6 @@ get_uptime <- function(df, start_date, end_time) {
 }
 
 
-
 get_spm_data_athena <- function(start_date, end_date, signals_list = NULL, conf, table, TWR_only=TRUE) {
 
     conn <- get_athena_connection(conf)

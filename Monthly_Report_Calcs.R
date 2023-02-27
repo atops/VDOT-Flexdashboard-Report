@@ -6,7 +6,7 @@ source("Monthly_Report_Calcs_init.R")
 
 # # GET CAMERA UPTIMES ########################################################
 
-print(glue("{Sys.time()} parse cctv logs [1 of 11]"))
+print(glue("{Sys.time()} parse cctv logs [1 of 14]"))
 
 if (conf$run$cctv == TRUE) {
     # Run python scripts asynchronously
@@ -18,11 +18,11 @@ if (conf$run$cctv == TRUE) {
 
 # # GET RSU UPTIMES ###########################################################
 
-print(glue("{Sys.time()} parse rsu logs [2 of 11]"))
+print(glue("{Sys.time()} parse rsu logs [2 of 14]"))
 
 # # TRAVEL TIMES FROM RITIS API ###############################################
 
-print(glue("{Sys.time()} travel times [3 of 11]"))
+print(glue("{Sys.time()} travel times [3 of 14]"))
 
 if (conf$run$travel_times == TRUE) {
     # Run python script asynchronously
@@ -33,7 +33,7 @@ if (conf$run$travel_times == TRUE) {
 
 # # COUNTS ####################################################################
 
-print(glue("{Sys.time()} counts [4 of 11]"))
+print(glue("{Sys.time()} counts [4 of 14]"))
 
 if (conf$run$counts == TRUE) {
     date_range <- seq(ymd(start_date), ymd(end_date), by = "1 day")
@@ -59,7 +59,7 @@ if (conf$run$counts == TRUE) {
     }
 
 
-    print(glue("{Sys.time()} Detection Levels by Signal [5.1 of 11]"))
+    print(glue("{Sys.time()} Detection Levels by Signal [5.1 of 14]"))
 
     lapply(date_range, function(date_) {
 
@@ -83,13 +83,11 @@ print("\n---------------------- Finished counts ---------------------------\n")
 
 
 
-print(glue("{Sys.time()} monthly cu [5 of 11]"))
+print(glue("{Sys.time()} monthly cu [5 of 14]"))
 
 
-# --- Everything up to here needs the ATSPM Database ---
-
-signals_list <- as.integer(as.character(corridors$SignalID))
-signals_list <- unique(as.character(signals_list[signals_list > 0]))
+signals_list <- unique(corridors$SignalID)
+signals_list <- signals_list[signals_list != "-1"]
 
 # Group into months to calculate filtered and adjusted counts
 # adjusted counts needs a full month to fill in gaps based on monthly averages
@@ -107,7 +105,7 @@ signals_list <- unique(as.character(signals_list[signals_list > 0]))
 
 
 
-print(glue("{Sys.time()} counts-based measures [6 of 11]"))
+print(glue("{Sys.time()} counts-based measures [6 of 14]"))
 
 get_counts_based_measures <- function(month_abbrs) {
     lapply(month_abbrs, function(yyyy_mm) {
@@ -314,7 +312,8 @@ get_counts_based_measures <- function(month_abbrs) {
             "counts_ped_1hr",
             as.character(sd),
             as.character(ed),
-            bucket = conf$bucket
+            bucket = conf$bucket,
+            conf = conf
         )
 
         if (!is.null(counts_ped_1hr) && nrow(counts_ped_1hr)) {
@@ -353,7 +352,8 @@ get_counts_based_measures <- function(month_abbrs) {
             "counts_ped_15min",
             as.character(sd),
             as.character(ed),
-            bucket = conf$bucket
+            bucket = conf$bucket,
+            conf = conf
         )
 
         if (!is.null(counts_ped_15min) && nrow(counts_ped_15min)) {
@@ -381,7 +381,7 @@ print("--- Finished counts-based measures ---")
 
 
 # -- Run etl_dashboard (Python): cycledata, detectionevents to S3/Athena --
-print(glue("{Sys.time()} etl [7 of 11]"))
+print(glue("{Sys.time()} etl [7 of 14]"))
 
 if (conf$run$etl == TRUE) {
 
@@ -392,7 +392,7 @@ if (conf$run$etl == TRUE) {
 # --- ----------------------------- -----------
 
 # # GET ARRIVALS ON GREEN #####################################################
-print(glue("{Sys.time()} aog [8 of 11]"))
+print(glue("{Sys.time()} aog [8 of 14]"))
 
 if (conf$run$arrivals_on_green == TRUE) {
 
@@ -430,7 +430,7 @@ get_queue_spillback_date_range <- function(start_date, end_date) {
         }
     })
 }
-print(glue("{Sys.time()} queue spillback [9 of 11]"))
+print(glue("{Sys.time()} queue spillback [9 of 14]"))
 
 if (conf$run$queue_spillback == TRUE) {
     get_queue_spillback_date_range(start_date, end_date)
@@ -441,7 +441,7 @@ if (conf$run$queue_spillback == TRUE) {
 # # GET PED DELAY ########################################################
 
 # Ped delay using ATSPM method, based on push button-start of walk durations
-print(glue("{Sys.time()} ped delay [10 of 11]"))
+print(glue("{Sys.time()} ped delay [10 of 14]"))
 
 get_pd_date_range <- function(start_date, end_date) {
     date_range <- seq(ymd(start_date), ymd(end_date), by = "1 day")
@@ -470,7 +470,7 @@ if (conf$run$ped_delay == TRUE) {
 
 # # GET SPLIT FAILURES ########################################################
 
-print(glue("{Sys.time()} split failures [11 of 11]"))
+print(glue("{Sys.time()} split failures [11 of 14]"))
 
 get_sf_date_range <- function(start_date, end_date) {
     date_range <- seq(ymd(start_date), ymd(end_date), by = "1 day")
@@ -510,7 +510,7 @@ if (conf$run$split_failures == TRUE) {
 
 # # GET TERMINATION TYPES #####################################################
 
-print(glue("{Sys.time()} phase terminations [11b of 11]"))
+print(glue("{Sys.time()} phase terminations [12 of 14]"))
 
 if (conf$run$phase_termination == TRUE) {
     date_range <- seq(ymd(start_date), ymd(end_date), by = "1 day")
@@ -532,6 +532,22 @@ if (conf$run$phase_termination == TRUE) {
     })
 }
 
+
+print(glue("{Sys.time()} time in transition [13 of 14]"))
+
+if (conf$run$time_in_transition == TRUE) {
+    # Run python script asynchronously
+    system("conda run -n tractionmetrics python get_tint.py")
+}
+
+
+
+print(glue("{Sys.time()} approach delay [14 of 14]"))
+
+if (conf$run$approach_delay == TRUE) {
+    # Run python script asynchronously
+    system("conda run -n tractionmetrics python get_approach_delay.py")
+}
 
 print("\n--------------------- End Monthly Report calcs -----------------------\n")
 

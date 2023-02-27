@@ -12,25 +12,9 @@ calcs_start_date <- max(calcs_start_date, as_date(get_date_from_string(conf$star
 rds_start_date <- calcs_start_date - days(1)
 
 
-# # DETECTOR UPTIME ###########################################################
-
-print(glue("{Sys.time()} Vehicle Detector Uptime [1 of 29(3)]"))
-
-# DAILY PEDESTRIAN PUSHBUTTON UPTIME ##########################################
-
-print(glue("{Sys.time()} Ped Pushbutton Uptime [2 of 29(3)]"))
-
-# # WATCHDOG ##################################################################
-
-print(glue("{Sys.time()} watchdog alerts [3 of 29(3)]"))
-
-# DAILY PEDESTRIAN ACTIVATIONS ################################################
-
-print(glue("{Sys.time()} Daily Pedestrian Activations [4 of 29(3)]"))
-
 # HOURLY PEDESTRIAN ACTIVATIONS ###############################################
 
-print(glue("{Sys.time()} Hourly Pedestrian Activations [5 of 29(3)]"))
+print(glue("{Sys.time()} Hourly Pedestrian Activations [1 of 9(3)]"))
 
 tryCatch(
     {
@@ -110,21 +94,9 @@ tryCatch(
     }
 )
 
-# GET PEDESTRIAN DELAY ########################################################
-
-print(glue("{Sys.time()} Pedestrian Delay [6 of 29(3)]"))
-
-# GET COMMUNICATIONS UPTIME ###################################################
-
-print(glue("{Sys.time()} Communication Uptime [7 of 29(3)]"))
-
-# DAILY VOLUMES ###############################################################
-
-print(glue("{Sys.time()} Daily Volumes [8 of 29(3)]"))
-
 # HOURLY VOLUMES ##############################################################
 
-print(glue("{Sys.time()} Hourly Volumes [9 of 29(3)]"))
+print(glue("{Sys.time()} Hourly Volumes [2 of 9(3)]"))
 
 tryCatch(
     {
@@ -171,17 +143,9 @@ tryCatch(
     }
 )
 
-# DAILY THROUGHPUT ############################################################
-
-print(glue("{Sys.time()} Daily Throughput [10 of 29(3)]"))
-
-# DAILY ARRIVALS ON GREEN #####################################################
-
-print(glue("{Sys.time()} Daily AOG [11 of 29(3)]"))
-
 # HOURLY ARRIVALS ON GREEN ####################################################
 
-print(glue("{Sys.time()} Hourly AOG [12 of 29(3)]"))
+print(glue("{Sys.time()} Hourly AOG [3 of 9(3)]"))
 
 tryCatch(
     {
@@ -242,13 +206,9 @@ tryCatch(
     }
 )
 
-# DAILY PROGRESSION RATIO #####################################################
-
-print(glue("{Sys.time()} Daily Progression Ratio [13 of 29(3)]"))
-
 # HOURLY PROGESSION RATIO #####################################################
 
-print(glue("{Sys.time()} Hourly Progression Ratio [14 of 29(3)]"))
+print(glue("{Sys.time()} Hourly Progression Ratio [4 of 9(3)]"))
 
 tryCatch(
     {
@@ -289,13 +249,9 @@ tryCatch(
     }
 )
 
-# DAILY SPLIT FAILURES ########################################################
-
-print(glue("{Sys.time()} Daily Split Failures [15 of 29(3)]"))
-
 # HOURLY SPLIT FAILURES #######################################################
 
-print(glue("{Sys.time()} Hourly Split Failures [16 of 29(3)]"))
+print(glue("{Sys.time()} Hourly Split Failures [5 of 9(3)]"))
 
 tryCatch(
     {
@@ -318,12 +274,15 @@ tryCatch(
             rename(Hour = Date_Hour) %>%
             select(SignalID, CallPhase, Hour, sf_freq, Date)
 
+        # TODO: Not sure this "complete" logic is correct. Revisit.
+        # It may fill in Hours that don't correspond to the date field.
         hourly_sf <- sf %>%
             complete(
                 nesting(SignalID, Date, CallPhase),
                 Hour = seq(as_datetime(rds_start_date), as_datetime(report_end_date) - hours(1), by = "1 hour"),
                 fill = list(sf_freq = 0)
             ) %>%
+            filter(Date == as_date(Hour)) %>%  # This is new. Need to test.
             get_period_avg("sf_freq", "Hour")
 
         cor_hourly_sf <- get_cor_monthly_avg_by_period(hourly_sf, corridors, "sf_freq", "Hour")
@@ -354,20 +313,16 @@ tryCatch(
     }
 )
 
-# DAILY QUEUE SPILLBACK #######################################################
-
-print(glue("{Sys.time()} Daily Queue Spillback [17 of 29(3)]"))
-
 # HOURLY QUEUE SPILLBACK ######################################################
 
-print(glue("{Sys.time()} Hourly Queue Spillback [18 of 29(3)]"))
+print(glue("{Sys.time()} Hourly Queue Spillback [6 of 9(3)]"))
 
 tryCatch(
     {
         qs <- s3_read_parquet_parallel(
             bucket = conf$bucket,
             table_name = "queue_spillback",
-            start_date = calcs_start_date,
+            start_date = rds_start_date,
             end_date = report_end_date,
             signals_list = signals_list,
             conf = conf
@@ -418,43 +373,72 @@ tryCatch(
     }
 )
 
-# TRAVEL TIME AND BUFFER TIME INDEXES #########################################
+# HOURLY APPROACH DELAY ###############################################################
 
-print(glue("{Sys.time()} Travel Time Indexes [19 of 29(3)]"))
+print(glue("{Sys.time()} Approach Delay [7 of 9(3)]"))
 
-# CCTV UPTIME From 511 and Encoders
+tryCatch(
+    {
+        ifrm(df)
+        ifrm(hourly)
+        ifrm(cor_hourly)
+        ifrm(sub_hourly)
 
-print(glue("{Sys.time()} CCTV Uptimes [20 of 29(3)]"))
+        metric <- approach_delay
 
-# ACTIVITIES ##################################################################
+        df <- s3_read_parquet_parallel(
+            bucket = conf$bucket,
+            table_name = metric$s3table,
+            start_date = rds_start_date,
+            end_date = report_end_date,
+            signals_list = signals_list,
+            conf = conf
+        ) %>%
+            mutate(
+                SignalID = factor(SignalID),
+                CallPhase = factor(0),
+                Week = week(Date)
+            )
 
-print(glue("{Sys.time()} TEAMS [21 of 29(3)]"))
+        hourly <- df %>%
+            get_period_avg(metric$variable, "Hour", metric$weight)
 
-# USER DELAY COSTS   ##########################################################
+        cor_hourly <- get_cor_monthly_avg_by_period(
+            hourly, corridors, metric$variable, "Hour", metric$weight)
+        sub_hourly <- get_cor_monthly_avg_by_period(
+            hourly, subcorridors, metric$variable, "Hour", metric$weight)
 
-print(glue("{Sys.time()} User Delay Costs [22 of 29(3)]"))
+        hourly <- sigify(hourly, cor_hourly, corridors) %>%
+                select(all_of(c("Zone_Group", "Corridor", "Hour", metric$variable, "delta")))
 
-# Flash Events ################################################################
+        addtoRDS(
+            hourly, glue("hourly_{metric$table}.rds"), metric$variable, rds_start_date, calcs_start_date
+        )
+        addtoRDS(
+            cor_hourly, glue("cor_hourly_{metric$table}.rds"), metric$variable, rds_start_date, calcs_start_date
+        )
+        addtoRDS(
+            sub_hourly, glue("sub_hourly_{metric$table}.rds"), metric$variable, rds_start_date, calcs_start_date
+        )
 
-print(glue("{Sys.time()} Flash Events [23 of 29(3)]"))
-
-# BIKE/PED SAFETY INDEX #######################################################
-
-print(glue("{Sys.time()} Bike/Ped Safety Index [24 of 29(3)]"))
-
-# RELATIVE SPEED INDEX ########################################################
-
-print(glue("{Sys.time()} Relative Speed Index [25 of 29(3)]"))
-
-# CRASH INDICES ###############################################################
-
-print(glue("{Sys.time()} Crash Indices [26 of 29(3)]"))
+        ifrm(df)
+        ifrm(hourly)
+        ifrm(cor_hourly)
+        ifrm(sub_hourly)
+    },
+    error = function(e) {
+        print("ENCOUNTERED AN ERROR:")
+        print(e)
+    }
+)
 
 
 
 
 
 # Package up for Flexdashboard
+
+print(glue("{Sys.time()} Package for Monthly Report [8 of 9(3)]"))
 
 # All of the hourly bins.
 
@@ -467,7 +451,8 @@ tryCatch(
             "aogh" = readRDS("cor_hourly_aog.rds"),
             "prh" = readRDS("cor_hourly_pr.rds"),
             "sfh" = readRDS("cor_hourly_sf.rds"),
-            "qsh" = readRDS("cor_hourly_qs.rds")
+            "qsh" = readRDS("cor_hourly_qs.rds"),
+            "adh" = readRDS("cor_hourly_ad.rds")
         )
     },
     error = function(e) {
@@ -486,7 +471,8 @@ tryCatch(
             "aogh" = readRDS("sub_hourly_aog.rds"),
             "prh" = readRDS("sub_hourly_pr.rds"),
             "sfh" = readRDS("sub_hourly_sf.rds"),
-            "qsh" = readRDS("sub_hourly_qs.rds")
+            "qsh" = readRDS("sub_hourly_qs.rds"),
+            "adh" = readRDS("sub_hourly_ad.rds")
         )
     },
     error = function(e) {
@@ -506,7 +492,8 @@ tryCatch(
             "aogh" = readRDS("hourly_aog.rds"),
             "prh" = readRDS("hourly_pr.rds"),
             "sfh" = readRDS("hourly_sf.rds"),
-            "qsh" = readRDS("hourly_qs.rds")
+            "qsh" = readRDS("hourly_qs.rds"),
+            "adh" = readRDS("hourly_ad.rds")
         )
     },
     error = function(e) {
@@ -519,10 +506,7 @@ tryCatch(
 
 
 
-print(glue("{Sys.time()} Upload to AWS [28 of 29(3)]"))
-
-
-print(glue("{Sys.time()} Write to Database [29 of 29(3)]"))
+print(glue("{Sys.time()} Write to Database [9 of 9(3)]"))
 
 # Update Aurora Nightly
 aurora <- keep_trying(func = get_aurora_connection, n_tries = 5)
