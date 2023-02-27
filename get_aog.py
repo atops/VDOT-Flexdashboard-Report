@@ -6,6 +6,7 @@ Created on Sat Feb 15 15:15:31 2020
 """
 
 import os
+import posixpath
 import psutil
 import yaml
 import time
@@ -28,7 +29,7 @@ def get_aog(signalid, date_, det_config, conf, per='H'):
     '''
     try:
         bucket = conf['bucket']
-        key_prefix = conf['key_prefix']
+        key_prefix = conf['key_prefix'] or ''
 
         date_str = date_.strftime('%Y-%m-%d')
         all_hours = pd.date_range(date_, date_ + pd.Timedelta(1, unit='days'), freq=per, inclusive='left')
@@ -39,7 +40,7 @@ def get_aog(signalid, date_, det_config, conf, per='H'):
         else:
             detection_events = gcsio.s3_read_parquet(
                 Bucket=bucket,
-                Key=f'{key_prefix}/detections/date={date_str}/de_{signalid}_{date_str}.parquet')
+                Key=posixpath.join(key_prefix, f'detections/date={date_str}/de_{signalid}_{date_str}.parquet'))
 
         df = (pd.merge(
                 detection_events,
@@ -153,7 +154,7 @@ def main(start_date, end_date, conf):
             gcsio.s3_write_parquet(
                 df,
                 Bucket=bucket,
-                Key=f'{key_prefix}/mark/arrivals_on_green/date={date_str}/aog_{date_str}.parquet')
+                Key=posixpath.join(key_prefix, f'mark/arrivals_on_green/date={date_str}/aog_{date_str}.parquet'))
 
             num_signals = len(list(set(df.SignalID.values)))
             t1 = round(time.time() - t0, 1)
@@ -185,12 +186,12 @@ def main(start_date, end_date, conf):
                           vol=lambda x: x.vol.astype('int32')))
 
             bucket = conf['bucket']
-            key_prefix = conf['key_prefix']
+            key_prefix = conf['key_prefix'] or ''
 
             gcsio.s3_write_parquet(
                 df,
                 Bucket=bucket,
-                Key=f'{key_prefix}/mark/arrivals_on_green_15min/date={date_str}/aog_{date_str}.parquet')
+                Key=posixpath.join(key_prefix, f'mark/arrivals_on_green_15min/date={date_str}/aog_{date_str}.parquet'))
 
             num_signals = len(list(set(df.SignalID.values)))
             t1 = round(time.time() - t0, 1)

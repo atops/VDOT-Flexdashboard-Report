@@ -11,31 +11,37 @@ import numpy as np
 
 pd.options.display.width = 120
 
-def get_pairs(df, a, b):
+def get_pairs(df, a, b, field='EventCode'):
     # Get the start time, end time and duration of all chronological pairs of EventCodes
     # Example: a=1, b=8 gives the start, end and duration of green for every SignalID, EventParam
+    # a and b can be a scalar or a list
     
-    g = df.query('EventCode in [%s,%s]' % (str(a), str(b)))
-     
-    rdf = (g.query('EventCode=={}'.format(str(a)))
+    otherfield = {'EventCode', 'EventParam'} - set(field)
+
+    a = a if type(a)==list else [a]
+    b = b if type(b)==list else [b]
+
+    g = df[df[field].isin(a+b)]
+
+    rdf = (g[g[field].isin(a)]
             .rename(columns={'TimeStamp':'StartTimeStamp'})
             .sort_values('StartTimeStamp'))
-    ldf = (g.query('EventCode=={}'.format(str(b)))
-            .rename(columns={'TimeStamp':'EndTimeStamp','EventCode':'delete'})
+    ldf = (g[g[field].isin(b)]
+            .rename(columns={'TimeStamp':'EndTimeStamp', 'EventCode':'delete'})
             .sort_values('EndTimeStamp'))
-        
+
     j = (pd.merge_asof(left=ldf, 
                             right=rdf, 
                             left_on=['EndTimeStamp'], 
                             right_on=['StartTimeStamp'], 
-                            by=['SignalID','EventParam'])
+                            by=['SignalID', otherfield])
             .drop('delete', axis=1)
             .reset_index()
-            .sort_values(['SignalID','EventParam','StartTimeStamp'])
-            .set_index(['SignalID','EventParam']))
+            .sort_values(['SignalID', otherfield, 'StartTimeStamp'])
+            .set_index(['SignalID', otherfield]))
 
-    j['Duration'] = (j.EndTimeStamp - j.StartTimeStamp) / np.timedelta64(1, 's')
-    j = j[['StartTimeStamp','EndTimeStamp','EventCode','Duration']]
+    j['Duration'] = (j.EndTimeStamp - j.StartTimeStamp).dt.total_seconds()
+    j = j[['StartTimeStamp', 'EndTimeStamp', 'EventCode', 'Duration']]
     
     # Remove secondary matches when there are multiple matches on the first item    
     j = j.set_index('StartTimeStamp', append=True).sort_index()
