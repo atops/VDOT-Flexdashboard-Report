@@ -148,16 +148,20 @@ s3_read_parquet_parallel <- function(table_name,
                                      bucket = NULL,
                                      callback = function(x) {x},
                                      parallel = FALSE) {
-    
+
     dates <- seq(ymd(start_date), ymd(end_date), by = "1 day")
-    
+
     func <- function(date_) {
         prefix <- glue("mark/{table_name}/date={date_}")
         objects = aws.s3::get_bucket(bucket = bucket, prefix = prefix)
         lapply(objects, function(obj) {
-            s3_read_parquet(bucket = bucket, object = get_objectkey(obj), date_) %>%
+            df <- s3_read_parquet(bucket = bucket, object = get_objectkey(obj), date_) %>%
                 convert_to_utc() %>%
                 callback()
+            if (!is.null(signals_list)) {
+                df <- filter(df, SignalID %in% signals_list)
+            }
+            df
         }) %>% bind_rows()
     }
     # When using mclapply, it fails. When using lapply, it works. 6/23/2020
