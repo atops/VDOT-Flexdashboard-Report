@@ -113,19 +113,19 @@ get_corridors <- function(corr_fn, filter_signals = TRUE) {
 # This is a "function factory"
 # It is meant to be used to create a get_det_config function that takes only the date:
 # like: get_det_config <- get_det_config_(conf$bucket, "atspm_det_config_good")
-get_det_config_  <- function(bucket, folder, type = "det") {
+get_det_config_ <- function(bucket, folder, type = "det") {
 
     function(date_) {
         prefix <- glue("{folder}/date={date_}")
         objs <- s3_list_objects(bucket = bucket, prefix = prefix)
 
-	if (type == "det") {
-		arrow_schema <- det_config_arrow_schema
-	} else if (type == "ped") {
-		arrow_schema <- ped_config_arrow_schema
-	}
+        if (type == "det") {
+            arrow_schema <- det_config_arrow_schema
+        } else if (type == "ped") {
+            arrow_schema <- ped_config_arrow_schema
+        }
 
-	if (!is.null(objs)) {
+        if (!is.null(objs)) {
             tryCatch({
                 arrow::open_dataset(
                     sources = file.path("gs:/", bucket, prefix),
