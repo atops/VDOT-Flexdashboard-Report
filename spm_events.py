@@ -18,10 +18,10 @@ def get_pairs(df, a, b, field='EventCode'):
     
     otherfield = {'EventCode', 'EventParam'} - set(field)
 
-    ec = []
-    [ec.extend(z) if type(z)==list else ec.append(z) for z in (a, b)]
+    a = a if type(a)==list else [a]
+    b = b if type(b)==list else [b]
 
-    g = df[df[field].isin(ec)]
+    g = df[df[field].isin(a+b)]
 
     rdf = (g[g[field].isin(a)]
             .rename(columns={'TimeStamp':'StartTimeStamp'})
