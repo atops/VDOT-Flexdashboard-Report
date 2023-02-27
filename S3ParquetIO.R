@@ -34,12 +34,12 @@ s3read_using <- aws.s3::s3read_using
 s3write_using <- aws.s3::s3write_using 
 
 
-s3_write_parquet <- function(df, bucket, object) {
-    s3write_using(write_parquet, df, bucket, object)
+s3_write_parquet <- function(df, bucket, object, ...) {
+    s3write_using(df, write_parquet, bucket, object, ...)
 }
 
 
-s3_upload_parquet <- function(df, date_, fn, bucket, table_name) {
+s3_upload_parquet <- function(df, date_, fn, bucket, table_name, conf) {
     
     df <- ungroup(df)
     
@@ -65,7 +65,7 @@ s3_upload_parquet <- function(df, date_, fn, bucket, table_name) {
         write_parquet,
         use_deprecated_int96_timestamps = TRUE,
         bucket = bucket,
-        object = glue("mark/{table_name}/date={date_}/{fn}.parquet"),
+        object = join_path(conf$key_prefix, glue("mark/{table_name}/date={date_}/{fn}.parquet")),
         opts = list(multipart = TRUE)
     )
     
@@ -118,7 +118,6 @@ s3_upload_parquet_date_split <- function(df, prefix, bucket, table_name, conf, p
                 })
         }
     }
-    
 }
 
 
@@ -135,7 +134,7 @@ s3_read_parquet <- function(bucket, object, date_ = NULL) {
         }
         df
     }, error = function(e) {
-        print(e)
+        print(glue("Could not read {bucket}/{object} - {e}"))
         data.frame()
     })
 }
@@ -146,6 +145,7 @@ s3_read_parquet_parallel <- function(table_name,
                                      end_date,
                                      signals_list = NULL,
                                      bucket = NULL,
+                                     conf,
                                      callback = function(x) {x},
                                      parallel = FALSE) {
 
