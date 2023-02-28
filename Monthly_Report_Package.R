@@ -1719,6 +1719,7 @@ tryCatch(
             "vphpp" = readRDS("cor_daily_vph_pm.rds"),
             "vph" = readRDS("cor_daily_vph.rds"),
             "papd" = readRDS("cor_daily_papd.rds"),
+	    "pd" = readRDS("cor_daily_pd.rds"),
             "tp" = readRDS("cor_daily_throughput.rds"),
             "aogd" = readRDS("cor_daily_aog.rds"),
             "prd" = readRDS("cor_daily_pr.rds"),
@@ -1819,6 +1820,7 @@ tryCatch(
             "vphpp" = readRDS("sub_daily_vph_pm.rds"),
             "vph" = readRDS("sub_daily_vph.rds"),
             "papd" = readRDS("sub_daily_papd.rds"),
+	    "pd" = readRDS("sub_daily_pd.rds"),
             "tp" = readRDS("sub_daily_throughput.rds"),
             "aogd" = readRDS("sub_daily_aog.rds"),
             "prd" = readRDS("sub_daily_pr.rds"),
@@ -1899,6 +1901,7 @@ tryCatch(
             # "vph" = get_quarterly(sub$mo$vph, "vph"),
             "vphpa" = get_quarterly(sub$mo$vphpa, "vph"),
             "vphpp" = get_quarterly(sub$mo$vphpp, "vph"),
+	    "pd" = get_quarterly(sub$mo$pd, "pd"),
             "tp" = get_quarterly(sub$mo$tp, "vph"),
             "aogd" = get_quarterly(sub$mo$aogd, "aog", "vol"),
             "prd" = get_quarterly(sub$mo$prd, "pr", "vol"),
@@ -1931,6 +1934,8 @@ tryCatch(
                 select(Zone_Group, Corridor, Description, Date, vph, delta),
             "papd" = sigify(readRDS("daily_papd.rds"), cor$dy$papd, corridors) %>%
                 select(Zone_Group, Corridor, Description, Date, papd, delta),
+	    "pd" = sigify(readRDS("daily_pd.rds"), cor$dy$pd, corridors) %>%
+                select(Zone_Group, Corridor, Description, Date, pd, delta),
             "tp" = sigify(readRDS("daily_throughput.rds"), cor$dy$tp, corridors) %>%
                 select(Zone_Group, Corridor, Description, Date, vph, delta),
             "aogd" = sigify(readRDS("daily_aog.rds"), cor$dy$aogd, corridors) %>%
