@@ -150,7 +150,7 @@ s3_read_parquet <- function(bucket, object, date_ = NULL) {
         }
         df
     }, error = function(e) {
-        print(glue("Could not read {bucket}/{object}"))
+        print(glue("Could not read {bucket}/{object} - {e}"))
         data.frame()
     })
 }
@@ -164,16 +164,20 @@ s3_read_parquet_parallel <- function(table_name,
                                      conf,
                                      callback = function(x) {x},
                                      parallel = FALSE) {
-    
+
     dates <- seq(ymd(start_date), ymd(end_date), by = "1 day")
-    
+
     func <- function(date_) {
         prefix <- glue("{conf$key_prefix}/mark/{table_name}/date={date_}")
         objects = s3_list_objects(bucket = bucket, prefix = prefix)$Key
         lapply(objects, function(obj) {
-            s3_read_parquet(bucket = bucket, object = obj, date_) %>%
+            df <- s3_read_parquet(bucket = bucket, object = obj, date_) %>%
                 convert_to_utc() %>%
                 callback()
+            if (!is.null(signals_list)) {
+                df <- filter(df, SignalID %in% signals_list)
+            }
+            df
         }) %>% bind_rows()
     }
     # When using mclapply, it fails. When using lapply, it works. 6/23/2020
