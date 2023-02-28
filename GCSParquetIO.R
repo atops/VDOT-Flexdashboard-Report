@@ -19,14 +19,14 @@ get_bucket <- function(...) {
 s3_list_objects <- function(...) {
     z <- gcs_list_objects(...)
     if (class(z) == "list") {
-	print("list block")
-	names(z) <- "Key"
+        print("list block")
+        names(z) <- "Key"
     } else if (class(z) == "data.frame") {
         if (nrow(z) > 0) {
             z <- rename(z, Key = name)
-	} else {
+        } else {
             z <- NULL
-	}
+        }
     }
     z
 }
@@ -83,7 +83,7 @@ s3_upload_parquet <- function(df, date_, fn, bucket, table_name, conf) {
         n_tries = 5,
         df,
         bucket = bucket,
-        name = glue("{conf$key_prefix}/mark/{table_name}/date={date_}/{fn}.parquet"),
+        name = join_path(conf$key_prefix, glue("mark/{table_name}/date={date_}/{fn}.parquet")),
         object_function = function(input, output) write_parquet(x = input, sink = output),
         predefinedAcl = "bucketLevel")
 }
