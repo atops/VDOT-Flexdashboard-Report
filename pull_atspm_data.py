@@ -196,7 +196,7 @@ if __name__ == '__main__':
                 while True:
                     keys = gcsio.s3_list_objects(
                         Bucket=bucket,
-                        Prefix=posixpath.join(key_prefix, f"atspm/date={start_date.strftime('%Y-%m-%d')}",
+                        Prefix=posixpath.join(key_prefix, f"atspm/date={start_date.strftime('%Y-%m-%d')}"),
                         max_results=1)
                     if len(keys) > 0:
                         start_date = (start_date + timedelta(days=1))

@@ -75,17 +75,17 @@ def nightly_config(engine, date_, conf):
 
     print("ATSPM Vehicle Detectors [1 of 3]")
     ad = get_atspm_detectors(engine, date_)
-    key = posixpath.join(KEY_PREFIX, f'atspm_det_config/date={date_string}/ATSPM_Det_Config_{REGION}.parquet'
+    key = posixpath.join(KEY_PREFIX, f'atspm_det_config/date={date_string}/ATSPM_Det_Config_{REGION}.parquet')
     gcsio.s3_write_parquet(ad, Bucket=BUCKET, Key=key)
 
     print("ATSPM Vehicle Detector Config [2 of 3]")
     det_config = get_det_config(ad, engine, date_string)
-    key = posixpath.join(KEY_PREFIX, f'atspm_det_config_good/date={date_string}/ATSPM_Det_Config_Good_{REGION}.parquet'
+    key = posixpath.join(KEY_PREFIX, f'atspm_det_config_good/date={date_string}/ATSPM_Det_Config_Good_{REGION}.parquet')
     gcsio.s3_write_parquet(det_config, Bucket=BUCKET, Key=key)
     
     print("ATSPM Pedestrian Detectors [3 of 3]")
     ped_config = get_atspm_ped_detectors(engine, date_)
-    key = posixpath.join(KEY_PREFIX, f'atspm_ped_config/date={date_string}/ATSPM_Ped_Config_{REGION}.parquet'
+    key = posixpath.join(KEY_PREFIX, f'atspm_ped_config/date={date_string}/ATSPM_Ped_Config_{REGION}.parquet')
     gcsio.s3_write_parquet(ped_config, Bucket=BUCKET, Key=key)
     
 
