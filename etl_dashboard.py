@@ -79,7 +79,7 @@ def etl2(s, date_, det_config, conf):
                 print(f'{date_str} | {s} | No cycles')
 
     except Exception as e:
-        print(f'{s}: {e}')
+        print(f'{s}: Exception - {e}')
 
 
 
@@ -131,7 +131,7 @@ def main(start_date, end_date, conf):
         det_config = det_config.assign(CountDetector = det_config.CountPriority == dcg.transform(min))
 
         if len(det_config) > 0:
-            nthreads = round(psutil.virtual_memory().total/1e9)  # ensure 1 MB memory per thread
+            nthreads = round(psutil.virtual_memory().available/1e9)  # ensure 1 MB memory per thread
 
             #-----------------------------------------------------------------------------------------
             # with Pool(processes=nthreads) as pool:

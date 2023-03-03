@@ -16,7 +16,8 @@ def get_pairs(df, a, b, field='EventCode'):
     # Example: a=1, b=8 gives the start, end and duration of green for every SignalID, EventParam
     # a and b can be a scalar or a list
     
-    otherfield = {'EventCode', 'EventParam'} - set(field)
+    otherfield = {'EventCode', 'EventParam'} - set([field])
+    otherfield = list(otherfield)[0]
 
     a = a if type(a)==list else [a]
     b = b if type(b)==list else [b]
