@@ -379,14 +379,14 @@ print(glue("{Sys.time()} Approach Delay [7 of 9(3)]"))
 
 tryCatch(
     {
-        ifrm(df)
+        ifrm(z)
         ifrm(hourly)
         ifrm(cor_hourly)
         ifrm(sub_hourly)
 
         metric <- approach_delay
 
-        df <- s3_read_parquet_parallel(
+        z <- s3_read_parquet_parallel(
             bucket = conf$bucket,
             table_name = metric$s3table,
             start_date = rds_start_date,
@@ -400,7 +400,7 @@ tryCatch(
                 Week = week(Date)
             )
 
-        hourly <- df %>%
+        hourly <- z %>%
             get_period_avg(metric$variable, "Hour", metric$weight)
 
         cor_hourly <- get_cor_monthly_avg_by_period(
@@ -421,7 +421,7 @@ tryCatch(
             sub_hourly, glue("sub_hourly_{metric$table}.rds"), metric$variable, rds_start_date, calcs_start_date
         )
 
-        ifrm(df)
+        ifrm(z)
         ifrm(hourly)
         ifrm(cor_hourly)
         ifrm(sub_hourly)
