@@ -289,7 +289,8 @@ get_occupancy <- function(de_dt, int_dt) {
 
     occ_df <- full_join(
             int_df, occ_df,
-            by = c("SignalID", "Phase", "CycleStart", "IntervalStart", "IntervalEnd")
+            by = c("SignalID", "Phase", "CycleStart", "IntervalStart", "IntervalEnd"),
+            multiple = "all"
         ) %>%
         tidyr::replace_na(
             list(Detector = 0, occ_duration = 0, int_duration = 1)) %>%
