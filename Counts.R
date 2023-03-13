@@ -240,7 +240,7 @@ get_counts2 <- function(date_, bucket, conf, uptime = TRUE, counts = TRUE) {
         }
 
         # get 15min ped counts
-        print("15-minute pedestrian actutation counts")
+        print("15-minute pedestrian actuation counts")
         counts_ped_15min <- get_counts(
             df,
             ped_config,

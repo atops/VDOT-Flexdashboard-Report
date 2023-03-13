@@ -325,11 +325,11 @@ get_sf_utah <- function(date_, conf, signals_list = NULL, first_seconds_of_red =
 
     cat('.')
 
-    de <- get_detection_events_arrow(date_, conf, callback = function(x) filter(x, Phase %in% c(3,4,7,8)))
+    de <- get_detection_events_arrow(date_, conf, signals_list, callback = function(x) filter(x, Phase %in% c(3,4,7,8)))
 
     cat('.')
 
-    cd <- get_cycle_data_arrow(date_, conf, callback = function(x) filter(x, Phase %in% c(3, 4, 7, 8), EventCode %in% c(1, 9)))
+    cd <- get_cycle_data_arrow(date_, conf, signals_list, callback = function(x) filter(x, Phase %in% c(3, 4, 7, 8), EventCode %in% c(1, 9)))
 
     if (nrow(de) == 0 & nrow(cd) == 0) {
         print(glue(" Can't calculate split failures for {date_}. No cycle or detector data."))
