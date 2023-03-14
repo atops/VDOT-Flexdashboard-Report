@@ -11,5 +11,5 @@ echo datestr is %datestr%
 call activate.bat
 cd c:\TractionMetrics\production
 if not exist logs mkdir logs
-conda run -n tractionmetrics python get_watchdog_alerts.py >> logs\get_watchdog_alerts_%datestr%.log
+conda run -n vdot-flexdashboard-report python get_watchdog_alerts.py >> logs\get_watchdog_alerts_%datestr%.log
 Rscript get_alerts.R

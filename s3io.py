@@ -100,7 +100,10 @@ def get_keys(s3, bucket, prefix, callback=lambda x: x):
         Prefix=prefix)
     if 'Contents' in response.keys():
         for cont in response['Contents']:
-            yield callback(cont['Key'])
+            try:
+                yield callback(cont['Key'])
+            except:
+                pass
 
     while 'NextContinuationToken' in response.keys():
         response = s3.list_objects_v2(
@@ -108,14 +111,18 @@ def get_keys(s3, bucket, prefix, callback=lambda x: x):
             Prefix=prefix,
             ContinuationToken=response['NextContinuationToken'])
         for cont in response['Contents']:
-            yield callback(cont['Key'])
+            try:
+                yield callback(cont['Key'])
+            except:
+                pass
 
 
-def get_signalids(date_, conf):
+def get_signalids(date_, conf, path='detections'):
     date_str = date_.strftime('%Y-%m-%d')
     bucket = conf['bucket']
     key_prefix = conf['key_prefix'] or ''
-    prefix = posixpath.join(key_prefix, f'detections/date={date_str}')
+    prefix = posixpath.join(key_prefix, path, f'date={date_str}')
+    print(prefix)
     keys = get_keys(s3, bucket, prefix, callback = lambda k: re.search('(?<=_)\d+(?=_)', k).group())
     return keys
 
@@ -127,7 +134,7 @@ def get_det_config(date_, conf):
     '''
 
     def read_det_config(s3, bucket, key):
-        dc = read_feather(Bucket=bucket, Key=key)
+        dc = s3_read_feather(Bucket=bucket, Key=key)
         dc.loc[dc.DetectionTypeDesc.isna(), 'DetectionTypeDesc'] = '[]'
         return dc
 

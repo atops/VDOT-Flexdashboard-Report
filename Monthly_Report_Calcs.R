@@ -537,7 +537,7 @@ print(glue("{Sys.time()} time in transition [13 of 14]"))
 
 if (conf$run$time_in_transition == TRUE) {
     # Run python script asynchronously
-    system("conda run -n tractionmetrics python get_tint.py")
+    system("conda run -n vdot-flexdashboard-report python get_tint.py")
 }
 
 
@@ -546,7 +546,7 @@ print(glue("{Sys.time()} approach delay [14 of 14]"))
 
 if (conf$run$approach_delay == TRUE) {
     # Run python script asynchronously
-    system("conda run -n tractionmetrics python get_approach_delay.py")
+    system("conda run -n vdot-flexdashboard-report python get_approach_delay.py")
 }
 
 print("\n--------------------- End Monthly Report calcs -----------------------\n")

@@ -15,7 +15,6 @@ s3_list_objects <- function(...) {
     s3b <- aws.s3::get_bucket(...)
     
     df <- lapply(names(s3b$Contents), function(attr) {
-        print(attr)
         unlist(lapply(s3b, function(x) x[[attr]]), use.names = FALSE)
     }) %>% as.data.frame()
     names(df) <- names(s3b$Contents)

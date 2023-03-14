@@ -52,6 +52,8 @@ def etl2(s, date_, det_config, conf):
     try:
         bucket = conf['bucket']
         key_prefix = conf['key_prefix'] or ''
+        key = posixpath.join(key_prefix, f'atspm/date={date_str}/atspm_{s}_{date_str}.parquet')
+        df = s3io.s3_read_parquet_hive(bucket, key)
 
         if len(df)==0:
             print(f'{date_str} | {s} | No event data for this signal')
@@ -65,14 +67,14 @@ def etl2(s, date_, det_config, conf):
 
             if len(c) > 0 and len(d) > 0:
                 s3io.s3_write_parquet(
-                    c, 
-                    bucket, 
-                    posixpath.join(key_prefix, f'cycles/date={date_str}/cd_{s}_{date_str}.parquet'), 
+                    c,
+                    bucket,
+                    posixpath.join(key_prefix, f'cycles/date={date_str}/cd_{s}_{date_str}.parquet'),
                     allow_truncated_timestamps=True)
                 s3io.s3_write_parquet(
-                    d, 
-                    bucket, 
-                    posixpath.join(key_prefix, f'detections/date={date_str}/de_{s}_{date_str}.parquet'), 
+                    d,
+                    bucket,
+                    posixpath.join(key_prefix, f'detections/date={date_str}/de_{s}_{date_str}.parquet'),
                     allow_truncated_timestamps=True)
 
             else:
@@ -100,12 +102,6 @@ def main(start_date, end_date, conf):
     with open('Monthly_Report_AWS.yaml') as yaml_file:
         cred = yaml.load(yaml_file, Loader=yaml.Loader)
 
-    engine = get_aurora_engine(cred)
-    with engine.connect() as conn:
-        corridors = pd.read_sql_table('Corridors', conn)
-
-    signalids = list(corridors.SignalID.values)
-
     athena_database = conf['athena']['database']
     staging_dir = conf['athena']['staging_dir']
     x = re.split('/+', staging_dir) # split path elements into a list
@@ -130,6 +126,8 @@ def main(start_date, end_date, conf):
         dcg = det_config.groupby(['SignalID', 'Call Phase'])['CountPriority']
         det_config = det_config.assign(CountDetector = det_config.CountPriority == dcg.transform(min))
 
+        signalids = list(s3io.get_signalids(date_, conf, 'atspm'))
+
         if len(det_config) > 0:
             nthreads = round(psutil.virtual_memory().available/1e9)  # ensure 1 MB memory per thread
 
@@ -149,26 +147,26 @@ def main(start_date, end_date, conf):
 
     # Add a partition for each day. If more than ten days, update all partitions in one command.
     if len(dates) > 10:
-        response_repair_cycledata = athena.start_query_execution(
+        response_repair_cycledata = s3io.athena.start_query_execution(
             QueryString=f"MSCK REPAIR TABLE cycledata;",
             QueryExecutionContext={'Database': athena_database},
             ResultConfiguration={'OutputLocation': staging_dir})
 
-        response_repair_detection_events = athena.start_query_execution(
+        response_repair_detection_events = s3io.athena.start_query_execution(
             QueryString=f"MSCK REPAIR TABLE detectionevents",
             QueryExecutionContext={'Database': athena_database},
             ResultConfiguration={'OutputLocation': staging_dir})
     else:
         for date_ in dates:
             date_str = date_.strftime('%Y-%m-%d')
-            response_repair_cycledata = athena.start_query_execution(
+            response_repair_cycledata = s3io.athena.start_query_execution(
                 QueryString=f"ALTER TABLE cycledata ADD PARTITION (date = '{date_str}');",
                 QueryExecutionContext={'Database': athena_database},
                 ResultConfiguration={'OutputLocation': staging_dir})
 
-            response_repair_detection_events = athena.start_query_execution(
+            response_repair_detection_events = s3io.athena.start_query_execution(
                 QueryString=f"ALTER TABLE detectionevents ADD PARTITION (date = '{date_str}');",
-                QueryExecutionContext={'Database': athena_database}, 
+                QueryExecutionContext={'Database': athena_database},
                 ResultConfiguration={'OutputLocation': staging_dir})
 
 

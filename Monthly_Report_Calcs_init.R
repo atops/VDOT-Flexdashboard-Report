@@ -92,3 +92,24 @@ dbDisconnect(aurora)
 
 
 signals_list <- unique(corridors$SignalID)
+
+
+# Add partitions that don't already exists to Athena ATSPM table
+athena <- get_athena_connection(conf)
+partitions <- dbGetQuery(athena, glue("SHOW PARTITIONS {conf$athena$atspm_table}"))$partition
+partitions <- sapply(stringr::str_split(partitions, "="), last)
+date_range <- seq(as_date(start_date), as_date(end_date), by = "1 day") %>% as.character()
+missing_partitions <- setdiff(date_range, partitions)
+
+if (length(missing_partitions) > 10) {
+    print(glue("Adding missing partition: date={missing_partitions}"))
+    dbExecute(athena, glue("MSCK REPAIR TABLE {conf$athena$atspm_table}"))
+} else if (length(missing_partitions) > 0) {
+    print("Adding missing partitions:")
+    for (query in glue("ALTER TABLE {conf$athena$atspm_table} add partition (date='{missing_partitions}') location 's3://{conf$bucket}/atspm/date={missing_partitions}/'")) {
+        print(query)
+        dbExecute(athena, query)
+    }
+}
+dbDisconnect(athena)
+

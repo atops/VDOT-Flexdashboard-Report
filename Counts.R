@@ -64,7 +64,7 @@ get_counts2 <- function(date_, bucket, conf, uptime = TRUE, counts = TRUE) {
     }
 
     atspm_query <- sql(glue(paste(
-        "select distinct timestamp as Timestamp, CAST(signalid as VARCHAR) as SignalID, eventcode as EventCode, eventparam as EventParam",
+        "select distinct timestamp as Timestamp, signalid as SignalID, eventcode as EventCode, eventparam as EventParam",
         "from {conf$athena$database}.{conf$athena$atspm_table}",
         "where date = '{date_}'")))
 
