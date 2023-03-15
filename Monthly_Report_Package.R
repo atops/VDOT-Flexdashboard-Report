@@ -382,9 +382,8 @@ tryCatch(
                           Date,
                           Alert = factor("Bad Ped Detection"),
                           Name = factor(Name)
-                )
+                ) %>%
             s3_write_parquet(
-                bad_ped,
                 object = join_path(conf$key_prefix, "mark/watchdog/bad_ped_pushbuttons.parquet"),
                 bucket = conf$bucket)
         }
@@ -400,12 +399,13 @@ tryCatch(
             table_name = "comm_quality",
             start_date = today() - days(90),
             end_date = today() - days(1),
-            signals_list = signals_list,
+            signals_list = NULL,
             conf = conf,
         )
         if (nrow(bad_comm)) {
             bad_comm <- bad_comm %>%
                 mutate(SignalID = factor(AssetNum)) %>%
+                filter(SignalID %in% signals_list) %>%
 
                 left_join(
                     dplyr::select(corridors, Zone_Group, Zone, Corridor, SignalID, Name),
@@ -637,7 +637,7 @@ tryCatch(
             table_name = "comm_quality",
             start_date = wk_calcs_start_date,
             end_date = report_end_date,
-            signals_list = signals_list,
+            signals_list = NULL,
             conf = conf
         ) %>%
             mutate(
@@ -649,7 +649,7 @@ tryCatch(
                 DOW = wday(Date),
                 Week = week(Date)
             ) %>%
-            filter(SignalID %in% corridors$SignalID, Date == as_date(CSDATE)) %>%
+            filter(SignalID %in% signals_list, Date == as_date(CSDATE)) %>%
             left_join(select(corridors, SignalID, Asof), by = "SignalID") %>%
             filter(Date >= Asof)
 
@@ -1648,7 +1648,7 @@ tryCatch(
                 SignalID = factor(SignalID),
                 CallPhase = 0,
                 Week = week(Date),
-                tint = TimeInTransition_sum, # total minutes in transition
+                #tint = TimeInTransition_sum, # total minutes in transition
                 ones = 1
             )
 
@@ -2013,10 +2013,10 @@ tryCatch(
                 select(-c(Name, cycles)),
             "sfo" = sigify(readRDS("monthly_sfo.rds"), cor$mo$sfo, corridors) %>%
                 select(-c(Name, cycles)),
-            "tti" = data.frame(),
-            "pti" = data.frame(),
-            "bi" = data.frame(),
-            "spd" = data.frame(),
+            # "tti" = data.frame(),
+            # "pti" = data.frame(),
+            # "bi" = data.frame(),
+            # "spd" = data.frame(),
             "du" = sigify(readRDS("monthly_detector_uptime.rds"), cor$mo$du, corridors) %>%
                 select(Zone_Group, Corridor, Month, uptime, uptime.sb, uptime.pr, delta),
             "cu" = sigify(readRDS("monthly_comm_uptime.rds"), cor$mo$cu, corridors) %>%

@@ -23,7 +23,7 @@ s3_list_objects <- function(...) {
 
 
 s3_upload_file <- function(file, bucket, object, ...) {
-    aws.s3::put_object(file, bucket, object, ...)
+    aws.s3::put_object(file, object = object, bucket = bucket, ...)
 }
 
 
@@ -34,7 +34,7 @@ s3write_using <- aws.s3::s3write_using
 
 
 s3_write_parquet <- function(df, bucket, object, ...) {
-    s3write_using(df, write_parquet, bucket, object, ...)
+    s3write_using(df, write_parquet, ..., object = object, bucket = bucket)
 }
 
 

@@ -120,7 +120,7 @@ def main(start_date, end_date, conf):
             date_str = date_.strftime('%Y-%m-%d')
             print(date_str)
 
-            signalids = s3io.get_signalids(date_, conf)
+            signalids = list(s3io.get_signalids(date_, conf))
             det_config = s3io.get_det_config(date_, conf)
 
 
@@ -156,9 +156,8 @@ def main(start_date, end_date, conf):
                 Bucket=bucket,
                 Key=posixpath.join(key_prefix, f'mark/arrivals_on_green/date={date_str}/aog_{date_str}.parquet'))
 
-            num_signals = len(list(set(df.SignalID.values)))
             t1 = round(time.time() - t0, 1)
-            print(f'\n{num_signals} signals done in {t1} seconds.')
+            print(f'\n{len(signalids)} signals done in {t1} seconds.')
 
 
 
@@ -193,9 +192,8 @@ def main(start_date, end_date, conf):
                 Bucket=bucket,
                 Key=posixpath.join(key_prefix, f'mark/arrivals_on_green_15min/date={date_str}/aog_{date_str}.parquet'))
 
-            num_signals = len(list(set(df.SignalID.values)))
             t1 = round(time.time() - t0, 1)
-            print(f'\n{num_signals} signals done in {t1} seconds.')
+            print(f'\n{len(signalids)} signals done in {t1} seconds.')
 
 
         except Exception as e:

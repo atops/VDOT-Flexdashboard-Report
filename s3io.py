@@ -122,7 +122,6 @@ def get_signalids(date_, conf, path='detections'):
     bucket = conf['bucket']
     key_prefix = conf['key_prefix'] or ''
     prefix = posixpath.join(key_prefix, path, f'date={date_str}')
-    print(prefix)
     keys = get_keys(s3, bucket, prefix, callback = lambda k: re.search('(?<=_)\d+(?=_)', k).group())
     return keys
 

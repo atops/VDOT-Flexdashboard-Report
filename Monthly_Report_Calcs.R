@@ -408,7 +408,7 @@ get_queue_spillback_date_range <- function(start_date, end_date) {
     lapply(date_range, function(date_) {
         print(date_)
 
-        detection_events <- get_detection_events(date_, date_, conf, signals_list)
+        detection_events <- get_detection_events(date_, conf, signals_list)
         if (nrow(collect(head(detection_events))) > 0) {
 
             qs <- get_qs(detection_events, intervals = c("hour", "15min"))
@@ -537,7 +537,7 @@ print(glue("{Sys.time()} time in transition [13 of 14]"))
 
 if (conf$run$time_in_transition == TRUE) {
     # Run python script asynchronously
-    system("conda run -n vdot-flexdashboard-report python get_tint.py")
+    system(glue("~/miniconda3/bin/conda run -n vdot-flexdashboard-report python get_tint.py {start_date} {end_date}"))
 }
 
 
@@ -546,7 +546,7 @@ print(glue("{Sys.time()} approach delay [14 of 14]"))
 
 if (conf$run$approach_delay == TRUE) {
     # Run python script asynchronously
-    system("conda run -n vdot-flexdashboard-report python get_approach_delay.py")
+    system(glue("~/miniconda3/bin/conda run -n vdot-flexdashboard-report python get_approach_delay.py {start_date} {end_date}"))
 }
 
 print("\n--------------------- End Monthly Report calcs -----------------------\n")

@@ -1143,6 +1143,7 @@ get_quarterly <- function(monthly_df, var_, wt_="ones", operation = "avg") {
         group_by(Corridor,
                  Zone_Group,
                  Quarter = as.character(lubridate::quarter(Month, with_year = TRUE)))
+
     if (operation == "avg") {
         quarterly_df <- quarterly_df %>%
             summarize(!!var_ := weighted.mean(!!var_, !!wt_, na.rm = TRUE),

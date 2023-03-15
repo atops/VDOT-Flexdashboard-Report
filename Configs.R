@@ -67,7 +67,6 @@ get_corridors <- function(corr_fn, filter_signals = TRUE) {
                  Longitude = "numeric")
 
     df <- readxl::read_xlsx(corr_fn, col_types = unlist(cols)) %>%
-        rename(Zone_Group = Contract, Zone = District) %>%
 
         # Get the last modified record for the Signal|Zone|Corridor combination
         replace_na(replace = list(Modified = ymd("1900-01-01"))) %>%

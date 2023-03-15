@@ -43,7 +43,7 @@ get_uptime <- function(df, start_date, end_time) {
 }
 
 
-get_spm_data_athena <- function(start_date, end_date, signals_list = NULL, conf, table, TWR_only=TRUE) {
+get_spm_data_athena <- function(date_, signals_list = NULL, conf, table, TWR_only=TRUE) {
 
     conn <- get_athena_connection(conf)
 
@@ -64,20 +64,16 @@ get_spm_data_athena <- function(start_date, end_date, signals_list = NULL, conf,
         df <- df %>% filter(signalid %in% signals_list)
     }
 
-    end_date1 <- ymd(end_date) + days(1)
-
-    df %>%
-        dplyr::filter(date >= start_date & date < end_date1)
+    df %>% filter(date == date_)
 }
 
 get_spm_data <- get_spm_data_athena
 
 
 # Query Cycle Data
-get_cycle_data <- function(start_date, end_date, conf, signals_list = NULL) {
+get_cycle_data <- function(date_, conf, signals_list = NULL) {
     get_spm_data(
-        start_date,
-        end_date,
+        date_,
         signals_list,
         conf,
         table = "CycleData",
@@ -86,10 +82,9 @@ get_cycle_data <- function(start_date, end_date, conf, signals_list = NULL) {
 
 
 # Query Detection Events
-get_detection_events <- function(start_date, end_date, conf, signals_list = NULL) {
+get_detection_events <- function(date_, conf, signals_list = NULL) {
     get_spm_data(
-        start_date,
-        end_date,
+        date_,
         signals_list,
         conf,
         table = "DetectionEvents",
@@ -100,7 +95,7 @@ get_detection_events <- function(start_date, end_date, conf, signals_list = NULL
 # Query Detection Events
 get_detection_events_arrow <- function(date_, conf, signals_list = NULL, callback = function(x) {x}) {
 
-    detections_path <- glue("detections/date={date_}")
+    detections_path <- join_path(conf$key_prefix, glue("detections/date={date_}"))
 
     if (dir.exists(detections_path)) {
         print('read detections locally')
@@ -325,11 +320,30 @@ get_sf_utah <- function(date_, conf, signals_list = NULL, first_seconds_of_red =
 
     cat('.')
 
-    de <- get_detection_events_arrow(date_, conf, signals_list, callback = function(x) filter(x, Phase %in% c(3,4,7,8)))
-
+    de <- get_detection_events(date_, conf, signals_list) %>%
+        select(SignalID = signalid, Phase = phase, Detector = detector, CycleStart = cyclestart, PhaseStart = phasestart, DetTimeStamp = dettimestamp, DetDuration = detduration) %>%
+        filter(Phase %in% c(3,4,7,8)) %>%
+        arrange(SignalID, Phase, CycleStart, PhaseStart) %>%
+        collect() %>%
+        transmute(
+            SignalID = factor(SignalID),
+            Phase = factor(Phase),
+            Detector = factor(Detector),
+            CycleStart, PhaseStart,
+            DetOn = DetTimeStamp,
+            DetOff = DetTimeStamp + seconds(DetDuration),
+            Date = as_date(date_))
     cat('.')
 
-    cd <- get_cycle_data_arrow(date_, conf, signals_list, callback = function(x) filter(x, Phase %in% c(3, 4, 7, 8), EventCode %in% c(1, 9)))
+    cd <- get_cycle_data(date_, conf, signals_list) %>%
+        select(SignalID = signalid, Phase = phase, CycleStart = cyclestart, PhaseStart = phasestart, PhaseEnd = phaseend, EventCode = eventcode) %>%
+        filter(Phase %in% c(3, 4, 7, 8), EventCode %in% c(1, 9)) %>%
+        collect() %>%
+        arrange(SignalID, Phase, CycleStart, PhaseStart) %>%
+        mutate(
+            SignalID = factor(SignalID),
+            Phase = factor(Phase),
+            Date = as_date(date_))
 
     if (nrow(de) == 0 & nrow(cd) == 0) {
         print(glue(" Can't calculate split failures for {date_}. No cycle or detector data."))
@@ -752,7 +766,7 @@ get_pau_gamma <- function(papd, paph, corridors, wk_calcs_start_date, pau_start_
 
 
 
-get_ped_delay <- function(date_, cred, signals_list) {
+get_ped_delay <- function(date_, conf, signals_list) {
 
     print("Pulling data...")
 
@@ -761,21 +775,21 @@ get_ped_delay <- function(date_, cred, signals_list) {
     plan(sequential)
     plan(multisession)
 
-    ds <- arrow::open_dataset(join_path("s3://", conf$bucket, glue("atspm/date={date_}")))
+    date_str <- format(date_, "%F")
 
-    end_date_ <- date_ + days(1)
-    pe <- ds %>%
+    athena <- get_athena_connection(conf)
+
+    pe <- tbl(athena, "atspm") %>%
         filter(
-            SignalID %in% signals_list,
-            Timestamp >= date_, Timestamp < end_date_,
-            EventCode %in% c(45, 21, 22, 132)) %>%
-        select(SignalID, Timestamp, EventCode, EventParam) %>%
+            date == date_str,
+            signalid %in% signals_list,
+            eventcode %in% c(45, 21, 22, 132)) %>%
+        select(SignalID = signalid, Timestamp = timestamp, EventCode = eventcode, Phase = eventparam) %>%
         collect() %>%
-        convert_to_utc() %>%
-        mutate(CycleLength = ifelse(EventCode == 132, EventParam, NA)) %>%
-        arrange(SignalID, Timestamp) %>%
-        rename(Phase = EventParam) %>%
-	    convert_to_utc()
+        mutate(CycleLength = ifelse(EventCode == 132, Phase, NA)) %>%
+        arrange(SignalID, Timestamp)
+
+    dbDisconnect(athena)
 
     cat('.')
     coord.type <- group_by(pe, SignalID) %>%
