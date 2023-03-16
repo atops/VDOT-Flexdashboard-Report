@@ -106,9 +106,8 @@ if (length(missing_partitions) > 10) {
     dbExecute(athena, glue("MSCK REPAIR TABLE {conf$athena$atspm_table}"))
 } else if (length(missing_partitions) > 0) {
     print("Adding missing partitions:")
-    for (query in glue("ALTER TABLE {conf$athena$atspm_table} add partition (date='{missing_partitions}') location 's3://{conf$bucket}/atspm/date={missing_partitions}/'")) {
-        print(query)
-        dbExecute(athena, query)
+    for (date_ in missing_partitions) {
+        add_partition(conf, conf$athena$atspm_table, date_)
     }
 }
 dbDisconnect(athena)

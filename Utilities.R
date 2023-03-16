@@ -564,6 +564,7 @@ write_signal_details <- function(plot_date, conf, signals_list = NULL) {
             bucket = conf$bucket,
             object = join_path(conf$key_prefix, glue("mark/signal_details/date={plot_date}/sg_{plot_date}.parquet")))
 
+        add_partition(conf, "signal_details", plot_date)
     }, error = function(e) {
         print(glue("Can't write signal details for {plot_date}"))
     })

@@ -20,7 +20,7 @@ mydbAppendTable <- function(conn, name, value, chunksize = 1e4) {
             across(where(is.factor), as.character),
             across(where(is.character), ~replace(., is.na(.), "")),
             across(where(is.character), ~str_replace_all(., "'", "\\\\'")),
-            across(where(is.character), ~str_replace_all(., "^|$", "'")),
+            across(where(is.character), ~paste0("'", ., "'")),
             across(where(is.numeric), ~replace(., !is.finite(.), NA)))
 
     table_name <- name
@@ -86,7 +86,8 @@ add_partition <- function(conf, table_name, date_) {
         conn_ <- get_athena_connection(conf)
         dbExecute(conn_,
                   sql(glue(paste("ALTER TABLE {conf$athena$database}.{table_name}",
-                                 "ADD PARTITION (date='{date_}')"))))
+                                 "ADD PARTITION (date='{date_}')",
+                                 "location 's3://{conf$bucket}/{table_name}/date={date_}/'"))))
         print(glue("Successfully created partition (date='{date_}') for {conf$athena$database}.{table_name}"))
     }, error = function(e) {
         print(stringr::str_extract(as.character(e), "message:.*?\\."))

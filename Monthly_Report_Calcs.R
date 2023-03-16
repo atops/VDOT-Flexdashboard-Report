@@ -146,8 +146,8 @@ get_counts_based_measures <- function(month_abbrs) {
         rm(ac_ds)
 
         # mclapply(date_range, mc.cores = usable_cores, mc.preschedule = FALSE, FUN = function(x) {
-        lapply(date_range, function(x) {
-            write_signal_details(x, conf, signals_list)
+        lapply(date_range, function(date_) {
+            write_signal_details(date_, conf, signals_list)
         })
 
 

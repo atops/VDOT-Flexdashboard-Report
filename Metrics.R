@@ -321,7 +321,14 @@ get_sf_utah <- function(date_, conf, signals_list = NULL, first_seconds_of_red =
     cat('.')
 
     de <- get_detection_events(date_, conf, signals_list) %>%
-        select(SignalID = signalid, Phase = phase, Detector = detector, CycleStart = cyclestart, PhaseStart = phasestart, DetTimeStamp = dettimestamp, DetDuration = detduration) %>%
+        select(
+            SignalID = signalid,
+            Phase = phase,
+            Detector = detector,
+            CycleStart = cyclestart,
+            PhaseStart = phasestart,
+            DetTimeStamp = dettimestamp,
+            DetDuration = detduration) %>%
         filter(Phase %in% c(3,4,7,8)) %>%
         arrange(SignalID, Phase, CycleStart, PhaseStart) %>%
         collect() %>%
@@ -336,7 +343,13 @@ get_sf_utah <- function(date_, conf, signals_list = NULL, first_seconds_of_red =
     cat('.')
 
     cd <- get_cycle_data(date_, conf, signals_list) %>%
-        select(SignalID = signalid, Phase = phase, CycleStart = cyclestart, PhaseStart = phasestart, PhaseEnd = phaseend, EventCode = eventcode) %>%
+        select(
+            SignalID = signalid,
+            Phase = phase,
+            CycleStart = cyclestart,
+            PhaseStart = phasestart,
+            PhaseEnd = phaseend,
+            EventCode = eventcode) %>%
         filter(Phase %in% c(3, 4, 7, 8), EventCode %in% c(1, 9)) %>%
         collect() %>%
         arrange(SignalID, Phase, CycleStart, PhaseStart) %>%

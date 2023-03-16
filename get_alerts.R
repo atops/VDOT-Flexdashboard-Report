@@ -15,9 +15,13 @@ suppressMessages({
 })
 
 
-source("Database_Functions.R")
 
 conf <- read_yaml("Monthly_Report.yaml")
+
+source("Database_Functions.R")
+source("S3ParquetIO.R")
+source("Utilities.R")
+
 
 # Set credentials from ~/.aws/credentials file
 aws.signature::use_credentials(profile = conf$profile)
@@ -41,8 +45,7 @@ read_zipped_feather <- function(x) {
 get_alerts <- function(conf) {
 
     objs <- s3_list_objects(bucket = conf$bucket, prefix = join_path(conf$key_prefix, "mark/watchdog"))
-    lapply(objs, function(obj) {
-        key <- obj$Key
+    lapply(objs$Key, function(key) {
         print(key)
         f <- NULL
         if (endsWith(key, "feather.zip")) {
@@ -134,7 +137,7 @@ tryCatch({
 tryCatch({
     conn <- get_aurora_connection()
     dbExecute(conn, "TRUNCATE TABLE WatchdogAlerts")
-    dbWriteTable(conn, "WatchdogAlerts", alerts, row.names = FALSE, append = TRUE, overwrite = FALSE)
+    mydbAppendTable(conn, "WatchdogAlerts", alerts)
 
     write(
         glue(paste0(
