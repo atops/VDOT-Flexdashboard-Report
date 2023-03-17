@@ -117,7 +117,7 @@ get_det_config_  <- function(bucket, folder, type = "det") {
         }
 
         tryCatch({
-            dss <- lapply(date_range, function(date_) {
+            lapply(date_range, function(date_) {
                 arrow::open_dataset(
                     sources = join_path("s3://", bucket, folder, glue("date={date_}")),
                     format="feather",
