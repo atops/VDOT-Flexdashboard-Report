@@ -69,7 +69,7 @@ get_geom_coords <- function(coords_string) {
 }
 
 
-get_signals_sp <- function(corridors) {
+get_signals_sp <- function(conf, corridors) {
     
     corridor_palette <- c("#e41a1c", "#377eb8", "#4daf4a", "#984ea3", 
                           "#ff7f00", "#ffff33", "#a65628", "#f781bf")
@@ -95,8 +95,8 @@ get_signals_sp <- function(corridors) {
     
     
     most_recent_intersections_list_key <- max(
-        aws.s3::get_bucket_df(
-            bucket = "gdot-devices", 
+        s3_list_objects(
+            bucket = conf$bucket,
             prefix = "maxv_atspm_intersections")$Key)
     ints <- s3read_using(
         read_csv, 
@@ -112,7 +112,7 @@ get_signals_sp <- function(corridors) {
             Note_maxv = col_character(),
             HostAddress = col_character()
         ),
-        bucket = "gdot-devices", 
+        bucket = conf$bucket,
         object = most_recent_intersections_list_key,
     ) %>% 
         select(-X1) %>%

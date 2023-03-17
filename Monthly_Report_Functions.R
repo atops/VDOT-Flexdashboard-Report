@@ -47,15 +47,13 @@ filter <- dplyr::filter
 options(future.rng.onMisue = "ignore")
 
 conf <- read_yaml("Monthly_Report.yaml")
-aws.signature::use_credentials(profile = conf$profile)
-Sys.setenv(AWS_DEFAULT_REGION = conf$aws_region) # credentials file doesn't store region
+credentials <- read_yaml("Monthly_Report_AWS.yaml")
 
-cred <- aws.signature::read_credentials()[[conf$profile]]
-conf$athena$uid <- cred$AWS_ACCESS_KEY_ID
-conf$athena$pwd <- cred$AWS_SECRET_ACCESS_KEY
+conf$athena$uid <- credentials$AWS_ACCESS_KEY_ID
+conf$athena$pwd <- credentials$AWS_SECRET_ACCESS_KEY
 conf$athena$region <- conf$region
 
-aws_conf <- read_yaml("Monthly_Report_AWS.yaml")
+
 
 if (Sys.info()["sysname"] == "Windows") {
     home_path <- dirname(path.expand("~"))
@@ -91,7 +89,7 @@ SUN = 1; MON = 2; TUE = 3; WED = 4; THU = 5; FRI = 6; SAT = 7
 AM_PEAK_HOURS = conf$AM_PEAK_HOURS
 PM_PEAK_HOURS = conf$PM_PEAK_HOURS
 
-Sys.setenv(TZ="America/New_York")
+Sys.setenv(TZ = conf$timezone)
 
 
 source("Utilities.R")
@@ -102,11 +100,6 @@ source("Metrics.R")
 source("Map.R")
 source("Aggregations.R")
 source("Database_Functions.R")
-
-usable_cores <- get_usable_cores()
-
-
-
 
 
 

@@ -1,5 +1,5 @@
 det_config_arrow_schema <- schema(
-    SignalID = int64(),
+    SignalID = string(),  # int64(),
     Detector = int64(),
     ID = int64(),
     DetectorID = string(),
@@ -40,11 +40,16 @@ det_config_arrow_schema <- schema(
     CountPriority = int64(),
     index = double())
 
+ped_config_arrow_schema <- schema(
+    SignalID = string(),
+    Detector = int64(),
+    CallPhase = int64())
+
 
 get_corridors <- function(corr_fn, filter_signals = TRUE) {
 
     # Keep this up to date to reflect the Corridors_Latest.xlsx file
-    cols <- list(SignalID = "numeric", #"text",
+    cols <- list(SignalID = "text",
                  Zone_Group = "text",
                  Zone = "text",
                  Corridor = "text",
@@ -77,7 +82,7 @@ get_corridors <- function(corr_fn, filter_signals = TRUE) {
     if (filter_signals) {
         df <- df %>%
             filter(
-                SignalID > 0,
+                # SignalID > 0,
                 Include == TRUE)
     }
 
@@ -102,28 +107,21 @@ get_corridors <- function(corr_fn, filter_signals = TRUE) {
 # This is a "function factory"
 # It is meant to be used to create a get_det_config function that takes only the date:
 # like: get_det_config <- get_det_config_(conf$bucket, "atspm_det_config_good")
-get_det_config_  <- function(bucket, folder) {
-
-#     function(date_) {
-#
-#         tryCatch({
-#             arrow::open_dataset(
-#                 sources = glue("s3://{bucket}/{folder}/date={date_}"),
-#                 format="feather",
-#                 schema = det_config_arrow_schema
-#             ) %>%
-#                 collect() %>%
-#                 mutate(SignalID = as.character(SignalID),
-#                        Detector = as.integer(Detector),
-#                        CallPhase = as.integer(CallPhase))
+get_det_config_  <- function(bucket, folder, type = "det") {
 
     function(date_range) {
+        if (type == "det") {
+            arrow_schema <- det_config_arrow_schema
+        } else if (type == "ped") {
+            arrow_schema <- ped_config_arrow_schema
+        }
+
         tryCatch({
-            dss <- lapply(date_range, function(date_) {
+            lapply(date_range, function(date_) {
                 arrow::open_dataset(
-                sources = glue("s3://{bucket}/{folder}/date={date_}"),
-                format="feather",
-                schema = det_config_arrow_schema
+                    sources = join_path("s3://", bucket, folder, glue("date={date_}")),
+                    format="feather",
+                    schema = arrow_schema
                 ) %>%
                 mutate(
                     Date = date_,
@@ -134,9 +132,6 @@ get_det_config_  <- function(bucket, folder) {
                 collect()
             }) %>%
                 bind_rows()
-
-
-
         }, error = function(e) {
             stop(glue("Problem getting detector config file for {date_range}: {e}"))
             print(e)
@@ -144,8 +139,8 @@ get_det_config_  <- function(bucket, folder) {
     }
 }
 
-get_det_config <- get_det_config_(conf$bucket, "atspm_det_config_good")
-get_ped_config <- get_det_config_(conf$bucket, "atspm_ped_config")
+get_det_config <- get_det_config_(conf$bucket, join_path(conf$key_prefix, "atspm_det_config_good"), type = "det")
+get_ped_config <- get_det_config_(conf$bucket, join_path(conf$key_prefix, "atspm_ped_config"), type = "ped")
 
 
 
@@ -187,10 +182,9 @@ get_det_config_qs <- function(date_) {
                   Date = date(date_))
 
     # Bad detectors
-    bd <- s3read_using(
-        read_parquet,
+    bd <- s3_read_parquet(
         bucket = conf$bucket,
-        object = glue("mark/bad_detectors/date={date_}/bad_detectors_{date_}.parquet")) %>%
+        object = join_path(conf$key_prefix, glue("mark/bad_detectors/date={date_}/bad_detectors_{date_}.parquet"))) %>%
         transmute(SignalID = factor(SignalID),
                   Detector = factor(Detector),
                   Good_Day)

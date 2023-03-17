@@ -10,34 +10,41 @@ from multiprocessing import get_context, Pool
 import pandas as pd
 import sqlalchemy as sq
 import time
-import os
+import posixpath
 import itertools
-import boto3
 import yaml
-import io
 import re
 import psutil
 
+import s3io
+from s3io import (
+    s3_read_parquet_hive,
+    s3_write_parquet,
+    get_det_config,
+    athena,
+    s3_list_objects,
+    get_signalids
+)
 from spm_events import etl_main
-from parquet_lib import read_parquet_hive
-from s3io import *
 from config import get_date_from_string
+from pull_atspm_data import get_atspm_engine, get_aurora_engine
 
 '''
     df:
-        SignalID [int64]
+        SignalID [str]
         TimeStamp [datetime]
         EventCode [str or int64]
         EventParam [str or int64]
 
     det_config:
-        SignalID [int64]
+        SignalID [str]
         IP [str]
         PrimaryName [str]
         SecondaryName [str]
         Detector [int64]
         Call Phase [int64]
 '''
+
 
 def etl2(s, date_, det_config, conf):
 
@@ -46,14 +53,15 @@ def etl2(s, date_, det_config, conf):
     det_config = det_config[det_config.SignalID==s]
 
     start_date = date_
-    end_date = date_ + pd.DateOffset(days=1) - pd.DateOffset(seconds=0.1)
+    end_date = date_ + pd.DateOffset(days=1)
 
     t0 = time.time()
 
     try:
         bucket = conf['bucket']
-        key = f'atspm/date={date_str}/atspm_{s}_{date_str}.parquet'
-        df = read_parquet_hive(bucket, key)
+        key_prefix = conf['key_prefix'] or ''
+        key = posixpath.join(key_prefix, f'atspm/date={date_str}/atspm_{s}_{date_str}.parquet')
+        df = s3_read_parquet_hive(bucket, key)
 
         if len(df)==0:
             print(f'{date_str} | {s} | No event data for this signal')
@@ -66,18 +74,22 @@ def etl2(s, date_, det_config, conf):
             c, d = etl_main(df, det_config)
 
             if len(c) > 0 and len(d) > 0:
-
-                c.to_parquet(f's3://{bucket}/cycles/date={date_str}/cd_{s}_{date_str}.parquet',
-                             allow_truncated_timestamps=True)
-
-                d.to_parquet(f's3://{bucket}/detections/date={date_str}/de_{s}_{date_str}.parquet',
-                             allow_truncated_timestamps=True)
+                s3_write_parquet(
+                    c,
+                    bucket,
+                    posixpath.join(key_prefix, f'cycles/date={date_str}/cd_{s}_{date_str}.parquet'),
+                    allow_truncated_timestamps=True)
+                s3_write_parquet(
+                    d,
+                    bucket,
+                    posixpath.join(key_prefix, f'detections/date={date_str}/de_{s}_{date_str}.parquet'),
+                    allow_truncated_timestamps=True)
 
             else:
                 print(f'{date_str} | {s} | No cycles')
 
     except Exception as e:
-        print(f'{s}: {e}')
+        print(f'{s}: Exception - {e}')
 
 
 
@@ -95,15 +107,9 @@ def main(start_date, end_date, conf):
 
     dates = pd.date_range(start_date, end_date, freq='1D')
 
-    bucket = conf['bucket']
-   
-    corridors_filename = re.sub('\..*', '.parquet', conf['corridors_filename_s3'])
-    corridors = pd.read_parquet(f's3://{bucket}/{corridors_filename}')
-    corridors = corridors[~corridors.SignalID.isna()]
+    with open('Monthly_Report_AWS.yaml') as yaml_file:
+        cred = yaml.load(yaml_file, Loader=yaml.Loader)
 
-    signalids = list(corridors.SignalID.astype('int').values)
-  
-    bucket = conf['bucket']
     athena_database = conf['athena']['database']
     staging_dir = conf['athena']['staging_dir']
     x = re.split('/+', staging_dir) # split path elements into a list
@@ -123,14 +129,15 @@ def main(start_date, end_date, conf):
         date_str = date_.strftime('%Y-%m-%d')
         print(date_str)
 
-        det_config = (get_det_config(date_, conf)
-                     .rename(columns={'CallPhase': 'Call Phase'})
-                     .groupby(['SignalID','Call Phase'])
-                     .apply(lambda group: group.assign(CountDetector = group.CountPriority == group.CountPriority.min()))
-                     .reset_index())
+        det_config = get_det_config(date_, conf)
+        det_config = det_config.rename(columns={'CallPhase': 'Call Phase'})
+        dcg = det_config.groupby(['SignalID', 'Call Phase'])['CountPriority']
+        det_config = det_config.assign(CountDetector = det_config.CountPriority == dcg.transform(min))
+
+        signalids = list(get_signalids(date_, conf, 'atspm'))
 
         if len(det_config) > 0:
-            nthreads = round(psutil.virtual_memory().total/1e9)  # ensure 1 MB memory per thread
+            nthreads = round(psutil.virtual_memory().available/1e9)  # ensure 1 MB memory per thread
 
             #-----------------------------------------------------------------------------------------
             # with Pool(processes=nthreads) as pool:
@@ -167,18 +174,18 @@ def main(start_date, end_date, conf):
 
             response_repair_detection_events = athena.start_query_execution(
                 QueryString=f"ALTER TABLE detectionevents ADD PARTITION (date = '{date_str}');",
-                QueryExecutionContext={'Database': athena_database}, 
+                QueryExecutionContext={'Database': athena_database},
                 ResultConfiguration={'OutputLocation': staging_dir})
 
 
     # Check if the partitions for the last day were successfully added before moving on
     while True:
-        response1 = s3.list_objects(
+        response1 = s3_list_objects(
             Bucket=athena_bucket,
-            Prefix=os.path.join(athena_prefix, response_repair_cycledata['QueryExecutionId']))
-        response2 = s3.list_objects(
+            Prefix=posixpath.join(athena_prefix, response_repair_cycledata['QueryExecutionId']))
+        response2 = s3_list_objects(
             Bucket=athena_bucket,
-            Prefix=os.path.join(athena_prefix, response_repair_detection_events['QueryExecutionId']))
+            Prefix=posixpath.join(athena_prefix, response_repair_detection_events['QueryExecutionId']))
 
         if 'Contents' in response1 and 'Contents' in response2:
             print('done.')
@@ -202,6 +209,6 @@ if __name__=='__main__':
 
     start_date = get_date_from_string(start_date)
     end_date = get_date_from_string(end_date)
-    
+
     main(start_date, end_date, conf)
 

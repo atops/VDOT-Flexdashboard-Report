@@ -1,5 +1,4 @@
 suppressMessages({
-    library(aws.s3)
     library(dplyr)
     library(tidyr)
     library(stringr)
@@ -16,9 +15,13 @@ suppressMessages({
 })
 
 
-source("Database_Functions.R")
 
 conf <- read_yaml("Monthly_Report.yaml")
+
+source("Database_Functions.R")
+source("S3ParquetIO.R")
+source("Utilities.R")
+
 
 # Set credentials from ~/.aws/credentials file
 aws.signature::use_credentials(profile = conf$profile)
@@ -41,10 +44,8 @@ read_zipped_feather <- function(x) {
 
 get_alerts <- function(conf) {
 
-    objs <- aws.s3::get_bucket(bucket = conf$bucket,
-                               prefix = 'mark/watchdog')
-    lapply(objs, function(obj) {
-        key <- obj$Key
+    objs <- s3_list_objects(bucket = conf$bucket, prefix = join_path(conf$key_prefix, "mark/watchdog"))
+    lapply(objs$Key, function(key) {
         print(key)
         f <- NULL
         if (endsWith(key, "feather.zip")) {
@@ -55,9 +56,9 @@ get_alerts <- function(conf) {
             f <- read_fst
         }
         if (!is.null(f)) {
-            aws.s3::s3read_using(FUN = f,
-                                 object = key,
-                                 bucket = conf$bucket) %>%
+            s3read_using(FUN = f,
+                         object = key,
+                         bucket = conf$bucket) %>%
                 as_tibble() %>%
                 mutate(across(where(is.factor), as.character),
                        SignalID = as.integer(SignalID),
@@ -112,13 +113,14 @@ tryCatch({
         alerts,
         write_parquet,
         bucket = conf$bucket,
-        object = "mark/watchdog/alerts.parquet",
+        object = join_path(conf$key_prefix, "mark/watchdog/alerts.parquet"),
         opts = list(multipart = TRUE))
 
+    pth <- join_path(conf$bucket, conf$key_prefix, "mark/watchdog/alerts.parquet")
     write(
         glue(paste0(
             "{format(now(), '%F %H:%M:%S')}|SUCCESS|get_alerts.R|get_alerts|Line 173|",
-            "Uploaded {conf$bucket}/mark/watchdog/alerts.parquet")),
+            "Uploaded {pth}")),
         file.path(base_path, glue("logs/get_alerts_{today()}.log")),
         append = TRUE
     )
@@ -135,7 +137,7 @@ tryCatch({
 tryCatch({
     conn <- get_aurora_connection()
     dbExecute(conn, "TRUNCATE TABLE WatchdogAlerts")
-    dbWriteTable(conn, "WatchdogAlerts", alerts, row.names = FALSE, append = TRUE, overwrite = FALSE)
+    mydbAppendTable(conn, "WatchdogAlerts", alerts)
 
     write(
         glue(paste0(

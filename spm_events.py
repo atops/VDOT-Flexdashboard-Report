@@ -16,7 +16,8 @@ def get_pairs(df, a, b, field='EventCode'):
     # Example: a=1, b=8 gives the start, end and duration of green for every SignalID, EventParam
     # a and b can be a scalar or a list
     
-    otherfield = {'EventCode', 'EventParam'} - set(field)
+    otherfield = {'EventCode', 'EventParam'} - set([field])
+    otherfield = list(otherfield)[0]
 
     a = a if type(a)==list else [a]
     b = b if type(b)==list else [b]
@@ -121,7 +122,6 @@ def get_volume_by_phase(gyr, detections, aggregate=True):
                      .dropna()
                      .sort_values(['StartTimeStamp'])
                      .rename(columns={'StartTimeStamp':'DetTimeStamp'})
-                     .assign(SignalID = lambda x: x.SignalID.astype('int64'))
                      .assign(Phase = lambda x: x.Phase.astype('int64')))
 
     rdf = (gyr.reset_index()
@@ -195,13 +195,13 @@ def get_volume_by_phase(gyr, detections, aggregate=True):
 def etl_main(df, det_config):
     '''
     df:
-        SignalID [int64]
+        SignalID [str]
         TimeStamp [datetime]
         EventCode [str or int64]
         EventParam [str or int64]
     
     det_config:
-        SignalID [int64]
+        SignalID [str]
         IP [str]
         PrimaryName [str]
         SecondaryName [str]
@@ -247,7 +247,6 @@ def etl_main(df, det_config):
                    .reset_index())
         cycles = (gyrvt.assign(TermType = gyrvt.TermType.fillna(0).astype('int64'),
                                EventCode = gyrvt.EventCode.astype('int64'),
-                               SignalID = gyrvt.SignalID.astype('int64'),
                                Phase = gyrvt.Phase.astype('int64'),
                                Volume = gyrvt.Volume.astype('int64'))
                        .filter(['SignalID','Phase',

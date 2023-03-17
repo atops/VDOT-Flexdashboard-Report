@@ -3,9 +3,11 @@
 
 agency: VDOT
 bucket: vdot-spm2
+key_prefix: 
 profile: KH_VDOT
 aws_region: us-east-2
 region: 
+timezone: America/New_York
 athena:
     staging_dir: s3://vdot-spm2/athena
     database: vdot_spm
@@ -31,6 +33,8 @@ run:
     ped_delay: TRUE
     split_failures: TRUE
     phase_termination: TRUE
+    approach_delay: TRUE
+    time_in_transition: TRUE
 
 start_date: 2 days ago
 end_date: yesterday
