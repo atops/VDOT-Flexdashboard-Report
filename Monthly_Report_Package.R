@@ -1402,7 +1402,7 @@ tryCatch(
 # TRAVEL TIME AND BUFFER TIME INDEXES #########################################
 
 print(glue("{Sys.time()} Travel Time Indexes [19 of 25]"))
-if (FALSE) {
+
 tryCatch(
     {
         # ------- Corridor/Subcorridor Travel Time Metrics ------- #
@@ -1528,7 +1528,7 @@ tryCatch(
         print(e)
     }
 )
-}
+
 
 
 # DAILY DETECTION LEVELS #####################################################
@@ -1763,14 +1763,14 @@ tryCatch(
             "sfd" = readRDS("cor_monthly_sfd.rds"),
             "sfh" = readRDS("cor_msfh.rds"),
             "sfo" = readRDS("cor_monthly_sfo.rds"),
-            "tti" = readRDS("cor_monthly_tti.rds"),
-            "ttih" = readRDS("cor_monthly_tti_by_hr.rds"),
-            "pti" = readRDS("cor_monthly_pti.rds"),
-            "ptih" = readRDS("cor_monthly_pti_by_hr.rds"),
-            "bi" = readRDS("cor_monthly_bi.rds"),
-            "bih" = readRDS("cor_monthly_bi_by_hr.rds"),
-            "spd" = readRDS("cor_monthly_spd.rds"),
-            "spdh" = readRDS("cor_monthly_spd_by_hr.rds"),
+            # "tti" = readRDS("cor_monthly_tti.rds"),
+            # "ttih" = readRDS("cor_monthly_tti_by_hr.rds"),
+            # "pti" = readRDS("cor_monthly_pti.rds"),
+            # "ptih" = readRDS("cor_monthly_pti_by_hr.rds"),
+            # "bi" = readRDS("cor_monthly_bi.rds"),
+            # "bih" = readRDS("cor_monthly_bi_by_hr.rds"),
+            # "spd" = readRDS("cor_monthly_spd.rds"),
+            # "spdh" = readRDS("cor_monthly_spd_by_hr.rds"),
             "du" = readRDS("cor_monthly_detector_uptime.rds"),
             "cu" = readRDS("cor_monthly_comm_uptime.rds"),
             "pau" = readRDS("cor_monthly_pa_uptime.rds"),
@@ -1789,9 +1789,9 @@ tryCatch(
             "qsd" = get_quarterly(cor$mo$qsd, "qs_freq"),
             "sfd" = get_quarterly(cor$mo$sfd, "sf_freq"),
             "sfo" = get_quarterly(cor$mo$sfo, "sf_freq"),
-            "tti" = get_quarterly(cor$mo$tti, "tti"),
-            "pti" = get_quarterly(cor$mo$pti, "pti"),
-            "bi" = get_quarterly(cor$mo$bi, "bi"),
+            # "tti" = get_quarterly(cor$mo$tti, "tti"),
+            # "pti" = get_quarterly(cor$mo$pti, "pti"),
+            # "bi" = get_quarterly(cor$mo$bi, "bi"),
             "du" = get_quarterly(cor$mo$du, "uptime"),
             "cu" = get_quarterly(cor$mo$cu, "uptime"),
             "pau" = get_quarterly(cor$mo$pau, "uptime"),
@@ -1880,12 +1880,12 @@ tryCatch(
             "sfd" = readRDS("sub_monthly_sfd.rds"),
             "sfo" = readRDS("sub_monthly_sfo.rds"),
             "sfh" = readRDS("sub_msfh.rds"),
-            "tti" = readRDS("sub_monthly_tti.rds"),
-            "ttih" = readRDS("sub_monthly_tti_by_hr.rds"),
-            "pti" = readRDS("sub_monthly_pti.rds"),
-            "ptih" = readRDS("sub_monthly_pti_by_hr.rds"),
-            "bi" = readRDS("sub_monthly_bi.rds"),
-            "bih" = readRDS("sub_monthly_bi_by_hr.rds"),
+            # "tti" = readRDS("sub_monthly_tti.rds"),
+            # "ttih" = readRDS("sub_monthly_tti_by_hr.rds"),
+            # "pti" = readRDS("sub_monthly_pti.rds"),
+            # "ptih" = readRDS("sub_monthly_pti_by_hr.rds"),
+            # "bi" = readRDS("sub_monthly_bi.rds"),
+            # "bih" = readRDS("sub_monthly_bi_by_hr.rds"),
             "du" = readRDS("sub_monthly_detector_uptime.rds"),
             "cu" = readRDS("sub_monthly_comm_uptime.rds"),
             "pau" = readRDS("sub_monthly_pa_uptime.rds"),
