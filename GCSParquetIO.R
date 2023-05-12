@@ -2,7 +2,7 @@
 library(googleCloudStorageR)
 library(gargle)
 
-gcs_auth('../castle-rock-service-account.json')
+gar_gce_auth()
 
 
 get_bucket <- function(...) {
