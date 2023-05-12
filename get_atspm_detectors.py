@@ -107,9 +107,12 @@ def get_atspm_ped_detectors(engine, date=None):
 
     with engine.connect() as conn:
 
+        signals = pd.read_sql_table('Signals', con=conn)
+        signals_string = "('" + "', '".join(signals.SignalID.values) + "')"
+
         query = f"""SELECT Distinct SignalID, EventParam AS Detector
                     FROM Controller_Event_Log WHERE EventCode = 90
-                    AND Timestamp > '{start_date}'
+                    AND SignalID IN {signals_string} AND Timestamp > '{start_date}'
                     ORDER BY SignalID, EventParam"""
 
         df = pd.read_sql_query(query, con=conn)
