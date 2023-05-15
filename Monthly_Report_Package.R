@@ -1616,10 +1616,12 @@ tryCatch(
             ) %>%
         group_by(SignalID, Date, Week) %>%
         summarize(
+            CallPhase = 0,
             GapOut = weighted.mean(GapOut, Cycles),
             ForceOff = weighted.mean(ForceOff, Cycles),
             MaxOut = weighted.mean(MaxOut, Cycles),
-            Cycles = sum(Cycles)
+            Cycles = sum(Cycles),
+            .groups = "drop"
         )
 
         aurora <- keep_trying(get_aurora_connection, n_tries = 5)
