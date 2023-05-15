@@ -1613,7 +1613,14 @@ tryCatch(
                 SignalID = factor(SignalID),
                 CallPhase = factor(CallPhase),
                 Week = week(Date)
-            )
+            ) %>%
+        group_by(SignalID, Date, Week) %>%
+        summarize(
+            GapOut = weighted.mean(GapOut, Cycles),
+            ForceOff = weighted.mean(ForceOff, Cycles),
+            MaxOut = weighted.mean(MaxOut, Cycles),
+            Cycles = sum(Cycles)
+        )
 
         aurora <- keep_trying(get_aurora_connection, n_tries = 5)
 
