@@ -2,7 +2,7 @@
 library(googleCloudStorageR)
 library(gargle)
 
-gar_gce_auth()
+googleAuthR::gar_gce_auth()
 
 
 get_bucket <- function(...) {
