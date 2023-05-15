@@ -190,6 +190,32 @@ set_index_aurora <- function(aurora, table_name) {
 
 
 
+
+set_primary_keys_aurora <- function(aurora, table_name) {
+
+    fields <- dbListFields(aurora, table_name)
+    period <- intersect(fields, c("Month", "Date", "Hour", "Timeperiod", "Quarter"))
+
+    if (length(period) > 1) {
+        print("More than one possible period in table fields")
+        return(0)
+    }
+
+    indexes <- dbGetQuery(aurora, glue("SHOW INDEXES FROM {table_name}"))
+
+    # Unique Index on Period, Zone Group and Corridor
+    if (glue("idx_{table_name}_unique") %in% indexes$Key_name) {
+        dbExecute(aurora, glue(paste(
+            "DROP INDEX idx_{table_name}_unique ON {table_name};")))
+    }
+
+    # Composite Primary Key on Period, Zone Group and Corridor
+    dbExecute(aurora, glue(paste(
+        "ALTER TABLE {table_name} ADD PRIMARY KEY ({period}, Zone_Group, Corridor);")))
+}
+
+
+
 convert_to_key_value_df <- function(key, df) {
     data.frame(
         key = key,
