@@ -490,7 +490,7 @@ print(glue("{Sys.time()} time in transition [13 of 14]"))
 
 if (conf$run$time_in_transition == TRUE) {
     # Run python script asynchronously
-    system("conda run -n tractionmetrics python get_tint.py")
+    system(glue("conda run -n tractionmetrics python get_tint.py {start_date} {end_date}"), wait = TRUE)
 }
 
 
@@ -499,7 +499,7 @@ print(glue("{Sys.time()} approach delay [14 of 14]"))
 
 if (conf$run$approach_delay == TRUE) {
     # Run python script asynchronously
-    system("conda run -n tractionmetrics python get_approach_delay.py")
+    system(glue("conda run -n tractionmetrics python get_approach_delay.py {start_date} {end_date}"), wait = TRUE)
 }
 
 print("\n--------------------- End Monthly Report calcs -----------------------\n")
