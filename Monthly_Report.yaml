@@ -2,10 +2,10 @@
 # Monthly_Report config file (yaml format)
 
 agency: CDOT
-bucket: its-apps-atspm-stage
-key_prefix: kimley-horn
-credentials_json: castle-rock-service-account.json
-profile: 
+bucket: its-apps-atspm-prod
+key_prefix: traction-metrics
+credentials_json:
+profile:
 region: CastleRock
 timezone: America/Denver
 
@@ -29,7 +29,7 @@ run:
 start_date: 2 days ago
 end_date: yesterday
 
-calcs_start_date: auto 
+calcs_start_date: auto
 report_end_date: yesterday
 
 corridors_filename_s3: CastleRock_Corridors.xlsx
