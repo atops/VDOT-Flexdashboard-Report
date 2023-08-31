@@ -87,17 +87,18 @@ def get_approach_delay(signalid, date_, det_config, conf, cred, per='H'):
     delay['CycleLength'] = delay['CycleLength'].fillna(maxcl)
     delay = delay[delay.delay < delay.CycleLength * 3]
 
-    # Hourly aggregation, weighted by volume (based on 'Advanced Count' detectors)
-    delay['Hour'] = delay.DetTimeStamp.dt.floor(per)
-    c = delay.groupby(['SignalID', 'Hour'])['delay'].count().rename('vol')
-    z = delay.groupby(['SignalID', 'Phase', 'Hour'])['delay'].agg(['mean', 'count'])
-    d = z.groupby(level=['SignalID', 'Hour']).apply(weighted_mean, 'mean', 'count').rename('delay')
-    x = pd.concat([d, c], axis=1)
+    if not delay.empty:
+        # Hourly aggregation, weighted by volume (based on 'Advanced Count' detectors)
+        delay['Hour'] = delay.DetTimeStamp.dt.floor(per)
+        c = delay.groupby(['SignalID', 'Hour'])['delay'].count().rename('vol')
+        z = delay.groupby(['SignalID', 'Phase', 'Hour'])['delay'].agg(['mean', 'count'])
+        d = z.groupby(level=['SignalID', 'Hour'], group_keys=False).apply(weighted_mean, 'mean', 'count').rename('delay')
+        x = pd.concat([d, c], axis=1)
 
-    signalids = [signalid]
-    all_hours = pd.date_range(date_str, pd.Timestamp(date_str) + pd.Timedelta(1, unit='days') - pd.Timedelta(1, unit='hours'), freq=per)
+        signalids = [signalid]
+        all_hours = pd.date_range(date_str, pd.Timestamp(date_str) + pd.Timedelta(1, unit='days') - pd.Timedelta(1, unit='hours'), freq=per)
 
-    return x.reindex(itertools.product(signalids, all_hours), fill_value=0)
+        return x.reindex(itertools.product(signalids, all_hours), fill_value=0)
 
 
 

@@ -565,7 +565,9 @@ get_daily_detector_uptime <- function(filtered_counts) {
         mutate(Date_Hour = Timeperiod,
                Date = date(Date_Hour)) %>%
         dplyr::select(SignalID, CallPhase, Detector, Date, Date_Hour, Good_Day) %>%
-        ungroup() %>%
+        ungroup()
+    if (nrow(ddu) > 0) {
+        ddu <- ddu %>%
         mutate(setback = ifelse(CallPhase %in% c(2,6), "Setback", "Presence"),
                setback = factor(setback),
                SignalID = factor(SignalID)) %>%
@@ -578,6 +580,7 @@ get_daily_detector_uptime <- function(filtered_counts) {
                 mutate(uptime = uptime/all,
                        all = as.double(all))
         })
+    }
     ddu
 }
 
