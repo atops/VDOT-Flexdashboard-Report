@@ -8,7 +8,8 @@ for /f "tokens=1-4 delims=/ " %%i in ("%date%") do (
 set datestr=%year%%month%%day%
 echo datestr is %datestr% > nightly_last_run.txt
 
-"C:\Program Files\R\R-4.2.3\bin\Rscript.exe" Monthly_Report_Calcs.R > logs\nightly_%datestr%.log
-"C:\Program Files\R\R-4.2.3\bin\Rscript.exe" Monthly_Report_Package.R >> logs\nightly_%datestr%.log
-"C:\Program Files\R\R-4.2.3\bin\Rscript.exe" Monthly_Report_Package_1hr.R >> logs\nightly_%datestr%.log
-"C:\Program Files\R\R-4.2.3\bin\Rscript.exe" Monthly_Report_Package_15min.R >> logs\nightly_%datestr%.log
+set rando=%random%
+"C:\Program Files\R\R-4.2.3\bin\Rscript.exe" Monthly_Report_Calcs.R > logs\nightly_%datestr%_%rando%.log
+"C:\Program Files\R\R-4.2.3\bin\Rscript.exe" Monthly_Report_Package.R >> logs\nightly_%datestr%_%rando%.log
+"C:\Program Files\R\R-4.2.3\bin\Rscript.exe" Monthly_Report_Package_1hr.R >> logs\nightly_%datestr%_%rando%.log
+"C:\Program Files\R\R-4.2.3\bin\Rscript.exe" Monthly_Report_Package_15min.R >> logs\nightly_%datestr%_%rando%.log
