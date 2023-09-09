@@ -46,15 +46,6 @@ get_date_from_string <- function(x) {
 }
 
 
-get_signalids_from_s3 <- function(date_, s3prefix="atspm") {
-    if (class(date_) == "Date") {
-        date_ <- format(date_, "%F")
-    }
-    keys <- aws.s3::get_bucket_df(conf$bucket, prefix = glue("{s3prefix}/date={date_}"), max=Inf) %>% as_tibble() %>% pull(Key)
-    signalids <- as.integer(stringr::str_extract(keys, glue("(?<={s3prefix}_)\\d+")))
-    sort(signalids)
-}
-
 get_last_modified_s3 <- function(bucket, object) {
     x <- get_bucket(bucket = bucket, prefix = object)[[1]]
     lm <- if (!is.null(x)) {
