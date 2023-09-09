@@ -751,8 +751,8 @@ get_ped_delay <- function(date_, cred, signals_list) {
 
     end_date_ <- date_ + days(1)
     pe <- tbl(conn, "Controller_Event_Log") %>%
-        filter(date == date_, signalid %in% signals_list, eventcode %in% c(45, 21, 22, 132)) %>%
-        select(SignalID = signalid, Timestamp = timestamp, EventCode = eventcode, Phase = eventparam) %>%
+        filter(Timestamp >= date_, Timestamp < end_date_, SignalID %in% signals_list, EventCode %in% c(45, 21, 22, 132)) %>%
+        select(SignalID, Timestamp, EventCode, Phase = EventParam) %>%
         arrange(SignalID, Timestamp) %>%
         collect() %>%
         convert_to_utc() %>%

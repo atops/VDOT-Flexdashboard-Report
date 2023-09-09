@@ -506,7 +506,7 @@ if (conf$run$phase_termination == TRUE) {
 print(glue("{Sys.time()} time in transition [13 of 14]"))
 
 if (conf$run$time_in_transition == TRUE) {
-    # Run python script asynchronously
+    # Run python script synchronously
     system(glue("conda run -n tractionmetrics python get_tint.py {start_date} {end_date}"), wait = TRUE)
 }
 
@@ -515,7 +515,7 @@ if (conf$run$time_in_transition == TRUE) {
 print(glue("{Sys.time()} approach delay [14 of 14]"))
 
 if (conf$run$approach_delay == TRUE) {
-    # Run python script asynchronously
+    # Run python script synchronously
     system(glue("conda run -n tractionmetrics python get_approach_delay.py {start_date} {end_date}"), wait = TRUE)
 }
 
