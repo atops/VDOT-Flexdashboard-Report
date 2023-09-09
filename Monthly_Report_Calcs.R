@@ -87,8 +87,6 @@ print("\n---------------------- Finished counts ---------------------------\n")
 print(glue("{Sys.time()} monthly cu [5 of 14]"))
 
 
-signals_list <- unique(corridors$SignalID)
-
 # Group into months to calculate filtered and adjusted counts
 # adjusted counts needs a full month to fill in gaps based on monthly averages
 

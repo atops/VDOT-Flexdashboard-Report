@@ -575,10 +575,8 @@ write_signal_details <- function(plot_date, conf, signals_list = NULL) {
             n_tries = 5,
             df,
             write_parquet,
-            use_deprecated_int96_timestamps = TRUE,
             bucket = conf$bucket,
-            object = glue("mark/{table_name}/date={date_}/{fn}.parquet"),
-            opts = list(multipart = TRUE, body_as_string = TRUE)
+            object = glue("mark/{table_name}/date={date_}/{fn}.parquet")
         )
     }, error = function(e) {
         print(glue("Can't write signal details for {plot_date}"))
@@ -606,11 +604,9 @@ get_signals_chunks <- function(df, rows = 1e6) {
     records <- records$n
 
     if ("SignalID" %in% colnames(df)) {
-        signals_list <- df %>% distinct(SignalID) %>% arrange(SignalID) %>% collect()
-        signals_list <- signals_list$SignalID
+        signals_list <- df %>% distinct(SignalID) %>% arrange(SignalID) %>% collect() %>% pull(SignalID)
     } else if ("signalid" %in% colnames(df)) {
-        signals_list <- df %>% distinct(signalid) %>% arrange(signalid) %>% collect()
-        signals_list <- signals_list$signalid
+        signals_list <- df %>% distinct(signalid) %>% arrange(signalid) %>% collect() %>% pull(SignalID)
     }
 
     # keep this to about a million records per core
@@ -632,7 +628,7 @@ get_signals_chunks_arrow <- function(df, rows = 1e6) {
     extract <- df %>% select(SignalID) %>% collect()
     records <- nrow(extract)
 
-    signals_list <- (extract %>% distinct(SignalID) %>% arrange(SignalID))$SignalID
+    signals_list <- extract %>% distinct(SignalID) %>% arrange(SignalID) %>% pull(SignalID)
 
     # keep this to about a million records per core
     # based on the average number of records per signal.
