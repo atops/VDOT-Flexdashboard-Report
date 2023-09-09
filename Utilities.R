@@ -46,6 +46,26 @@ get_date_from_string <- function(x) {
 }
 
 
+get_signalids_from_s3 <- function(date_, s3prefix="atspm") {
+    if (class(date_) == "Date") {
+        date_ <- format(date_, "%F")
+    }
+    keys <- aws.s3::get_bucket_df(conf$bucket, prefix = glue("{s3prefix}/date={date_}"), max=Inf) %>% as_tibble() %>% pull(Key)
+    signalids <- as.integer(stringr::str_extract(keys, glue("(?<={s3prefix}_)\\d+")))
+    sort(signalids)
+}
+
+get_last_modified_s3 <- function(bucket, object) {
+    x <- get_bucket(bucket = bucket, prefix = object)[[1]]
+    lm <- if (!is.null(x)) {
+        as_datetime(x$LastModified)
+    } else {
+        as_datetime("1900-01-01")
+    }
+    lm
+}
+
+
 split_path <- function(...) {
     path <- file.path(...)
 	parts <- setdiff(strsplit(path,"/|\\\\")[[1]], "")
@@ -145,21 +165,18 @@ keep_trying <- function(func, n_tries, ..., sleep = 1, timeout = Inf) {
     try_number <- 1
 
     while((!is.null(error) || is.null(result)) && try_number <= n_tries) {
-        if (try_number > 1) {
-            print(glue("{deparse(substitute(func))} Attempt: {try_number}"))
-        }
 
-        try_number = try_number + 1
         x <- R.utils::withTimeout(safely_func(...), timeout=timeout, onTimeout="error")
 
         result <- x$result
         error <- x$error
         if (!is.null(error)) {
-            print(error)
+            print(glue("{deparse(substitute(func))} Attempt {try_number} failed: {error}"))
         }
 
+        try_number = try_number + 1
         Sys.sleep(sleep)
-        sleep = sleep + 1
+        sleep = sleep * 2
     }
     return(result)
 }
@@ -479,7 +496,6 @@ get_corridor_summary_data <- function(cor) {
 }
 
 
-# TODO: This function has a problem in that it can't handle missing data
 write_signal_details <- function(plot_date, conf, signals_list = NULL) {
 
     print(glue("Writing signal details for {plot_date}"))
@@ -558,12 +574,21 @@ write_signal_details <- function(plot_date, conf, signals_list = NULL) {
             relocate(Hour) %>%
             nest(data = -c(SignalID))
 
-        s3write_using(
+        table_name <- "signal_details"
+        prefix <- "sg"
+        date_ <- plot_date
+        fn = glue("{prefix}_{date_}")
+
+        keep_trying(
+            s3write_using,
+            n_tries = 5,
             df,
             write_parquet,
+            use_deprecated_int96_timestamps = TRUE,
             bucket = conf$bucket,
-            object = join_path(conf$key_prefix, glue("mark/signal_details/date={plot_date}/sg_{plot_date}.parquet")))
-
+            object = glue("mark/{table_name}/date={date_}/{fn}.parquet"),
+            opts = list(multipart = TRUE, body_as_string = TRUE)
+        )
     }, error = function(e) {
         print(glue("Can't write signal details for {plot_date}"))
     })
