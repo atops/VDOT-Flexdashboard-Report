@@ -10,7 +10,6 @@ get_uptime <- function(df, start_date, end_time) {
     bookend1 <- expand.grid(SignalID = signals, Timestamp = as_datetime(glue("{start_date} 00:00:00")))
     bookend2 <- expand.grid(SignalID = signals, Timestamp = as_datetime(end_time))
 
-
     ts_sig <- ts_sig %>%
         transmute(SignalID, Timestamp = as_datetime(Timestamp)) %>%
         bind_rows(., bookend1, bookend2) %>%
@@ -618,7 +617,7 @@ get_gamma_p0 <- function(df) {
 }
 
 
-get_pau_gamma <- function(papd, paph, corridors, wk_calcs_start_date, pau_start_date) {
+get_pau_gamma <- function(dates, papd, paph, corridors, wk_calcs_start_date, pau_start_date) {
 
     # A pushbutton input (aka "detector") is failed for a given day if:
     # the streak of days with no actuations is greater that what
@@ -638,20 +637,17 @@ get_pau_gamma <- function(papd, paph, corridors, wk_calcs_start_date, pau_start_
     too_high <- get_pau_high_(paph, wk_calcs_start_date)
 
 
-    begin_date <- min(papd$Date)
+    begin_date <- min(dates)
 
     corrs <- corridors %>%
         group_by(SignalID) %>%
         summarize(Asof = min(Asof),
                   .groups = "drop")
 
-    ped_config <- lapply(unique(papd$Date), function(d) {
-        pc <- get_ped_config(d)
-        if (!is.null(pc)) {
-	    pc %>%
-                mutate(Date = d) %>%
-                filter(SignalID %in% papd$SignalID)
-        }
+    ped_config <- lapply(dates, function(d) {
+        get_ped_config(d) %>%
+            mutate(Date = d) %>%
+            filter(SignalID %in% papd$SignalID)
     }) %>%
         bind_rows() %>%
         mutate(SignalID = factor(SignalID),
@@ -690,7 +686,6 @@ get_pau_gamma <- function(papd, paph, corridors, wk_calcs_start_date, pau_start_
         dplyr::select(-Asof) %>%
         mutate(SignalID = factor(SignalID))
 
-    #plan(multisession, workers = detectCores()-1)
     modres <- papd %>%
         group_by(SignalID, Detector, CallPhase, weekday) %>%
         filter(n() > 2) %>%
@@ -751,30 +746,24 @@ get_ped_delay <- function(date_, cred, signals_list) {
 
     cat('.')
 
-    plan(sequential)
-    plan(multisession)
-
     conn <- get_atspm_connection(cred)
-    ds <- tbl(conn, "Controller_Event_Log")
+
 
     end_date_ <- date_ + days(1)
-    pe <- ds %>%
-        filter(
-            SignalID %in% signals_list,
-            Timestamp >= date_, Timestamp < end_date_,
-            EventCode %in% c(45, 21, 22, 132)) %>%
-        select(SignalID, Timestamp, EventCode, EventParam) %>%
+    pe <- tbl(conn, "Controller_Event_Log") %>%
+        filter(Timestamp >= date_, Timestamp < end_date_, SignalID %in% signals_list, EventCode %in% c(45, 21, 22, 132)) %>%
+        select(SignalID, Timestamp, EventCode, Phase = EventParam) %>%
+        arrange(SignalID, Timestamp) %>%
         collect() %>%
         convert_to_utc() %>%
-        mutate(CycleLength = ifelse(EventCode == 132, EventParam, NA)) %>%
-        arrange(SignalID, Timestamp) %>%
-        rename(Phase = EventParam)
+        mutate(CycleLength = ifelse(EventCode == 132, Phase, NA))
 
     cat('.')
     coord.type <- group_by(pe, SignalID) %>%
         tidyr::fill(CycleLength) %>%
+        replace_na(list(CycleLength = 0)) %>%
         summarise(CL = max(CycleLength, na.rm = T), .groups = "drop") %>%
-        mutate(Pattern = ifelse((CL == 0 | !is.finite(CL)), "Free", "Coordinated"))
+        mutate(Pattern = ifelse(CL == 0, "Free", "Coordinated"))
 
     cat('.')
     pe <- inner_join(pe, coord.type, by = "SignalID") %>%

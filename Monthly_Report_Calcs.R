@@ -87,8 +87,6 @@ print("\n---------------------- Finished counts ---------------------------\n")
 print(glue("{Sys.time()} monthly cu [5 of 14]"))
 
 
-signals_list <- unique(corridors$SignalID)
-
 # Group into months to calculate filtered and adjusted counts
 # adjusted counts needs a full month to fill in gaps based on monthly averages
 
@@ -147,8 +145,9 @@ get_counts_based_measures <- function(month_abbrs) {
                 conf = conf, parallel = FALSE)
         })
 
-        mclapply(date_range, mc.cores = usable_cores, mc.preschedule = FALSE, FUN = function(x) {
-            write_signal_details(x, conf, signals_list)
+        lapply(date_range, function(date_) {
+            date_str <- format(date_, "%F")
+            write_signal_details(date_str, conf, signals_list)
         })
 
 
@@ -507,7 +506,7 @@ if (conf$run$phase_termination == TRUE) {
 print(glue("{Sys.time()} time in transition [13 of 14]"))
 
 if (conf$run$time_in_transition == TRUE) {
-    # Run python script asynchronously
+    # Run python script synchronously
     system(glue("conda run -n tractionmetrics python get_tint.py {start_date} {end_date}"), wait = TRUE)
 }
 
@@ -516,7 +515,7 @@ if (conf$run$time_in_transition == TRUE) {
 print(glue("{Sys.time()} approach delay [14 of 14]"))
 
 if (conf$run$approach_delay == TRUE) {
-    # Run python script asynchronously
+    # Run python script synchronously
     system(glue("conda run -n tractionmetrics python get_approach_delay.py {start_date} {end_date}"), wait = TRUE)
 }
 

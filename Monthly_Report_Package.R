@@ -116,7 +116,7 @@ tryCatch(
     {
         pau_start_date <- pmin(
             as_date(calcs_start_date),
-            pmax(as_date("2022-10-01"), floor_date(as_date(report_end_date) - as.duration("6 months"), "month"))
+            pmax(as_date("2022-10-01"), floor_date(as_date(report_end_date), unit = "months") - months(6))
         ) %>%
             format("%F")
 
@@ -163,7 +163,8 @@ tryCatch(
         rm(counts_ped_daily)
         rm(counts_ped_hourly)
 
-        pau <- get_pau_gamma(papd, paph, corridors, wk_calcs_start_date, pau_start_date)
+        dates <- seq(as_date(pau_start_date), as_date(report_end_date), by = "1 day")
+        pau <- get_pau_gamma(dates, papd, paph, corridors, wk_calcs_start_date, pau_start_date)
 
         # Remove and replace papd for bad days, similar to filtered_counts.
         # Replace papd with papd averaged over all days in the date range
