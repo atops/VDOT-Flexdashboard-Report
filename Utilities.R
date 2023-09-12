@@ -149,7 +149,7 @@ read_zipped_feather <- function(x) {
 
 keep_trying <- function(func, n_tries, ..., sleep = 1, timeout = Inf) {
 
-    safely_func = purrr::safely(func, otherwise = NULL)
+    safely_func <- purrr::safely(func, otherwise = NULL)
 
     result <- NULL
     error <- 1
@@ -162,7 +162,10 @@ keep_trying <- function(func, n_tries, ..., sleep = 1, timeout = Inf) {
         result <- x$result
         error <- x$error
         if (!is.null(error)) {
-            print(glue("{deparse(substitute(func))} Attempt {try_number} failed: {error}"))
+            print(glue("{deparse(substitute(func))} Attempt {try_number} failed: {str_trim(error)}"))
+        }
+        if (is.null(error) && try_number > 1) {
+            print(glue("{deparse(substitute(func))} Attempt {try_number} succeeded."))
         }
 
         try_number = try_number + 1
