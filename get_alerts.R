@@ -16,6 +16,7 @@ suppressMessages({
 
 
 source("Database_Functions.R")
+source("GCSParquetIO.R")
 
 conf <- read_yaml("Monthly_Report.yaml")
 
@@ -33,7 +34,8 @@ read_zipped_feather <- function(x) {
 
 get_alerts <- function(conf) {
 
-    objs <- s3_list_objects(bucket = conf$bucket, prefix = glue("{conf$key_prefix}/mark/watchdog"))
+    objs <- s3_list_objects(bucket = conf$bucket, prefix = glue("{conf$key_prefix}/mark/watchdog")) %>% split(1:nrow(objs))
+
     lapply(objs, function(obj) {
         key <- obj$Key
         print(key)
@@ -51,7 +53,6 @@ get_alerts <- function(conf) {
                          bucket = conf$bucket) %>%
                 as_tibble() %>%
                 mutate(across(where(is.factor), as.character),
-                       SignalID = as.integer(SignalID),
                        Detector = as.integer(Detector),
                        Date = date(Date))
         }
@@ -99,12 +100,12 @@ alerts <- get_alerts(conf)
 # Upload to S3 Bucket: mark/watchdog/
 tryCatch({
 
+    print(glue("{conf$key_prefix}/mark/watchdog/alerts.parquet"))
     s3write_using(
         alerts,
         write_parquet,
         bucket = conf$bucket,
-        object = glue("{conf$key_prefix}/mark/watchdog/alerts.parquet"),
-        opts = list(multipart = TRUE))
+        object = glue("{conf$key_prefix}/mark/watchdog/alerts.parquet"))
 
     write(
         glue(paste0(
