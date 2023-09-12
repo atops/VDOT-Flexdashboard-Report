@@ -2,9 +2,9 @@
 # Monthly_Report config file (yaml format)
 
 agency: CDOT
-bucket: its-apps-atspm-prod
-key_prefix: traction-metrics
-credentials_json:
+bucket: its-apps-atspm-stage
+key_prefix: kimley-horn
+credentials_json: castle-rock-service-account.json
 profile:
 region: CastleRock
 timezone: America/Denver

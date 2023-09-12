@@ -8,7 +8,6 @@ suppressMessages({
 
 cred <- read_yaml("Monthly_Report_AWS.yaml")
 
-
 # My own function to perform multiple inserts at once.
 # Hadn't found a way to do this through native functions.
 mydbAppendTable <- function(conn, name, value, chunksize = 1e4) {
@@ -20,7 +19,7 @@ mydbAppendTable <- function(conn, name, value, chunksize = 1e4) {
             across(where(is.factor), as.character),
             across(where(is.character), ~replace(., is.na(.), "")),
             across(where(is.character), ~str_replace_all(., "'", "\\\\'")),
-            across(where(is.character), ~str_replace_all(., "^|$", "'")),
+            across(where(is.character), ~paste0("'", ., "'")),
             across(where(is.numeric), ~replace(., !is.finite(.), NA)))
 
     table_name <- name

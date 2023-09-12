@@ -110,14 +110,6 @@ def main(start_date, end_date, conf):
 
     dates = pd.date_range(start_date, end_date, freq='1D')
 
-    with open('Monthly_Report_AWS.yaml') as yaml_file:
-        cred = yaml.load(yaml_file, Loader=yaml.Loader)
-
-    engine = get_aurora_engine(cred)
-    with engine.connect() as conn:
-        corridors = pd.read_sql_table('Corridors', conn)
-
-    signalids = list(corridors.SignalID.values)
 
 
     #-----------------------------------------------------------------------------------------
@@ -136,6 +128,8 @@ def main(start_date, end_date, conf):
         det_config = det_config.rename(columns={'CallPhase': 'Call Phase'})
         dcg = det_config.groupby(['SignalID', 'Call Phase'])['CountPriority']
         det_config = det_config.assign(CountDetector = det_config.CountPriority == dcg.transform(min))
+
+        signalids = det_config['SignalID'].drop_duplicates().values
 
         if len(det_config) > 0:
             nthreads = round(psutil.virtual_memory().available/1e9)  # ensure 1 MB memory per thread
@@ -168,6 +162,7 @@ if __name__=='__main__':
 
     start_date = get_date_from_string(start_date)
     end_date = get_date_from_string(end_date)
+
 
     main(start_date, end_date, conf)
 

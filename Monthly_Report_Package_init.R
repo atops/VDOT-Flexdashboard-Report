@@ -28,8 +28,10 @@ corridors <- dbReadTable(aurora, "Corridors")
 all_corridors <- dbReadTable(aurora, "AllCorridors")
 
 
+conn <- get_atspm_connection(cred)
+signals_list <- dbGetQuery(conn, "SELECT SignalID from Signals") %>% pull(SignalID)
+dbDisconnect(conn)
 
-signals_list <- unique(corridors$SignalID)
 
 subcorridors <- corridors %>% 
     filter(!is.na(Subcorridor)) %>%
