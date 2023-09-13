@@ -34,7 +34,8 @@ read_zipped_feather <- function(x) {
 
 get_alerts <- function(conf) {
 
-    objs <- s3_list_objects(bucket = conf$bucket, prefix = glue("{conf$key_prefix}/mark/watchdog")) %>% split(1:nrow(objs))
+    objs <- s3_list_objects(bucket = conf$bucket, prefix = glue("{conf$key_prefix}/mark/watchdog"))
+    objs <- split(objs, 1:nrow(objs))
 
     lapply(objs, function(obj) {
         key <- obj$Key
