@@ -24,7 +24,7 @@ base_path = '.'
 logs_path = os.path.join(base_path, 'logs')
 if not os.path.exists(logs_path):
     os.mkdir(logs_path)
-logger = mark1_logger(os.path.join(logs_path, f'get_watchdog_alerts_{datetime.today().strftime("%F")}.log'))
+logger = mark1_logger(os.path.join(logs_path, f'get_watchdog_alerts_{datetime.today().strftime("%F_%H%M%S")}.log'))
 
 
 
@@ -128,18 +128,18 @@ def main():
         engine = get_atspm_engine(cred)
         wd = get_watchdog_alerts(engine, corridors)
         engine.dispose()
-        print(f'{now} - {len(wd)} watchdog alerts')
+        logger.debug(f'{now} - {len(wd)} watchdog alerts')
 
         try:
             # Write to Feather file - WatchDog
             s3_upload_watchdog_alerts(wd, conf)
-            print(f'{now} - successfully uploaded to s3')
+            logger.debug(f'{now} - successfully uploaded to s3')
         except Exception as e:
-            print(f'{now} - ERROR: Could not upload to s3 - {str(e)}')
+            logger.error(f'{now} - ERROR: Could not upload to s3 - {str(e)}')
 
     except Exception as e:
         logger.error(f'Could not save watchdog alerts to s3 - {str(e)}')
-        print(f'{now} - ERROR: Could not retrieve watchdog alerts - {str(e)}')
+        logger.error(f'{now} - ERROR: Could not retrieve watchdog alerts - {str(e)}')
 
 
 if __name__=='__main__':

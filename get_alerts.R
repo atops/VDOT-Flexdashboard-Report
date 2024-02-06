@@ -55,7 +55,7 @@ get_alerts <- function(conf) {
                 as_tibble() %>%
                 mutate(across(where(is.factor), as.character),
                        Detector = as.integer(Detector),
-                       Date = date(Date))
+                       Date = as_date(Date))
         }
     }) %>% bind_rows() %>%
         filter(!is.na(Corridor)) %>%
